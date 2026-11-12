@@ -70,6 +70,7 @@ export interface BidHistoryRow {
   username: string | null;
   country: Country | null;
 }
+
 /** Comment select with author join. Lives here (not in a client module) so server code can use it. */
 export const COMMENT_COLUMNS =
   "id,auction_id,user_id,parent_id,content,is_seller_reply,created_at,author:profiles!comments_user_id_fkey(username,role)" as const;
