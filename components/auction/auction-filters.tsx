@@ -5,14 +5,7 @@ import { useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { COUNTRY_NAMES } from "@/lib/format";
 import type { Country } from "@/lib/types";
-
-export const STATUS_TABS = [
-  { value: "live", label: "Live" },
-  { value: "ending", label: "Ending in 24h" },
-  { value: "upcoming", label: "Coming up" },
-  { value: "past", label: "Past results" },
-] as const;
-export type FeedStatus = (typeof STATUS_TABS)[number]["value"];
+import { STATUS_TABS, type FeedStatus } from "@/lib/feed";
 
 export function AuctionFilters({ makes, status }: { makes: string[]; status: FeedStatus }) {
   const router = useRouter();
