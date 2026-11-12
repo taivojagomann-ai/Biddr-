@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* shadcn/ui tokens mapped onto the asphalt palette */
+  :root {
+    --background: 240 6% 4%;          /* #0A0A0B */
+    --foreground: 240 5% 96%;
+    --card: 240 5% 8%;                /* #141416 */
+    --card-foreground: 240 5% 96%;
+    --popover: 240 5% 8%;
+    --popover-foreground: 240 5% 96%;
+    --primary: 20 100% 50%;           /* #FF5500 */
+    --primary-foreground: 240 6% 4%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 240 5% 96%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 96%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 240 5% 96%;
+    --border: 240 4% 16%;             /* #27272A */
+    --input: 240 4% 16%;
+    --ring: 20 100% 50%;
+    color-scheme: dark;
+  }
+
+  html { background: #0A0A0B; }
+  body {
+    @apply bg-asphalt text-chalk antialiased;
+    font-feature-settings: "ss01";
+  }
+  :focus-visible { @apply outline-none ring-2 ring-signal ring-offset-2 ring-offset-asphalt; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  }
+}
+
+@layer utilities {
+  /* Wide cut of Archivo for figures that matter: bids and clocks */
+  .font-wide { font-stretch: 125%; font-variation-settings: "wdth" 125; }
+  .font-narrow { font-stretch: 85%; font-variation-settings: "wdth" 85; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+}
