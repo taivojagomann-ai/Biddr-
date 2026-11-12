@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { AuctionFeed } from "@/components/auction/auction-feed";
-import { AuctionFilters, STATUS_TABS, type FeedStatus } from "@/components/auction/auction-filters";
+import { AuctionFilters } from "@/components/auction/auction-filters";
+import { parseFeedStatus } from "@/lib/feed";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AUCTION_CARD_COLUMNS, type AuctionCard, type Country } from "@/lib/types";
 
@@ -10,13 +11,9 @@ type SearchParams = { status?: string; make?: string; country?: string; conditio
 
 const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
 
-function parseStatus(v: string | undefined): FeedStatus {
-  return STATUS_TABS.some((t) => t.value === v) ? (v as FeedStatus) : "live";
-}
-
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = getServerSupabase();
-  const status = parseStatus(searchParams.status);
+  const status = parseFeedStatus(searchParams.status);
   const now = Date.now();
 
   let query = supabase.from("auctions").select(AUCTION_CARD_COLUMNS).limit(48);
