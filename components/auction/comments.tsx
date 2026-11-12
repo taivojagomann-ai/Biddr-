@@ -6,10 +6,7 @@ import { getBrowserSupabase } from "@/lib/supabase/client";
 import { timeAgo } from "@/lib/format";
 import { useServerNow } from "@/hooks/use-server-clock";
 import { cn } from "@/lib/utils";
-import type { CommentRow } from "@/lib/types";
-
-export const COMMENT_COLUMNS =
-  "id,auction_id,user_id,parent_id,content,is_seller_reply,created_at,author:profiles!comments_user_id_fkey(username,role)";
+import { COMMENT_COLUMNS, type CommentRow } from "@/lib/types";
 
 interface CommentsProps {
   auctionId: string;
