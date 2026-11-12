@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const PROTECTED = ["/admin", "/sell", "/account"];
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -21,13 +23,16 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/sell")) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", request.nextUrl.pathname);
-      return NextResponse.redirect(url);
-    }
+  const { pathname, search } = request.nextUrl;
+  if (!user && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    url.searchParams.set("next", `${pathname}${search}`);
+    const redirect = NextResponse.redirect(url);
+    // Keep any refreshed session cookies set above.
+    response.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+    return redirect;
   }
   return response;
 }
