@@ -46,6 +46,10 @@ app/
   page.tsx                      Home: filters + live feed
   auctions/[id]/page.tsx        Auction detail (server data load)
   auctions/[id]/not-found.tsx
+  login/page.tsx, login-form.tsx  Google + email link / 6-digit code sign-in
+  auth/callback/route.ts        code exchange, sends new users to profile setup
+  auth/signout/route.ts         POST only
+  account/setup/                profile form (page, client form, server action)
   api/stripe/hold/route.ts
   api/stripe/hold/confirm/route.ts
   api/stripe/webhook/route.ts
@@ -58,12 +62,15 @@ components/
     bid-box.tsx, sticky-bid-bar.tsx, bid-modal.tsx, bid-history.tsx
     gallery.tsx, inspection-card.tsx, spec-sheet.tsx, video-player.tsx
     comments.tsx, countdown.tsx, badges.tsx
+  site-header.tsx               signed-in state, profile link, sign-out
   ui/                           shadcn/ui: button, dialog, input, tabs
 hooks/use-server-clock.ts       shared 1 Hz ticker + server clock offset
 lib/
   supabase/client.ts, server.ts
   stripe.ts, holds.ts, pricing.ts, errors.ts, format.ts, types.ts, utils.ts
-middleware.ts                   session refresh, guards /sell and /admin
+  redirect.ts                   safeNext(): same-site ?next= paths only
+  login.ts, profile.ts          shared copy, types and constants for auth pages
+middleware.ts                   session refresh, guards /sell, /admin and /account
 supabase/migrations/0001_init.sql
 vercel.json                     cron for hold release
 ```
@@ -86,6 +93,30 @@ npm run dev
 
 In Supabase: enable the `pg_cron` extension if `db push` reports it missing, and add your storage bucket host to `next.config.mjs` if you serve images from elsewhere.
 
+## Sign-in setup (Supabase dashboard)
+
+Sign-in uses Supabase Auth with Google and email (a magic link plus a 6-digit code in the same email). Every flow lands on `/auth/callback`, which sends users without a username or country to `/account/setup`.
+
+1. **Redirect URLs.** Authentication → URL Configuration:
+   - Site URL: your production URL, e.g. `https://biddr.ee`.
+   - Redirect URLs, add all of:
+     - `https://biddr.ee/auth/callback` (production)
+     - `https://*-<your-vercel-team>.vercel.app/auth/callback` (Vercel previews)
+     - `http://localhost:3000/auth/callback` (local)
+
+   A redirect URL missing here makes Supabase fall back to the Site URL, so the user loses their `next` page.
+2. **Google provider.** In Google Cloud Console create an OAuth client (type *Web application*) and add `https://<project-ref>.supabase.co/auth/v1/callback` as an authorised redirect URI. Then Authentication → Providers → Google: enable it and paste the client ID and secret.
+3. **Magic Link email template.** Authentication → Email Templates → Magic Link: add the code so people can sign in on a different device from the one reading the email, for example:
+
+   ```html
+   <h2>Sign in to Biddr</h2>
+   <p><a href="{{ .ConfirmationURL }}">Sign in</a></p>
+   <p>Or enter this code: <strong>{{ .Token }}</strong></p>
+   ```
+
+   Do the same in the *Confirm signup* template, since a first sign-in creates the account.
+4. **Custom SMTP before launch.** Supabase's built-in mailer is rate-limited to a few emails per hour and is meant for testing only. Authentication → SMTP Settings: connect your provider (Postmark, Resend, SES…) with a sender on your own domain, and raise the email rate limit under Authentication → Rate Limits.
+
 Make yourself admin: `update profiles set role = 'admin' where id = '<your user id>';`
 
 ## Verified so far
@@ -94,7 +125,7 @@ The migration was run on PostgreSQL 16 with Supabase-style stubs and these cases
 
 ## Next phases
 
-1. `/login` (Supabase Auth: magic link + Google), profile completion (username, country, phone).
+1. ~~`/login` (Supabase Auth: magic link + Google), profile completion (username, country, phone).~~ Done.
 2. `/sell` multi-step form: details and VIN, history, photo upload to Storage, inspection city (Tallinn, Riga, Vilnius) stored in `auction_private.inspection_city`.
 3. `/admin`: approve or reject drafts, attach the inspection PDF, set reserve, schedule. Admin writes go through server actions using the service-role client after checking `role = 'admin'`, because column grants intentionally stop browser clients from touching money and status columns.
 4. Winner checkout: premium charge, invoices, seller payout flow.
