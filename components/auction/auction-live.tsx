@@ -5,11 +5,11 @@ import type { RealtimePostgresInsertPayload, RealtimePostgresUpdatePayload } fro
 import { BidBox, type BidUiState } from "./bid-box";
 import { BidHistory } from "./bid-history";
 import { BidModal } from "./bid-modal";
-import { Comments, COMMENT_COLUMNS } from "./comments";
+import { Comments } from "./comments";
 import { StickyBidBar } from "./sticky-bid-bar";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { minNextBid } from "@/lib/pricing";
-import type { Auction, BidHistoryRow, CommentRow, PlaceBidResult } from "@/lib/types";
+import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow, type PlaceBidResult } from "@/lib/types";
 
 interface AuctionLiveProps {
   initialAuction: Auction;
