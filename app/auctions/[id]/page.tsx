@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AuctionLive } from "@/components/auction/auction-live";
-import { COMMENT_COLUMNS } from "@/components/auction/comments";
 import { Gallery } from "@/components/auction/gallery";
 import { InspectionCard } from "@/components/auction/inspection-card";
 import { SpecSheet } from "@/components/auction/spec-sheet";
@@ -10,7 +9,7 @@ import { VideoPlayer } from "@/components/auction/video-player";
 import { InspectionBadge, RestoredBadge } from "@/components/auction/badges";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatKm } from "@/lib/format";
-import type { Auction, BidHistoryRow, CommentRow } from "@/lib/types";
+import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
