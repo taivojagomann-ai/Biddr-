@@ -9,7 +9,7 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTML
       <select
         ref={ref}
         className={cn(
-          "flex h-10 w-full appearance-none rounded-md border border-line bg-asphalt pl-3 pr-9 text-sm text-chalk focus-visible:border-signal disabled:opacity-50",
+          "flex h-10 w-full appearance-none rounded-md border border-field bg-asphalt pl-3 pr-9 text-sm text-chalk focus-visible:border-signal disabled:opacity-50",
           className,
         )}
         {...props}

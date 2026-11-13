@@ -27,7 +27,20 @@
     color-scheme: dark;
   }
 
-  html { background: #0A0A0B; }
+  html {
+    background: #0A0A0B;
+    /* Keep focused elements clear of the sticky header (WCAG 2.4.11). */
+    scroll-padding-top: 4.5rem;
+  }
+  /* ...and of the sticky bottom bars on small screens. */
+  @media (max-width: 1023.98px) {
+    html:has([data-sticky-bottom="bid"]) { scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+    body:has([data-sticky-bottom="bid"]) { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  }
+  @media (max-width: 767.98px) {
+    html:has([data-sticky-bottom="sell"]) { scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom)); }
+    body:has([data-sticky-bottom="sell"]) { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)); }
+  }
   body {
     @apply bg-asphalt text-chalk antialiased;
     font-feature-settings: "ss01";

@@ -1,7 +1,9 @@
 "use client";
+import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
 import { PROFILE_COUNTRIES, type ProfileField, type ProfileFormState } from "@/lib/profile";
 import type { Country } from "@/lib/types";
 import { saveProfile } from "./actions";
@@ -51,8 +53,16 @@ function Field({
   );
 }
 
+const FIELD_ORDER: ProfileField[] = ["username", "full_name", "country", "phone"];
+
 export function SetupForm({ isNew, next, defaults }: { isNew: boolean; next: string; defaults: Defaults }) {
   const [state, formAction] = useFormState(saveProfile, initialState);
+
+  // After a failed save, put focus on the first field to fix; its error is read via aria-describedby.
+  useEffect(() => {
+    const first = FIELD_ORDER.find((f) => state.fieldErrors?.[f]);
+    if (first) document.getElementById(first)?.focus();
+  }, [state]);
   const fe = state.fieldErrors ?? {};
   const describedBy = (id: ProfileField) => (fe[id] ? `${id}-error` : `${id}-hint`);
 
@@ -95,7 +105,7 @@ export function SetupForm({ isNew, next, defaults }: { isNew: boolean; next: str
       </Field>
 
       <Field id="country" label="Country" hint="Shown next to your username." error={fe.country}>
-        <select
+        <NativeSelect
           id="country"
           name="country"
           defaultValue={defaults.country}
@@ -103,7 +113,6 @@ export function SetupForm({ isNew, next, defaults }: { isNew: boolean; next: str
           required
           aria-invalid={Boolean(fe.country)}
           aria-describedby={describedBy("country")}
-          className="flex h-10 w-full rounded-md border border-line bg-asphalt px-3 text-sm text-chalk focus-visible:border-signal"
         >
           <option value="" disabled>
             Choose a country
@@ -113,7 +122,7 @@ export function SetupForm({ isNew, next, defaults }: { isNew: boolean; next: str
               {c.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </Field>
 
       <Field id="phone" label="Phone" hint="Private. Used only to arrange handover." error={fe.phone}>

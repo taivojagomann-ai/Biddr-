@@ -56,10 +56,15 @@ export function FieldError({ id, error }: { id: string; error?: string }) {
   );
 }
 
+/** The step's h2. Focus moves here when the step changes, so screen readers hear where they are. */
+export const STEP_HEADING_ID = "sell-step-heading";
+
 export function StepHeading({ title, intro }: { title: string; intro?: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="font-wide text-xl font-bold">{title}</h2>
+      <h2 id={STEP_HEADING_ID} tabIndex={-1} className="scroll-mt-24 font-wide text-xl font-bold outline-none">
+        {title}
+      </h2>
       {intro ? <p className="mt-1 text-sm text-mute">{intro}</p> : null}
     </div>
   );

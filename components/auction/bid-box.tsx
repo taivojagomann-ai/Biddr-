@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { Gavel, Info, TimerReset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
       <div className="grid grid-cols-2 border-b border-line">
         <div className={cn("p-4", flash && "animate-bid-flash")}>
           <p className="text-xs text-mute">{auction.current_bid ? "Current bid" : "Starting bid"}</p>
-          <p className="font-wide text-2xl font-black tabular" aria-live="polite">
+          <p className="font-wide text-2xl font-black tabular">
             {formatEur(auction.current_bid ?? auction.starting_bid)}
           </p>
           <p className="text-xs text-mute">{auction.bid_count} {auction.bid_count === 1 ? "bid" : "bids"}</p>
@@ -47,7 +48,8 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 p-4" aria-live="polite">
+      {/* Changes here are announced once, by the live region in AuctionLive. */}
+      <div className="flex flex-col gap-3 p-4 empty:hidden">
         {justExtended && (
           <p className="flex items-center gap-2 rounded-md bg-signal/10 px-3 py-2 text-sm text-signal">
             <TimerReset className="size-4" aria-hidden /> A late bid added 2 minutes to the clock.
@@ -67,9 +69,9 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
             {QUICK_INCREMENTS.map((inc) => {
               const target = Math.max(minNext, (auction.current_bid ?? auction.starting_bid) + inc);
               return (
-                <Button key={inc} type="button" variant="outline" size="sm" onClick={() => setAmount(target)}
-                  aria-label={`Set bid to ${formatEur(target)}`}>
+                <Button key={inc} type="button" variant="outline" size="sm" onClick={() => setAmount(target)}>
                   +{formatEur(inc)}
+                  <span className="sr-only">, sets your bid to {formatEur(target)}</span>
                 </Button>
               );
             })}
@@ -97,7 +99,12 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
 
           <p className="flex gap-2 text-xs text-mute">
             <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            Before your first bid we place a refundable {formatEur(holdEur)} hold on your card. It is released when the auction ends unless you win.
+            <span>
+              Before your first bid we place a refundable {formatEur(holdEur)} hold on your card. It is released when the auction ends unless you win.{" "}
+              <Link href="/how-it-works#bidding" className="inline-block py-1 text-chalk underline underline-offset-4 hover:text-signal">
+                How bidding works
+              </Link>
+            </span>
           </p>
         </div>
       ) : (

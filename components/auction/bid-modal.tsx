@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadStripe, type Appearance } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { CheckCircle2, Loader2, Lock } from "lucide-react";
@@ -26,7 +26,7 @@ const appearance: Appearance = {
     borderRadius: "8px",
     fontFamily: "Archivo, system-ui, sans-serif",
   },
-  rules: { ".Input": { border: "1px solid #27272A" }, ".Input:focus": { border: "1px solid #FF5500", boxShadow: "none" } },
+  rules: { ".Input": { border: "1px solid #71717A" }, ".Input:focus": { border: "1px solid #FF5500", boxShadow: "none" } },
 };
 
 type Step =
@@ -53,6 +53,15 @@ interface BidModalProps {
 export function BidModal(props: BidModalProps) {
   const { open, onOpenChange, auction, userId, hasHold, holdEur } = props;
   const [step, setStep] = useState<Step>({ kind: "loading" });
+
+  // The dialog is opened from state (bid box or sticky bar), not a DialogTrigger, so Radix
+  // doesn't know where to send focus on close. Remember the opener and return focus there.
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (open && document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+      opener.current = document.activeElement;
+    }
+  }, [open]);
 
   const startHold = useCallback(async () => {
     setStep({ kind: "loading" });
@@ -95,7 +104,15 @@ export function BidModal(props: BidModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby="bid-modal-desc">
+      <DialogContent
+        aria-describedby="bid-modal-desc"
+        onCloseAutoFocus={(e) => {
+          if (opener.current?.isConnected) {
+            e.preventDefault();
+            opener.current.focus();
+          }
+        }}
+      >
         {step.kind === "signin" && (
           <div className="flex flex-col gap-4">
             <DialogTitle>Sign in to bid</DialogTitle>
@@ -138,7 +155,8 @@ export function BidModal(props: BidModalProps) {
               {step.result.extended && " It came in the final two minutes, so the auction now ends 2 minutes later."}
               {" "}We&apos;ll show it here if someone outbids you.
             </DialogDescription>
-            <Button className="mt-2 w-full" onClick={() => onOpenChange(false)}>Back to the car</Button>
+            {/* Focus lands here so screen readers hear the result straight away. */}
+            <Button className="mt-2 w-full" autoFocus onClick={() => onOpenChange(false)}>Back to the car</Button>
           </div>
         )}
 
@@ -146,12 +164,12 @@ export function BidModal(props: BidModalProps) {
           <div className="flex flex-col gap-4">
             <DialogTitle>Card check didn&apos;t start</DialogTitle>
             <DialogDescription id="bid-modal-desc">{step.message}</DialogDescription>
-            <Button onClick={() => void startHold()}>Try again</Button>
+            <Button autoFocus onClick={() => void startHold()}>Try again</Button>
           </div>
         )}
 
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-mute">
-          <Lock className="size-3" aria-hidden /> Card details are handled by Stripe. Hold: {formatEur(holdEur)}, refundable.
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-mute">
+          <Lock className="size-3 shrink-0" aria-hidden /> Card details are handled by Stripe. Hold: {formatEur(holdEur)}, refundable.
         </p>
       </DialogContent>
     </Dialog>
@@ -262,15 +280,15 @@ function ConfirmBid({
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-mute">€</span>
           <Input id="modal-bid" inputMode="numeric" pattern="[0-9]*" className="h-12 pl-7 font-wide text-xl font-black tabular"
             value={amount ? String(amount) : ""} onChange={(e) => setAmount(Number(e.target.value.replace(/\D/g, "")) || 0)}
-            aria-invalid={outpaced} />
+            aria-invalid={outpaced} aria-describedby={outpaced ? "modal-bid-outpaced" : undefined} />
         </div>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {QUICK_INCREMENTS.map((inc) => {
             const target = Math.max(minNext, (auction.current_bid ?? auction.starting_bid) + inc);
             return (
-              <Button key={inc} type="button" variant="outline" size="sm" onClick={() => setAmount(target)}
-                aria-label={`Set bid to ${formatEur(target)}`}>
+              <Button key={inc} type="button" variant="outline" size="sm" onClick={() => setAmount(target)}>
                 +{formatEur(inc)}
+                <span className="sr-only">, sets your bid to {formatEur(target)}</span>
               </Button>
             );
           })}
@@ -278,8 +296,8 @@ function ConfirmBid({
       </div>
 
       {outpaced && (
-        <div role="status" className="flex items-center justify-between gap-3 rounded-md bg-signal/10 p-3 text-sm text-signal">
-          <span>A new bid came in. The minimum is now {formatEur(minNext)}.</span>
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-signal/10 p-3 text-sm text-signal">
+          <span id="modal-bid-outpaced">A new bid came in. The minimum is now {formatEur(minNext)}.</span>
           <Button size="sm" variant="outline" onClick={() => setAmount(minNext)}>Use {formatEur(minNext)}</Button>
         </div>
       )}
@@ -300,7 +318,12 @@ function ConfirmBid({
       <Button size="lg" onClick={placeBid} disabled={busy || outpaced || amount <= 0}>
         {busy ? <><Loader2 className="animate-spin" aria-hidden /> Placing bid…</> : `Place bid of ${formatEur(amount)}`}
       </Button>
-      <p className="text-xs text-mute">Bids are binding. A bid in the final two minutes adds two minutes to the clock.</p>
+      <p className="text-xs text-mute">
+        Bids are binding. A bid in the final two minutes adds two minutes to the clock.{" "}
+        <Link href="/how-it-works#bidding" className="inline-block py-1 text-chalk underline underline-offset-4 hover:text-signal">
+          How bidding works
+        </Link>
+      </p>
     </div>
   );
 }

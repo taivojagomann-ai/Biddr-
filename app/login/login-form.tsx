@@ -147,7 +147,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   }
 
   const errorBox = error ? (
-    <p role="alert" className="rounded-md border border-signal/40 bg-signal/10 px-3 py-2 text-sm text-chalk">
+    <p id="login-error" role="alert" className="rounded-md border border-signal/40 bg-signal/10 px-3 py-2 text-sm text-chalk">
       {error}
     </p>
   ) : null;
@@ -157,7 +157,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
       <div className="mt-8 space-y-5">
         <div className="rounded-lg border border-line bg-panel p-4">
           <h2 className="font-wide text-lg font-bold">Check your inbox</h2>
-          <p className="mt-1 text-sm text-mute">
+          <p id="otp-help" className="mt-1 text-sm text-mute">
             We sent a sign-in link and a 6-digit code to <span className="break-all text-chalk">{sentTo}</span>. Open
             the link on this device, or enter the code below.
           </p>
@@ -178,6 +178,8 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             className="font-mono text-lg tracking-[0.4em]"
+            aria-describedby={error ? "otp-help login-error" : "otp-help"}
+            aria-invalid={error ? true : undefined}
             autoFocus
           />
           {errorBox}
@@ -196,9 +198,8 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
             size="sm"
             onClick={onResend}
             disabled={pending !== null || cooldown > 0}
-            aria-live="polite"
           >
-            {pending === "email" ? "Sending…" : cooldown > 0 ? `Send a new code (${cooldown}s)` : "Send a new code"}
+            {pending === "email" ? "Sending…" : cooldown > 0 ? `Send a new code in ${cooldown}s` : "Send a new code"}
           </Button>
         </div>
       </div>
@@ -240,6 +241,8 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          aria-describedby={error ? "login-error" : undefined}
+          aria-invalid={error && error !== initialError ? true : undefined}
           required
         />
         {errorBox}

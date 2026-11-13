@@ -61,7 +61,7 @@ export function ConfirmButton({
           <Button
             type="button"
             disabled={busy || confirmDisabled}
-            className={cn(destructive && "bg-[#dc2626] text-chalk hover:bg-[#b91c1c] active:bg-[#991b1b]")}
+            className={cn(destructive && "bg-[#b91c1c] text-chalk hover:bg-[#991b1b] active:bg-[#7f1d1d]")}
             onClick={async () => {
               setBusy(true);
               const ok = await onConfirm();

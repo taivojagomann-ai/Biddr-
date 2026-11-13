@@ -31,7 +31,6 @@ export function Countdown({ endsAt, startsAt, status, initialNow, className }: C
     <time
       dateTime={target ?? undefined}
       className={cn("tabular", status === "live" && (isFinalMinutes || isUnderHour) && "text-signal", className)}
-      aria-label={status === "upcoming" ? "Bidding opens in" : "Time left"}
     >
       {status === "upcoming" && <span className="mr-1 text-mute">Opens in</span>}
       {formatCountdown(remaining)}

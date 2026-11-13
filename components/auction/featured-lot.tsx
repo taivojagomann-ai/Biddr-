@@ -16,7 +16,7 @@ export function FeaturedLot({ auction, initialNow }: { auction: AuctionCard; ini
     >
       <div className="relative aspect-[16/10] bg-asphalt md:aspect-auto md:min-h-[360px]">
         {cover && (
-          <Image src={cover} alt={auction.title} fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover" />
+          <Image src={cover} alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover" />
         )}
         <div className="absolute left-3 top-3">
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />

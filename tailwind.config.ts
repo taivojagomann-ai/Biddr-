@@ -10,7 +10,8 @@ const config: Config = {
       colors: {
         asphalt: "#0A0A0B",
         panel: "#141416",
-        line: "#27272A",
+        line: "#27272A", // decorative only: dividers and card edges
+        field: "#71717A", // borders of inputs and outline buttons: 3:1+ on asphalt and panel (WCAG 1.4.11)
         signal: { DEFAULT: "#FF5500", dim: "#CC4400" },
         chalk: "#F4F4F5",
         mute: "#A1A1AA",

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -26,9 +27,18 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`dark ${archivo.variable}`}>
-      <body className="min-h-dvh font-sans">
+      <body className="flex min-h-dvh flex-col font-sans">
+        <a
+          href="#content"
+          className="sr-only z-50 rounded-md bg-signal px-4 py-3 font-semibold text-asphalt focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+        >
+          Skip to main content
+        </a>
         <SiteHeader />
-        {children}
+        <div id="content" tabIndex={-1} className="flex-1 outline-none">
+          {children}
+        </div>
+        <SiteFooter />
       </body>
     </html>
   );

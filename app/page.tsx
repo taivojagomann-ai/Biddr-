@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { AuctionFeed } from "@/components/auction/auction-feed";
 import { AuctionFilters } from "@/components/auction/auction-filters";
@@ -10,6 +11,14 @@ export const dynamic = "force-dynamic";
 type SearchParams = { status?: string; make?: string; country?: string; condition?: string };
 
 const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
+const HOLD_EUR = Number(process.env.BID_HOLD_AMOUNT_EUR ?? 500);
+
+const BUY_STEPS = [
+  { title: "Browse", detail: "Every car has photos, specs and its full history.", anchor: "bidding" },
+  { title: "Confirm your card once", detail: `A refundable €${HOLD_EUR} hold on each car you bid on.`, anchor: "card-hold" },
+  { title: "Bid", detail: "Bids update live. A late bid adds 2 minutes.", anchor: "extensions" },
+  { title: "Win and collect", detail: "We arrange payment and handover with you.", anchor: "after-you-win" },
+] as const;
 
 export default async function HomePage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = getServerSupabase();
@@ -64,6 +73,35 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           independent workshop inspection you can read before you bid.
         </p>
       </div>
+
+      <section aria-labelledby="steps-heading" className="-mt-2">
+        <h2 id="steps-heading" className="sr-only">
+          How buying works
+        </h2>
+        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {BUY_STEPS.map((s, i) => (
+            <li key={s.title}>
+              <Link
+                href={`/how-it-works#${s.anchor}`}
+                className="flex h-full min-h-11 items-start gap-3 rounded-lg border border-line bg-panel p-3 hover:border-field"
+              >
+                <span aria-hidden className="flex size-7 shrink-0 items-center justify-center rounded-full bg-chalk font-wide text-sm font-bold text-asphalt">
+                  {i + 1}
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold">{s.title}</span>
+                  <span className="block text-xs text-mute">{s.detail}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-2 text-sm">
+          <Link href="/how-it-works" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal sm:min-h-0">
+            How it works, fees and the card hold
+          </Link>
+        </p>
+      </section>
 
       <Suspense>
         <AuctionFilters makes={makes} status={status} />

@@ -92,7 +92,7 @@ export function InspectionPanel({
           </div>
         </div>
 
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className="mb-1.5 text-sm font-semibold">Highlights</legend>
           <p className="mb-2 text-xs text-mute">Short lines bidders see first, e.g. “Paint thickness measured on all panels”.</p>
           <ul className="space-y-2">

@@ -106,6 +106,12 @@ function PhotoSectionBlock({
   const [dropActive, setDropActive] = useState(false);
   const id = fieldId(`photos.${section}`);
   const done = items.filter((i) => i.status === "done").length;
+  const busy = items.filter((i) => i.status === "queued" || i.status === "processing" || i.status === "uploading").length;
+  const failed = items.filter((i) => i.status === "error").length;
+  // Announced politely when uploads finish or fail; per-photo progress stays visual only.
+  const summary = busy
+    ? `Uploading ${busy} ${busy === 1 ? "photo" : "photos"}.`
+    : `${label}: ${done} of at least ${min} photos added.${failed ? ` ${failed} failed to upload.` : ""}`;
   const full = items.length >= MAX_PHOTOS_PER_SECTION;
 
   return (
@@ -167,6 +173,10 @@ function PhotoSectionBlock({
           }}
         />
       </div>
+
+      <p role="status" className="sr-only">
+        {summary}
+      </p>
 
       {section === "exterior" ? (
         <p className="mt-2 text-xs text-mute">
@@ -268,7 +278,7 @@ function PhotoSectionBlock({
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="mt-4 flex w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-line px-4 py-8 text-sm text-mute hover:border-mute"
+          className="mt-4 flex w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-field px-4 py-8 text-sm text-mute hover:border-chalk"
         >
           <ImagePlus aria-hidden className="size-6" />
           Tap to add photos, or drop them here
@@ -297,7 +307,7 @@ function StatusOverlay({ item, onRetry }: { item: UploadItem; onRetry: () => voi
   const pct = Math.round(item.progress * 100);
   const label = item.status === "uploading" ? `Uploading ${pct}%` : item.status === "processing" ? "Resizing…" : "Waiting…";
   return (
-    <div className="absolute inset-x-0 bottom-0 bg-asphalt/80 p-2" role="status">
+    <div className="absolute inset-x-0 bottom-0 bg-asphalt/80 p-2">
       <p className="flex items-center gap-1.5 text-[11px]">
         <Loader2 aria-hidden className="size-3 animate-spin" />
         {label}

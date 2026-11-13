@@ -66,18 +66,18 @@ export function ScheduleForm({ auctionId, startsAt, endsAt }: { auctionId: strin
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className="mb-1.5 text-sm font-semibold">Start (Baltic time)</legend>
-          <div className="flex gap-2">
-            <Input aria-label="Start date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            <Input aria-label="Start date" type="date" className="min-w-0 flex-1" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             <Input aria-label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-32" />
           </div>
           <FieldNote error={fe.start} />
         </fieldset>
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className="mb-1.5 text-sm font-semibold">End (Baltic time)</legend>
-          <div className="flex gap-2">
-            <Input aria-label="End date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            <Input aria-label="End date" type="date" className="min-w-0 flex-1" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             <Input aria-label="End time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-32" />
           </div>
           <FieldNote error={fe.end} />

@@ -30,7 +30,7 @@ import type { Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { submitListing } from "./actions";
 import { CarStep } from "./car-step";
-import { fieldId } from "./field";
+import { STEP_HEADING_ID, fieldId } from "./field";
 import { HistoryStep } from "./history-step";
 import { PhotosStep } from "./photos-step";
 import { PriceStep } from "./price-step";
@@ -344,6 +344,16 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
   // ---------------------------------------------------------------------------
   const scrollTop = () => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  // When the step changes (not on first load), move focus to the new step's heading.
+  const stepRef = useRef<StepId | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    if (stepRef.current !== null && stepRef.current !== step) {
+      document.getElementById(STEP_HEADING_ID)?.focus({ preventScroll: true });
+    }
+    stepRef.current = step;
+  }, [step, loaded]);
+
   const focusFirstError = (errs: SellErrors) => {
     const first = (Object.keys(FIELD_STEP) as SellField[]).find((k) => errs[k]);
     if (!first) return;
@@ -483,6 +493,9 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
         <p className="text-sm text-mute md:hidden">
           Step {step} of {STEPS.length}: <span className="font-semibold text-chalk">{current?.label}</span>
         </p>
+        <p className="sr-only hidden md:block">
+          Step {step} of {STEPS.length}: {current?.label}
+        </p>
         <span className="hidden md:block" />
         <Button type="button" variant="ghost" size="sm" onClick={startOver} disabled={submitting}>
           <RotateCcw aria-hidden />
@@ -535,7 +548,7 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
           </p>
         ) : null}
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-asphalt/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:static md:mt-10 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div data-sticky-bottom="sell" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-asphalt/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:static md:mt-10 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
           <div className="mx-auto flex max-w-3xl gap-3 md:justify-between">
             <Button
               type="button"

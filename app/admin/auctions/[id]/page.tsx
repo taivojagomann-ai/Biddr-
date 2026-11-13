@@ -125,11 +125,11 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      <nav aria-label="Sections" className="-mx-4 mt-6 overflow-x-auto px-4">
-        <ul className="flex min-w-max gap-1 text-sm">
+      <nav aria-label="Sections" className="mt-6">
+        <ul className="flex flex-wrap gap-1 text-sm">
           {NAV.map(([id, label]) => (
             <li key={id}>
-              <a href={`#${id}`} className="block rounded-md px-2.5 py-1.5 text-mute hover:bg-panel hover:text-chalk">
+              <a href={`#${id}`} className="inline-flex min-h-9 items-center rounded-md px-2.5 text-mute hover:bg-panel hover:text-chalk [@media(pointer:coarse)]:min-h-11">
                 {label}
               </a>
             </li>
