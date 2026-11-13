@@ -8,6 +8,17 @@ export type AuctionStatus =
 export type HoldStatus = "pending" | "authorized" | "released" | "captured" | "failed";
 export type UserRole = "user" | "seller" | "admin";
 export type InspectionCity = "Tallinn" | "Riga" | "Vilnius";
+export type BodyStyle = "coupe" | "sedan" | "estate" | "hatchback" | "convertible" | "suv" | "other";
+export type SellerType = "private" | "dealer";
+export type RegistrationCountry = "EE" | "LV" | "LT" | "other_eu" | "non_eu";
+
+/** One row of auctions.service_history (0007). */
+export interface ServiceRecord {
+  date: string; // "YYYY-MM"
+  mileage_km: number;
+  description: string;
+  workshop?: string | null;
+}
 
 export interface GalleryUrls {
   exterior: string[];
@@ -52,6 +63,26 @@ export interface Auction {
   status: AuctionStatus;
   /** Created by the admin "Demo data" tools; bidding is refused (0006). */
   is_demo: boolean;
+  // Structured listing details (0007)
+  body_style: BodyStyle | null;
+  interior_color: string | null;
+  seller_type: SellerType;
+  dealer_name: string | null;
+  dealer_registry_code: string | null;
+  registration_country: RegistrationCountry | null;
+  is_registered: boolean | null;
+  owner_count: number | null;
+  highlights: string[];
+  equipment: string[];
+  modifications: string[];
+  known_flaws: string[];
+  items_included: string[];
+  no_known_flaws: boolean;
+  no_modifications: boolean;
+  service_history: ServiceRecord[];
+  seller_notes: string | null;
+  /** "Biddr's take": written by admins only, shown publicly. */
+  editor_take: string | null;
   created_at: string;
   updated_at: string;
 }
