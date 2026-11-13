@@ -10,6 +10,7 @@ let offsetMs = 0;
 let synced = false;
 let syncing: Promise<void> | null = null;
 const listeners = new Set<() => void>();
+const offsetListeners = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
 let snapshot = Date.now();
 
@@ -33,6 +34,24 @@ function subscribe(listener: () => void) {
   };
 }
 
+/** Current time in ms, corrected to the database clock (uncorrected until the first sync). */
+export function serverNow(): number {
+  return Date.now() + offsetMs;
+}
+
+/** Called whenever the server clock offset changes, so other tickers can re-align. */
+export function subscribeClockOffset(listener: () => void): () => void {
+  offsetListeners.add(listener);
+  return () => {
+    offsetListeners.delete(listener);
+  };
+}
+
+/** Starts the one-time server clock sync if it hasn't run yet. Safe to call often. */
+export function ensureClockSync(): void {
+  if (!synced && !syncing) syncing = syncOffset().finally(() => { syncing = null; });
+}
+
 async function syncOffset(): Promise<void> {
   const t0 = Date.now();
   const { data, error } = await getBrowserSupabase().rpc("server_time");
@@ -42,13 +61,12 @@ async function syncOffset(): Promise<void> {
   offsetMs = new Date(data).getTime() - (t0 + (t1 - t0) / 2);
   synced = true;
   tick();
+  offsetListeners.forEach((l) => l());
 }
 
 /** Current time in ms, corrected to the database clock. */
 export function useServerNow(initial: number): number {
-  useEffect(() => {
-    if (!synced && !syncing) syncing = syncOffset().finally(() => { syncing = null; });
-  }, []);
+  useEffect(ensureClockSync, []);
   return useSyncExternalStore(subscribe, () => snapshot, () => initial);
 }
 
