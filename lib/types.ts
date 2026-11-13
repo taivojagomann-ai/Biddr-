@@ -151,6 +151,16 @@ export interface PlaceBidResult {
   min_next: number;
 }
 
+/** What the signed-in user still needs before bidding (bidder_status(), 0008). */
+export interface BidderStatus {
+  profile_complete: boolean;
+  terms_accepted: boolean;
+  current_version: string;
+}
+
+/** Error codes for bidder requirements, from the database or /api/stripe/hold. */
+export type BidderRequirementCode = "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED";
+
 export interface HoldResponse {
   status: "authorized" | "requires_payment";
   clientSecret?: string;

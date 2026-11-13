@@ -90,6 +90,7 @@ const PUBLIC_PAGES = [
   ["How it works", "/how-it-works"],
   ["Terms", "/terms"],
   ["Privacy", "/privacy"],
+  ["Bidding terms", "/terms/bidding"],
   ["Not found", "/no-such-page"],
 ] as const;
 
@@ -164,6 +165,19 @@ test.describe("signed-in pages", () => {
     await page.getByRole("button", { name: "Reset demo data" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expectNoSeriousViolations(page, "Demo data dialog");
+  });
+
+  test("bidding terms step has no serious axe violations and announces errors", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    await page.getByRole("button", { name: /^(Bid|Place bid)/ }).filter({ visible: true }).first().click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Before your first bid" })).toBeVisible();
+    await expect(dialog.getByRole("link", { name: /Read the full bidding terms/ })).toHaveAttribute("target", "_blank");
+    await expectNoSeriousViolations(page, "Bidding terms step");
+    await dialog.getByRole("button", { name: "Agree and continue" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("Tick both boxes to continue.");
+    await expect(dialog.getByRole("checkbox", { name: "I am 18 or older" })).toHaveAttribute("aria-invalid", "true");
+    await expectNoSeriousViolations(page, "Bidding terms step with error");
   });
 
   test("admin confirmation dialog has no serious axe violations", async ({ page }) => {

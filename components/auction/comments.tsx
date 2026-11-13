@@ -15,10 +15,11 @@ interface CommentsProps {
   comments: CommentRow[];
   onPosted: (c: CommentRow) => void;
   currentUserId: string | null;
+  canComment: boolean;
   initialNow: number;
 }
 
-export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, initialNow }: CommentsProps) {
+export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, canComment, initialNow }: CommentsProps) {
   const now = useMinuteNow(initialNow);
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
 
@@ -39,8 +40,18 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
         <span className="text-sm text-mute tabular">{comments.length}</span>
       </div>
 
-      {currentUserId ? (
+      {currentUserId && canComment ? (
         <CommentForm auctionId={auctionId} replyTo={null} onPosted={onPosted} />
+      ) : currentUserId ? (
+        <p className="rounded-lg border border-line bg-panel p-4 text-sm text-mute">
+          <Link
+            href={`/account/setup?next=${encodeURIComponent(`/auctions/${auctionId}`)}`}
+            className="font-semibold text-chalk underline underline-offset-4"
+          >
+            Finish your profile to comment
+          </Link>
+          . Comments show your username and country.
+        </p>
       ) : (
         <p className="rounded-lg border border-line bg-panel p-4 text-sm text-mute">
           <Link href={`/login?next=/auctions/${auctionId}`} className="font-semibold text-chalk underline underline-offset-4">Sign in</Link>{" "}
@@ -55,7 +66,7 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
           {roots.map((c) => (
             <li key={c.id} className="rounded-lg border border-line bg-panel p-4">
               <CommentBody comment={c} sellerId={sellerId} now={now} />
-              {currentUserId && (
+              {currentUserId && canComment && (
                 <button type="button" onClick={() => setReplyTo(replyTo?.id === c.id ? null : c)}
                   aria-expanded={replyTo?.id === c.id}
                   className="-ml-2 mt-1 inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold text-mute hover:text-chalk">
@@ -120,7 +131,11 @@ function CommentForm({ auctionId, replyTo, onPosted }: { auctionId: string; repl
       .single<CommentRow>();
     setBusy(false);
     if (error || !data) {
-      setError("Your comment wasn't posted. Check your connection and try again.");
+      setError(
+        error?.message === "PROFILE_INCOMPLETE"
+          ? "Finish your profile to comment: add a username and country."
+          : "Your comment wasn't posted. Check your connection and try again.",
+      );
       return;
     }
     setContent("");

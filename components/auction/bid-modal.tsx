@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { bidErrorMessage } from "@/lib/errors";
 import { formatEur } from "@/lib/format";
-import { buyersPremium, minNextBid, QUICK_INCREMENTS } from "@/lib/pricing";
-import type { Auction, HoldResponse, PlaceBidResult } from "@/lib/types";
+import { buyersPremium, minNextBid, PREMIUM_MAX, PREMIUM_MIN, PREMIUM_RATE, QUICK_INCREMENTS } from "@/lib/pricing";
+import type { Auction, BidderStatus, HoldResponse, PlaceBidResult } from "@/lib/types";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -32,10 +32,21 @@ const appearance: Appearance = {
 type Step =
   | { kind: "signin" }
   | { kind: "loading" }
+  | { kind: "profile" }
+  | { kind: "terms"; version: string }
   | { kind: "hold"; clientSecret: string; amountEur: number }
   | { kind: "confirm" }
   | { kind: "success"; result: PlaceBidResult }
-  | { kind: "error"; message: string };
+  | { kind: "error"; title: string; message: string };
+
+function isBidderStatus(v: unknown): v is BidderStatus {
+  return (
+    typeof v === "object" && v !== null &&
+    typeof (v as BidderStatus).profile_complete === "boolean" &&
+    typeof (v as BidderStatus).terms_accepted === "boolean" &&
+    typeof (v as BidderStatus).current_version === "string"
+  );
+}
 
 interface BidModalProps {
   open: boolean;
@@ -71,9 +82,14 @@ export function BidModal(props: BidModalProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ auctionId: auction.id }),
       });
-      const body = (await res.json()) as HoldResponse | { error: string };
+      const body = (await res.json()) as HoldResponse | { error: string; code?: string };
+      if (res.status === 403 && "code" in body && (body.code === "PROFILE_INCOMPLETE" || body.code === "TERMS_NOT_ACCEPTED")) {
+        // The server is the final word: send the user to the step they still need.
+        await checkRequirementsRef.current();
+        return;
+      }
       if (!res.ok || "error" in body) {
-        setStep({ kind: "error", message: "error" in body ? body.error : "The card check couldn't start." });
+        setStep({ kind: "error", title: "Card check didn't start", message: "error" in body ? body.error : "The card check couldn't start." });
         return;
       }
       if (body.status === "authorized") {
@@ -83,17 +99,32 @@ export function BidModal(props: BidModalProps) {
         setStep({ kind: "hold", clientSecret: body.clientSecret, amountEur: body.amountEur });
       }
     } catch {
-      setStep({ kind: "error", message: "The card check couldn't start. Check your connection and try again." });
+      setStep({ kind: "error", title: "Card check didn't start", message: "The card check couldn't start. Check your connection and try again." });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auction.id]);
+
+  // Profile, then terms, then the card hold: each step is skipped when already done.
+  const checkRequirements = useCallback(async () => {
+    setStep({ kind: "loading" });
+    const { data, error } = await getBrowserSupabase().rpc("bidder_status");
+    if (error || !isBidderStatus(data)) {
+      setStep({ kind: "error", title: "We couldn't check your account", message: "Check your connection and try again." });
+      return;
+    }
+    if (!data.profile_complete) setStep({ kind: "profile" });
+    else if (!data.terms_accepted) setStep({ kind: "terms", version: data.current_version });
+    else if (hasHold) setStep({ kind: "confirm" });
+    else void startHold();
+  }, [hasHold, startHold]);
+  const checkRequirementsRef = useRef(checkRequirements);
+  checkRequirementsRef.current = checkRequirements;
 
   // Choose the first step each time the modal opens.
   useEffect(() => {
     if (!open) return;
     if (!userId) setStep({ kind: "signin" });
-    else if (hasHold) setStep({ kind: "confirm" });
-    else void startHold();
+    else void checkRequirements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -131,6 +162,28 @@ export function BidModal(props: BidModalProps) {
           </div>
         )}
 
+        {step.kind === "profile" && (
+          <div className="flex flex-col gap-4">
+            <DialogTitle>Finish your profile to bid</DialogTitle>
+            <DialogDescription id="bid-modal-desc">
+              Bidders need a username, full name, country and phone number. Only your username and country are shown
+              publicly.
+            </DialogDescription>
+            <Button asChild size="lg">
+              <Link href={`/account/setup?next=${encodeURIComponent(`/auctions/${auction.id}`)}`}>Finish your profile</Link>
+            </Button>
+          </div>
+        )}
+
+        {step.kind === "terms" && (
+          <TermsStep
+            version={step.version}
+            holdEur={holdEur}
+            onAccepted={() => (hasHold ? setStep({ kind: "confirm" }) : void startHold())}
+            onRecheck={() => void checkRequirements()}
+          />
+        )}
+
         {step.kind === "hold" && elementsOptions && (
           <Elements stripe={stripePromise} options={elementsOptions}>
             <HoldForm
@@ -143,7 +196,7 @@ export function BidModal(props: BidModalProps) {
 
         {step.kind === "confirm" && (
           <ConfirmBid {...props} onDone={(result) => { props.onBidPlaced(result); setStep({ kind: "success", result }); }}
-            onHoldMissing={() => void startHold()} />
+            onHoldMissing={() => void startHold()} onRequirementMissing={() => void checkRequirements()} />
         )}
 
         {step.kind === "success" && (
@@ -162,9 +215,9 @@ export function BidModal(props: BidModalProps) {
 
         {step.kind === "error" && (
           <div className="flex flex-col gap-4">
-            <DialogTitle>Card check didn&apos;t start</DialogTitle>
+            <DialogTitle>{step.title}</DialogTitle>
             <DialogDescription id="bid-modal-desc">{step.message}</DialogDescription>
-            <Button autoFocus onClick={() => void startHold()}>Try again</Button>
+            <Button autoFocus onClick={() => void checkRequirements()}>Try again</Button>
           </div>
         )}
 
@@ -236,8 +289,8 @@ function HoldForm({ amountEur, auctionId, onAuthorized }: { amountEur: number; a
 }
 
 function ConfirmBid({
-  auction, amount, setAmount, onDone, onHoldMissing,
-}: BidModalProps & { onDone: (r: PlaceBidResult) => void; onHoldMissing: () => void }) {
+  auction, amount, setAmount, onDone, onHoldMissing, onRequirementMissing,
+}: BidModalProps & { onDone: (r: PlaceBidResult) => void; onHoldMissing: () => void; onRequirementMissing: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const minNext = minNextBid(auction);
@@ -255,6 +308,10 @@ function ConfirmBid({
     if (rpcError) {
       if (rpcError.message === "HOLD_REQUIRED" || rpcError.message === "NOT_VERIFIED") {
         onHoldMissing();
+        return;
+      }
+      if (rpcError.message === "PROFILE_INCOMPLETE" || rpcError.message === "TERMS_NOT_ACCEPTED") {
+        onRequirementMissing();
         return;
       }
       if (rpcError.message === "BID_TOO_LOW" && rpcError.details) {
@@ -325,5 +382,122 @@ function ConfirmBid({
         </Link>
       </p>
     </div>
+  );
+}
+
+/** "Before your first bid": a plain summary of rules the system already enforces, then acceptance. */
+function TermsStep({
+  version,
+  holdEur,
+  onAccepted,
+  onRecheck,
+}: {
+  version: string;
+  holdEur: number;
+  onAccepted: () => void;
+  onRecheck: () => void;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  const [adult, setAdult] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [triedSubmit, setTriedSubmit] = useState(false);
+
+  async function accept(e: React.FormEvent) {
+    e.preventDefault();
+    setTriedSubmit(true);
+    if (!agreed || !adult) {
+      setError(
+        !agreed && !adult
+          ? "Tick both boxes to continue."
+          : !agreed
+            ? "Tick the box to agree to the bidding terms."
+            : "Confirm that you are 18 or older.",
+      );
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: rpcError } = await getBrowserSupabase().rpc("accept_bidding_terms", { p_version: version });
+    setBusy(false);
+    if (rpcError) {
+      if (rpcError.message === "TERMS_VERSION_MISMATCH") {
+        setError(bidErrorMessage("TERMS_VERSION_MISMATCH"));
+        onRecheck();
+        return;
+      }
+      setError(rpcError.message === "PROFILE_INCOMPLETE" ? bidErrorMessage("PROFILE_INCOMPLETE") : "Your acceptance wasn't saved. Check your connection and try again.");
+      return;
+    }
+    onAccepted();
+  }
+
+  const box = "mt-0.5 size-4 shrink-0 accent-[#FF5500]";
+  return (
+    <form onSubmit={accept} className="flex flex-col gap-4" noValidate>
+      <div>
+        <DialogTitle>Before your first bid</DialogTitle>
+        <DialogDescription id="bid-modal-desc" className="mt-1">
+          How bidding on Biddr works:
+        </DialogDescription>
+      </div>
+      <ul className="list-disc space-y-1.5 pl-5 text-sm">
+        <li>Bids are binding. If yours is the highest when the auction ends and the reserve is met, you buy the car.</li>
+        <li>Before your first bid on each auction, we place a refundable {formatEur(holdEur)} hold on your card.</li>
+        <li>
+          The winner pays a {Math.round(PREMIUM_RATE * 100)}% buyer&apos;s premium on top of the winning bid: at least{" "}
+          {formatEur(PREMIUM_MIN)}, at most {formatEur(PREMIUM_MAX)}.
+        </li>
+        <li>A bid in the final 2 minutes extends the auction by 2 minutes.</li>
+      </ul>
+      <p className="text-sm">
+        <a
+          href="/terms/bidding"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block py-1 text-chalk underline underline-offset-4 hover:text-signal"
+        >
+          Read the full bidding terms<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+      </p>
+
+      <div className="space-y-2">
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            required
+            aria-invalid={triedSubmit && !agreed ? true : undefined}
+            aria-describedby={error ? "terms-error" : undefined}
+            className={box}
+          />
+          I have read and agree to the bidding terms
+        </label>
+        <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={adult}
+            onChange={(e) => setAdult(e.target.checked)}
+            required
+            aria-invalid={triedSubmit && !adult ? true : undefined}
+            aria-describedby={error ? "terms-error" : undefined}
+            className={box}
+          />
+          I am 18 or older
+        </label>
+      </div>
+
+      {error && (
+        <p id="terms-error" role="alert" className="text-sm text-signal">
+          {error}
+        </p>
+      )}
+
+      <Button type="submit" size="lg" disabled={busy}>
+        {busy ? <><Loader2 className="animate-spin" aria-hidden /> Saving…</> : "Agree and continue"}
+      </Button>
+      <p className="text-xs text-mute">Terms version {version}</p>
+    </form>
   );
 }

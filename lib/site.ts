@@ -11,5 +11,6 @@ export const FOOTER_LINKS = [
   { label: "How it works", href: "/how-it-works" },
   { label: "Help and contact", href: `mailto:${SUPPORT_EMAIL}` },
   { label: "Terms", href: "/terms" },
+  { label: "Bidding terms", href: "/terms/bidding" },
   { label: "Privacy", href: "/privacy" },
 ] as const;

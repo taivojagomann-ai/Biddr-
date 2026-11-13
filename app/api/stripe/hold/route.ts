@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { HOLD_AMOUNT_EUR, stripe } from "@/lib/stripe";
+import { getBidderStatus, unmetRequirement } from "@/lib/bidder";
+import { bidErrorMessage } from "@/lib/errors";
 import { jsonError, markHoldAuthorized } from "@/lib/holds";
 import type { HoldResponse } from "@/lib/types";
 
@@ -15,8 +17,17 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.success) return jsonError("Missing or invalid auction.", 400);
   const { auctionId } = parsed.data;
 
-  const { data: { user } } = await getServerSupabase().auth.getUser();
+  const supabase = getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return jsonError("Sign in to place a bid.", 401);
+
+  // Complete profile and current bidding terms come first: never touch Stripe for
+  // someone who can't bid. Same check as the bids trigger (bidder_status(), 0008).
+  // If the check itself fails, stay closed rather than create a hold.
+  const status = await getBidderStatus(supabase);
+  if (!status) return jsonError("Bidding isn't available right now. Try again in a minute.", 503);
+  const unmet = unmetRequirement(status);
+  if (unmet) return Response.json({ error: bidErrorMessage(unmet), code: unmet }, { status: 403 });
 
   const admin = getAdminSupabase();
 
