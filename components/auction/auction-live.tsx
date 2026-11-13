@@ -18,6 +18,8 @@ interface AuctionLiveProps {
   initialComments: CommentRow[];
   userId: string | null;
   initialHasHold: boolean;
+  /** Signed-in user has a username and country (the comments trigger requires both). */
+  canComment: boolean;
   initialNow: number;
   holdEur: number;
   /** Server-rendered, non-interactive sections (gallery, specs, video) */
@@ -31,7 +33,7 @@ interface AuctionLiveProps {
  * On every (re)subscribe we refetch, so updates missed while offline aren't lost.
  */
 export function AuctionLive({
-  initialAuction, initialBids, initialComments, userId, initialHasHold, initialNow, holdEur, children,
+  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialNow, holdEur, children,
 }: AuctionLiveProps) {
   const supabase = getBrowserSupabase();
   const router = useRouter();
@@ -151,7 +153,7 @@ export function AuctionLive({
         <div className="flex min-w-0 flex-col gap-10">
           {children}
           <div className="lg:hidden"><BidHistory bids={bids} currentUserId={userId} initialNow={initialNow} /></div>
-          <Comments auctionId={auction.id} sellerId={auction.seller_id} comments={comments} currentUserId={userId}
+          <Comments auctionId={auction.id} sellerId={auction.seller_id} comments={comments} currentUserId={userId} canComment={canComment}
             initialNow={initialNow}
             onPosted={(c) => setComments((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))} />
         </div>

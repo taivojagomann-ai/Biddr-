@@ -1,7 +1,8 @@
 /** Maps stable error codes raised by place_bid / API routes to user-facing copy. */
 export type BidErrorCode =
   | "NOT_AUTHENTICATED" | "NOT_VERIFIED" | "HOLD_REQUIRED" | "AUCTION_NOT_FOUND" | "AUCTION_NOT_LIVE"
-  | "AUCTION_ENDED" | "OWN_AUCTION" | "ALREADY_LEADING" | "BID_TOO_LOW" | "INVALID_AMOUNT" | "DEMO_AUCTION";
+  | "AUCTION_ENDED" | "OWN_AUCTION" | "ALREADY_LEADING" | "BID_TOO_LOW" | "INVALID_AMOUNT" | "DEMO_AUCTION"
+  | "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED" | "TERMS_VERSION_MISMATCH";
 
 const MESSAGES: Record<BidErrorCode, string> = {
   NOT_AUTHENTICATED: "Sign in to place a bid.",
@@ -15,6 +16,9 @@ const MESSAGES: Record<BidErrorCode, string> = {
   BID_TOO_LOW: "Someone bid first. Raise your bid to at least the new minimum.",
   INVALID_AMOUNT: "Enter a bid in whole euros.",
   DEMO_AUCTION: "This is a demo listing. Bidding is turned off.",
+  PROFILE_INCOMPLETE: "Finish your profile before you bid: add your username, full name, country and phone.",
+  TERMS_NOT_ACCEPTED: "Accept the bidding terms before you bid.",
+  TERMS_VERSION_MISMATCH: "The bidding terms have just been updated. Read the new version and accept it to continue.",
 };
 
 export function isBidErrorCode(v: string): v is BidErrorCode {

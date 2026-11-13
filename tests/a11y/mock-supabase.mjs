@@ -224,6 +224,14 @@ const server = http.createServer(async (req, res) => {
     const id = JSON.parse(body || "{}").p_auction_id;
     return send(res, 200, BIDS.filter((b) => b.auction_id === id));
   }
+  const TERMS_VERSION = "2026-11-draft-1";
+  if (path === "/rest/v1/rpc/current_bidding_terms_version") return send(res, 200, TERMS_VERSION);
+  if (path === "/rest/v1/rpc/bidder_status") {
+    return send(res, 200, { profile_complete: true, terms_accepted: false, current_version: TERMS_VERSION });
+  }
+  if (path === "/rest/v1/rpc/accept_bidding_terms") {
+    return send(res, 200, { profile_complete: true, terms_accepted: true, current_version: TERMS_VERSION });
+  }
   if (path.startsWith("/rest/v1/rpc/")) return send(res, 200, null);
 
   const table = path.replace("/rest/v1/", "");

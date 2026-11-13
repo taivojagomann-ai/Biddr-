@@ -54,7 +54,14 @@ export default async function AuctionPage({ params }: { params: { id: string } }
   ]);
 
   let hasHold = false;
+  let canComment = false;
   if (user) {
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("username, country")
+      .eq("id", user.id)
+      .maybeSingle<{ username: string | null; country: string | null }>();
+    canComment = Boolean(me?.username?.trim() && me.country);
     const { data: hold } = await supabase
       .from("bid_holds")
       .select("id")
@@ -89,6 +96,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
           initialComments={commentsRes.data ?? []}
           userId={user?.id ?? null}
           initialHasHold={hasHold}
+          canComment={canComment}
           initialNow={Date.now()}
           holdEur={HOLD_EUR}
         >

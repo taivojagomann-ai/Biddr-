@@ -45,6 +45,7 @@ app/
   not-found.tsx                 site 404 (Next's default forces black text)
   how-it-works/page.tsx         bidding, card hold, premium, reserve, extensions, badges, selling
   terms/, privacy/              placeholders until the legal text is ready
+  terms/bidding/page.tsx        bidding terms placeholder, shows the current version
   globals.css                   palette tokens, shadcn variables, .font-wide
   page.tsx                      Home: filters + live feed
   auctions/[id]/page.tsx        Auction detail (server data load)
@@ -95,6 +96,7 @@ lib/
   baltic-time.ts                Europe/Tallinn date + time inputs <-> UTC
   demo/                         demo data: seed/remove, placeholder photos and PDF, bid generator
   site.ts                       footer links, support email and company placeholders
+  bidder.ts                     server-only: bidder_status() check used by the hold route
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
@@ -102,6 +104,7 @@ supabase/migrations/0003_sell.sql
 supabase/migrations/0004_admin.sql
 supabase/migrations/0006_demo_data.sql
 supabase/migrations/0007_listing_details.sql
+supabase/migrations/0008_bidder_requirements.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -140,6 +143,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0004_admin.sql` | `rejected` and `withdrawn` statuses, `rejection_reason`, `admin_actions` audit log, `inspection-reports` bucket, `admin_set_reserve` and `admin_set_schedule` | Run before using `/admin` |
 | `0006_demo_data.sql` | `is_demo` on auctions and profiles, demo listings refuse bids, comment trigger lets the server set the author, comments insert grant tightened | Run before using demo data |
 | `0007_listing_details.sql` | Structured listing details: body style, interior colour, ownership, seller type and dealer, registration, highlights, equipment, modifications, known flaws, service history, items included and seller notes. Also adds an `editor_take` column the app doesn't use. | Run before deploying this version (the sell form saves these columns) |
+| `0008_bidder_requirements.sql` | Bidders need a complete profile and the current bidding terms: `accept_bidding_terms`, `bidder_status`, `current_bidding_terms_version`, and triggers on `bids` and `comments` | Run before deploying this version (bidding stays closed until it is run) |
 
 ## Selling a car (`/sell`)
 
@@ -181,6 +185,38 @@ To remove admin access, set `role = 'user'` the same way. The header shows an "A
 - **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
 - **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. A restored car can't be scheduled without an inspection partner and report. Auctions run at most 7 days because card holds expire after about 7 days.
 - **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The inspection PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only.
+
+## Bidding requirements
+
+Before anyone can place a card hold or a bid, they need:
+
+1. **A complete profile:** username, full name, country and phone number.
+2. **The current bidding terms accepted,** with confirmation that they are 18 or older.
+
+This is enforced in the database, not only in the UI:
+- **Bids:** a trigger on `bids` raises `PROFILE_INCOMPLETE` or `TERMS_NOT_ACCEPTED`.
+- **Comments:** a trigger on `comments` needs a username and country.
+- **Card holds:** `/api/stripe/hold` runs the same check, `bidder_status()`, before it ever contacts Stripe, and stays closed if the check fails.
+- **Server-side inserts:** these use the service role (for example demo data) and aren't affected.
+
+The bid dialog walks people through the steps in order: sign in, finish profile, "Before your first bid" (terms), card hold, confirm bid. It skips any step that's already done. The profile page shows when the terms were accepted, and which version.
+
+The terms text is a placeholder at `/terms/bidding` until the real terms are written with a lawyer.
+
+### Changing the terms version
+The version lives in one place: the database function `current_bidding_terms_version()`. To make everyone accept again, for example when the real terms replace the draft:
+
+1. Update `/terms/bidding` with the new text.
+2. Run this in the Supabase SQL Editor, with the new version string:
+
+   ```sql
+   create or replace function public.current_bidding_terms_version()
+   returns text language sql stable as $$
+     select '2027-01-final'::text
+   $$;
+   ```
+
+From then on, everyone who accepted an older version sees the terms step again before their next bid, and the database refuses their bids until they accept. Nothing else needs to change: the page, the dialog and the checks all read the version from this function.
 
 ## Demo data (for testing)
 
