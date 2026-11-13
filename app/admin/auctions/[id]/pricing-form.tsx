@@ -36,7 +36,7 @@ export function PricingForm({
         void run(savePricing, { auctionId, startingBid, minIncrement, noReserve, reserve });
       }}
     >
-      <fieldset disabled={mode === "closed"} className="grid gap-4 sm:grid-cols-3">
+      <fieldset disabled={mode === "closed"} className="grid min-w-0 gap-4 sm:grid-cols-3">
         <div>
           <Label htmlFor="price-start">Starting bid (€)</Label>
           <Input id="price-start" inputMode="numeric" value={startingBid} onChange={(e) => setStartingBid(e.target.value)} disabled={locked} />

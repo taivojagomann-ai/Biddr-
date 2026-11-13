@@ -63,6 +63,9 @@ export function AuctionFeed({
     <div className="flex flex-col gap-6">
       {featured && <FeaturedLot auction={featured} initialNow={initialNow} />}
       {grid.length > 0 && (
+        <h2 className="sr-only">{featured ? "More auctions" : "Auctions"}</h2>
+      )}
+      {grid.length > 0 && (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {grid.map((a, i) => (
             <li key={a.id}>

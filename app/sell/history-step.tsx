@@ -15,7 +15,7 @@ export function HistoryStep({ values, errors, set }: StepProps) {
     <section>
       <StepHeading title="History" />
 
-      <fieldset aria-describedby={errors.hadDamage ? errId : undefined}>
+      <fieldset className="min-w-0" aria-describedby={errors.hadDamage ? errId : undefined}>
         <legend className="text-sm font-semibold">Has this car had accident damage?</legend>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {OPTIONS.map((o, i) => (
@@ -23,7 +23,7 @@ export function HistoryStep({ values, errors, set }: StepProps) {
               key={o.value}
               className={cn(
                 "flex cursor-pointer items-start gap-3 rounded-lg border bg-panel p-4 transition-colors",
-                values.hadDamage === o.value ? "border-signal" : "border-line hover:border-mute",
+                values.hadDamage === o.value ? "border-signal" : "border-field hover:border-chalk",
               )}
             >
               <input

@@ -24,6 +24,7 @@ export function BidHistory({ bids, currentUserId, initialNow }: { bids: BidHisto
                 <span className={cn("font-semibold", i === 0 && "text-signal")}>
                   {b.bidder_id === currentUserId ? "You" : b.username ?? "Bidder"}
                 </span>
+                {i === 0 && <span className="ml-1.5 rounded-sm bg-signal/15 px-1.5 py-0.5 text-xs font-semibold text-signal">Highest</span>}
                 {b.country && <span className="ml-1.5 text-mute">{b.country}</span>}
               </span>
               <span className="flex shrink-0 items-baseline gap-3">
@@ -35,7 +36,7 @@ export function BidHistory({ bids, currentUserId, initialNow }: { bids: BidHisto
         </ol>
       )}
       {bids.length > 8 && (
-        <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full border-t border-line px-4 py-2.5 text-sm text-mute hover:text-chalk">
+        <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded} className="min-h-11 w-full border-t border-line px-4 py-2.5 text-sm text-mute hover:text-chalk">
           {expanded ? "Show fewer" : `Show all ${bids.length} bids`}
         </button>
       )}

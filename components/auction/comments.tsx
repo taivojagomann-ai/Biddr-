@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { useMinuteNow } from "@/hooks/use-minute-now";
 import { RelativeTime } from "@/components/relative-time";
@@ -56,8 +57,10 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
               <CommentBody comment={c} sellerId={sellerId} now={now} />
               {currentUserId && (
                 <button type="button" onClick={() => setReplyTo(replyTo?.id === c.id ? null : c)}
-                  className="mt-2 text-xs font-semibold text-mute hover:text-chalk">
+                  aria-expanded={replyTo?.id === c.id}
+                  className="-ml-2 mt-1 inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold text-mute hover:text-chalk">
                   {replyTo?.id === c.id ? "Cancel reply" : "Reply"}
+                  <span className="sr-only"> to {c.author?.username ?? "this comment"}</span>
                 </button>
               )}
               {(replies.get(c.id) ?? []).length > 0 && (
@@ -100,6 +103,7 @@ function CommentForm({ auctionId, replyTo, onPosted }: { auctionId: string; repl
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [posted, setPosted] = useState(false);
   const id = replyTo ? `reply-${replyTo.id}` : "new-comment";
 
   async function submit(e: React.FormEvent) {
@@ -108,6 +112,7 @@ function CommentForm({ auctionId, replyTo, onPosted }: { auctionId: string; repl
     if (!text) return;
     setBusy(true);
     setError(null);
+    setPosted(false);
     const { data, error } = await getBrowserSupabase()
       .from("comments")
       .insert({ auction_id: auctionId, parent_id: replyTo?.id ?? null, content: text })
@@ -119,16 +124,21 @@ function CommentForm({ auctionId, replyTo, onPosted }: { auctionId: string; repl
       return;
     }
     setContent("");
+    setPosted(true);
     onPosted(data);
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      <label htmlFor={id} className="sr-only">{replyTo ? "Write a reply" : "Ask a question"}</label>
-      <textarea id={id} value={content} onChange={(e) => setContent(e.target.value)} maxLength={2000} rows={replyTo ? 2 : 3}
-        placeholder={replyTo ? `Reply to ${replyTo.author?.username ?? "this comment"}` : "Ask about service history, tyres, anything the photos don't show"}
-        className="w-full resize-y rounded-md border border-line bg-asphalt p-3 text-sm placeholder:text-mute focus-visible:border-signal" />
-      {error && <p role="alert" className="text-sm text-signal">{error}</p>}
+      <label htmlFor={id} className="text-sm font-semibold">
+        {replyTo ? `Reply to ${replyTo.author?.username ?? "this comment"}` : "Ask the seller a question"}
+      </label>
+      <Textarea id={id} value={content} onChange={(e) => setContent(e.target.value)} maxLength={2000} rows={replyTo ? 2 : 3}
+        placeholder={replyTo ? undefined : "e.g. service history, tyres, anything the photos don't show"}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className="min-h-0 resize-y p-3" autoFocus={Boolean(replyTo)} />
+      {error && <p id={`${id}-error`} role="alert" className="text-sm text-signal">{error}</p>}
+      <p role="status" className="sr-only">{posted ? (replyTo ? "Your reply was posted." : "Your question was posted.") : ""}</p>
       <div className="flex justify-end">
         <Button type="submit" size="sm" variant="secondary" disabled={busy || !content.trim()}>
           {busy ? "Posting…" : replyTo ? "Post reply" : "Post question"}

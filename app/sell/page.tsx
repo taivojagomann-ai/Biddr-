@@ -22,7 +22,7 @@ export default async function SellPage() {
   if (!isProfileComplete(profile)) redirect("/account/setup?next=/sell");
 
   return (
-    <main className="container max-w-3xl pb-32 pt-8 sm:pt-12 md:pb-16">
+    <main className="container max-w-3xl pt-8 sm:pt-12">
       <h1 className="font-wide text-3xl font-extrabold tracking-tight">Sell your car</h1>
       <p className="mt-2 max-w-xl text-sm text-mute">
         Tell us about the car and add photos. We review every listing, inspect the car and then schedule the auction.

@@ -236,8 +236,8 @@ export function StatusActions({
                 <label htmlFor="extend-date" className="mb-1 block text-xs text-mute">
                   New end (Baltic time)
                 </label>
-                <div className="flex gap-2">
-                  <Input id="extend-date" type="date" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />
+                <div className="flex flex-wrap gap-2">
+                  <Input id="extend-date" type="date" className="min-w-0 flex-1" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />
                   <Input aria-label="New end time" type="time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} className="w-32" />
                 </div>
               </div>

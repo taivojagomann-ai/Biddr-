@@ -34,7 +34,7 @@ export function AuctionCard({ auction, initialNow, priority = false }: { auction
         {cover ? (
           <Image
             src={cover}
-            alt={`${auction.year} ${auction.make} ${auction.model}`}
+            alt="" // the title below names the car; the photo would repeat it
             fill
             sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
             priority={priority}

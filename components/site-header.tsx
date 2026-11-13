@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MobileMenu, type MenuLink } from "@/components/mobile-menu";
 import { getServerSupabase } from "@/lib/supabase/server";
+
+const navLink =
+  "inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-3 text-mute hover:text-chalk [@media(pointer:coarse)]:min-h-11";
 
 export async function SiteHeader() {
   const supabase = getServerSupabase();
@@ -19,46 +23,69 @@ export async function SiteHeader() {
     isAdmin = data?.role === "admin";
   }
 
+  const menuLinks: MenuLink[] = [
+    { label: "Auctions", href: "/" },
+    { label: "How it works", href: "/how-it-works" },
+    { label: "Sell a car", href: "/sell" },
+    ...(user && username ? [{ label: "My listings", href: "/account/listings" }] : []),
+    ...(user ? [{ label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" }] : []),
+    ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),
+  ];
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-asphalt/90 backdrop-blur">
-      <div className="container flex h-14 items-center justify-between">
-        <Link href="/" className="font-wide text-lg font-extrabold tracking-tight">
+      <div className="container relative flex h-14 items-center justify-between gap-2">
+        <Link href="/" className="inline-flex min-h-10 items-center font-wide text-lg font-extrabold tracking-tight">
           Biddr<span className="text-signal">.</span>
+          <span className="sr-only">, home</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
-          <Link href="/" className="hidden rounded-md px-3 py-2 text-mute hover:text-chalk sm:inline-flex">
+
+        {/* Small screens: sign in stays visible, everything else is in the menu. */}
+        <div className="flex items-center gap-2 sm:hidden">
+          {!user ? (
+            <Link href="/login" className="inline-flex min-h-10 items-center rounded-md border border-field px-3 text-sm hover:border-chalk">
+              Sign in
+            </Link>
+          ) : null}
+          <MobileMenu links={menuLinks} signedIn={Boolean(user)} />
+        </div>
+
+        <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
+          <Link href="/" className={navLink}>
             Auctions
           </Link>
-          <Link href="/sell" className="whitespace-nowrap rounded-md px-2 py-2 text-mute hover:text-chalk sm:px-3">
+          <Link href="/how-it-works" className={`${navLink} hidden md:inline-flex`}>
+            How it works
+          </Link>
+          <Link href="/sell" className={navLink}>
             Sell a car
           </Link>
           {user ? (
             <>
               {isAdmin ? (
-                <Link href="/admin" className="rounded-md px-2 py-2 font-semibold text-signal hover:text-chalk sm:px-3">
+                <Link href="/admin" className={`${navLink} font-semibold text-signal`}>
                   Admin
                 </Link>
               ) : null}
               {username ? (
-                <Link href="/account/listings" className="rounded-md px-2 py-2 text-mute hover:text-chalk sm:px-3">
-                  <span className="sm:hidden">Listings</span>
-                  <span className="hidden sm:inline">My listings</span>
+                <Link href="/account/listings" className={navLink}>
+                  My listings
                 </Link>
               ) : null}
               <Link
                 href="/account/setup"
-                className="max-w-[7rem] truncate sm:max-w-[10rem] rounded-md border border-line px-3 py-2 hover:border-mute"
+                className="inline-flex min-h-10 max-w-[10rem] items-center rounded-md border border-field px-3 hover:border-chalk"
               >
-                {username ?? "Finish profile"}
+                <span className="truncate">{username ?? "Finish profile"}</span>
               </Link>
               <form action="/auth/signout" method="post">
                 <Button type="submit" variant="ghost" size="icon" aria-label="Sign out" title="Sign out">
-                  <LogOut aria-hidden="true" />
+                  <LogOut aria-hidden />
                 </Button>
               </form>
             </>
           ) : (
-            <Link href="/login" className="rounded-md border border-line px-3 py-2 hover:border-mute">
+            <Link href="/login" className="inline-flex min-h-10 items-center rounded-md border border-field px-3 hover:border-chalk">
               Sign in
             </Link>
           )}

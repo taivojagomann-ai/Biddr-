@@ -85,14 +85,14 @@ function PhotoStrip({ photos, alt }: { photos: string[]; alt: string }) {
         {photos.length > 1 && (
           <>
             <button type="button" onClick={() => go(-1)} aria-label="Previous photo"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-asphalt/80 p-2 hover:bg-asphalt">
-              <ChevronLeft className="size-5" />
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-asphalt/80 p-2.5 hover:bg-asphalt">
+              <ChevronLeft className="size-5" aria-hidden />
             </button>
             <button type="button" onClick={() => go(1)} aria-label="Next photo"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-asphalt/80 p-2 hover:bg-asphalt">
-              <ChevronRight className="size-5" />
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-asphalt/80 p-2.5 hover:bg-asphalt">
+              <ChevronRight className="size-5" aria-hidden />
             </button>
-            <span className="absolute bottom-2 right-2 rounded-sm bg-asphalt/80 px-2 py-0.5 text-xs tabular">
+            <span aria-hidden className="absolute bottom-2 right-2 rounded-sm bg-asphalt/80 px-2 py-0.5 text-xs tabular">
               {index + 1} / {photos.length}
             </span>
           </>
@@ -102,7 +102,7 @@ function PhotoStrip({ photos, alt }: { photos: string[]; alt: string }) {
         <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
           {photos.map((src, i) => (
             <button key={src} type="button" onClick={() => setIndex(i)} aria-label={`Show photo ${i + 1}`}
-              aria-current={i === index}
+              aria-current={i === index ? "true" : undefined}
               className={cn("relative aspect-[3/2] w-24 shrink-0 overflow-hidden rounded-md border-2",
                 i === index ? "border-signal" : "border-transparent opacity-70 hover:opacity-100")}>
               <Image src={src} alt="" fill sizes="96px" className="object-cover" />

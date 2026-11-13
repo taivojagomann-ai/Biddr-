@@ -57,7 +57,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
   }
 
   return (
-    <main className="container py-6 pb-32 lg:pb-16">
+    <main className="container py-6">
       <div className="mb-5 flex flex-col gap-2">
         <h1 className="font-wide text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">{auction.title}</h1>
         <div className="flex flex-wrap items-center gap-2 text-sm text-mute">

@@ -8,6 +8,7 @@ import { BidModal } from "./bid-modal";
 import { Comments } from "./comments";
 import { StickyBidBar } from "./sticky-bid-bar";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import { formatEur } from "@/lib/format";
 import { minNextBid } from "@/lib/pricing";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow, type PlaceBidResult } from "@/lib/types";
 
@@ -45,6 +46,9 @@ export function AuctionLive({
   const [flash, setFlash] = useState(false);
   const [justExtended, setJustExtended] = useState(false);
   const [wasOutbid, setWasOutbid] = useState(false);
+  // One polite live region for the whole page, so each change is announced once,
+  // on phones (no sidebar) as well as desktop.
+  const [announcement, setAnnouncement] = useState("");
 
   const prev = useRef(initialAuction);
 
@@ -55,6 +59,10 @@ export function AuctionLive({
 
   const applyAuction = useCallback((next: Auction) => {
     const before = prev.current;
+    const messages: string[] = [];
+    if (next.bid_count > before.bid_count && next.current_bid) {
+      messages.push(next.leading_bidder_id === userId ? `Your bid of ${formatEur(next.current_bid)} is the high bid.` : `New bid: ${formatEur(next.current_bid)}.`);
+    }
     if (next.bid_count > before.bid_count) {
       setFlash(true);
       setTimeout(() => setFlash(false), 700);
@@ -65,10 +73,16 @@ export function AuctionLive({
     if (before.ends_at && next.ends_at && new Date(next.ends_at) > new Date(before.ends_at) && before.status === "live") {
       setJustExtended(true);
       setTimeout(() => setJustExtended(false), 8000);
+      messages.push("A late bid added 2 minutes to the clock.");
     }
     if (userId && before.leading_bidder_id === userId && next.leading_bidder_id !== userId) {
       setWasOutbid(true);
+      messages.unshift("You've been outbid.");
     }
+    if (before.status !== next.status && next.status !== "live") {
+      messages.push(next.status === "sold" ? "The auction has ended. The car is sold." : "The auction has ended.");
+    }
+    if (messages.length) setAnnouncement(messages.join(" "));
     prev.current = next;
     setAuction(next);
   }, [refreshBids, userId]);
@@ -149,6 +163,10 @@ export function AuctionLive({
           </div>
         </aside>
       </div>
+
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
       <StickyBidBar {...ui} />
 

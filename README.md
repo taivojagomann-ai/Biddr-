@@ -41,7 +41,10 @@ Supabase Postgres (source of truth)
 
 ```
 app/
-  layout.tsx                    Archivo variable font (wdth axis), header
+  layout.tsx                    Archivo variable font (wdth axis), skip link, header, footer
+  not-found.tsx                 site 404 (Next's default forces black text)
+  how-it-works/page.tsx         bidding, card hold, premium, reserve, extensions, badges, selling
+  terms/, privacy/              placeholders until the legal text is ready
   globals.css                   palette tokens, shadcn variables, .font-wide
   page.tsx                      Home: filters + live feed
   auctions/[id]/page.tsx        Auction detail (server data load)
@@ -74,7 +77,9 @@ components/
     bid-box.tsx, sticky-bid-bar.tsx, bid-modal.tsx, bid-history.tsx
     gallery.tsx, inspection-card.tsx, spec-sheet.tsx, video-player.tsx
     comments.tsx, countdown.tsx, badges.tsx
-  site-header.tsx               signed-in state, profile link, sign-out
+  site-header.tsx               signed-in state, profile link, sign-out; "Menu" on small screens
+  mobile-menu.tsx               disclosure menu for small screens
+  site-footer.tsx               the same help links on every page
   ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select
 hooks/use-server-clock.ts       shared 1 Hz ticker + server clock offset
 lib/
@@ -87,13 +92,19 @@ lib/
   admin.ts                      server-only: requireAdmin(), logAdminAction()
   admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
   baltic-time.ts                Europe/Tallinn date + time inputs <-> UTC
+  site.ts                       footer links, support email and company placeholders
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
 supabase/migrations/0003_sell.sql
 supabase/migrations/0004_admin.sql
+tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
+
+## Accessibility
+
+The site targets WCAG 2.2 AA. See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what was checked and what's still open. `npm run test:a11y` runs axe, reflow and keyboard checks on every page against a mock Supabase, with no keys needed.
 
 ## Environment variables
 
