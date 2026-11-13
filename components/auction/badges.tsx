@@ -38,11 +38,15 @@ export function DemoBadge({ className }: { className?: string }) {
   );
 }
 
-export function RestoredBadge({ className }: { className?: string }) {
+/** `collapsible`: on auction cards narrower than 180px only the wrench shows (text stays for screen readers). */
+export function RestoredBadge({ className, collapsible = false }: { className?: string; collapsible?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs text-mute", className)}>
-      <Wrench className="size-3.5" aria-hidden />
-      Professionally restored
+    <span
+      className={cn("inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs text-mute", className)}
+      title={collapsible ? "Professionally restored" : undefined}
+    >
+      <Wrench className="size-3.5 shrink-0" aria-hidden />
+      <span className={collapsible ? "ac-collapse-text" : undefined}>Professionally restored</span>
     </span>
   );
 }

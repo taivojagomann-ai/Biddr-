@@ -78,7 +78,8 @@ export function AuctionFeed({
         <h2 className="sr-only">{featured ? "More auctions" : "Auctions"}</h2>
       )}
       {grid.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        // Two per row on phones (12px gap), 3 from 1024px, 4 from 1280px.
+        <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {grid.map((a, i) => (
             <li key={a.id}>
               <AuctionCard auction={a} initialNow={initialNow} priority={i < 4} userId={userId} watching={watched.has(a.id)} />

@@ -83,6 +83,17 @@ const AUCTIONS = [
     current_bid: 44750, bid_count: 11, reserve_met: true, has_reserve: true,
     starts_at: iso(-9 * 24 * H), ends_at: iso(-2 * 24 * H), status: "sold", is_demo: true,
   },
+  // Worst case for the two-up phone cards: long title, seven-figure bid, both badges.
+  {
+    ...base, id: "10000000-0000-4000-8000-000000000007", seller_id: SELLER,
+    title: "2021 Mercedes-AMG GT Black Series Coupé with Magno Paint and Track Package",
+    make: "Mercedes-AMG", model: "GT Black Series", year: 2021, vin: "WDD1903791A912345", mileage_km: 1250,
+    location_city: "Kohtla-Järve", location_country: "EE", condition_type: "restored_accident",
+    damage_history_summary: "Rear bumper replaced after a car park scrape.", inspection_partner_name: "Autotest Tallinn",
+    inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r7.pdf`, gallery_urls: gallery("gt"),
+    starting_bid: 900000, current_bid: 1250000, bid_count: 31, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
+    watch_count: 140, starts_at: iso(-3 * 24 * H), ends_at: iso(4 * 24 * H + 7 * H), status: "live",
+  },
   // The signed-in test user's own listings.
   {
     ...base, id: "10000000-0000-4000-8000-000000000005", seller_id: ME, title: "2020 BMW M2 Competition",
