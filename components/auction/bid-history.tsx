@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
-import { formatEur, timeAgo } from "@/lib/format";
-import { useServerNow } from "@/hooks/use-server-clock";
+import { formatEur } from "@/lib/format";
+import { useMinuteNow } from "@/hooks/use-minute-now";
+import { RelativeTime } from "@/components/relative-time";
 import { cn } from "@/lib/utils";
 import type { BidHistoryRow } from "@/lib/types";
 
 export function BidHistory({ bids, currentUserId, initialNow }: { bids: BidHistoryRow[]; currentUserId: string | null; initialNow: number }) {
   const [expanded, setExpanded] = useState(false);
-  const now = useServerNow(initialNow);
+  const now = useMinuteNow(initialNow);
   const shown = expanded ? bids : bids.slice(0, 8);
 
   return (
@@ -26,7 +27,7 @@ export function BidHistory({ bids, currentUserId, initialNow }: { bids: BidHisto
                 {b.country && <span className="ml-1.5 text-mute">{b.country}</span>}
               </span>
               <span className="flex shrink-0 items-baseline gap-3">
-                <span className="text-xs text-mute">{timeAgo(b.created_at, now)}</span>
+                <RelativeTime iso={b.created_at} now={now} className="text-xs text-mute" />
                 <span className="font-bold tabular">{formatEur(b.amount)}</span>
               </span>
             </li>

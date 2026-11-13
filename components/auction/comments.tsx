@@ -3,8 +3,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getBrowserSupabase } from "@/lib/supabase/client";
-import { timeAgo } from "@/lib/format";
-import { useServerNow } from "@/hooks/use-server-clock";
+import { useMinuteNow } from "@/hooks/use-minute-now";
+import { RelativeTime } from "@/components/relative-time";
 import { cn } from "@/lib/utils";
 import { COMMENT_COLUMNS, type CommentRow } from "@/lib/types";
 
@@ -18,7 +18,7 @@ interface CommentsProps {
 }
 
 export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, initialNow }: CommentsProps) {
-  const now = useServerNow(initialNow);
+  const now = useMinuteNow(initialNow);
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
 
   const { roots, replies } = useMemo(() => {
@@ -89,7 +89,7 @@ function CommentBody({ comment, sellerId, now }: { comment: CommentRow; sellerId
         <span className="font-semibold">{comment.author?.username ?? "Member"}</span>
         {isSeller && <span className="rounded-sm bg-signal px-1.5 py-0.5 text-[11px] font-bold text-asphalt">Seller</span>}
         {isStaff && !isSeller && <span className="rounded-sm bg-chalk px-1.5 py-0.5 text-[11px] font-bold text-asphalt">Biddr team</span>}
-        <span className="text-xs text-mute">{timeAgo(comment.created_at, now)}</span>
+        <RelativeTime iso={comment.created_at} now={now} className="text-xs text-mute" />
       </div>
       <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed">{comment.content}</p>
     </div>

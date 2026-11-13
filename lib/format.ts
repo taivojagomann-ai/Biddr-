@@ -20,10 +20,60 @@ export function formatCountdown(ms: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-export function timeAgo(iso: string, now: number = Date.now()): string {
-  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+// Intl formatters are expensive to build; cache one per time zone ("" = the user's own).
+const shortDateFmt = new Map<string, Intl.DateTimeFormat>();
+const shortDateYearFmt = new Map<string, Intl.DateTimeFormat>();
+const yearFmt = new Map<string, Intl.DateTimeFormat>();
+const exactFmt = new Map<string, Intl.DateTimeFormat>();
+
+function cached(cache: Map<string, Intl.DateTimeFormat>, timeZone: string | undefined, options: Intl.DateTimeFormatOptions) {
+  const key = timeZone ?? "";
+  let fmt = cache.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", { ...options, timeZone });
+    cache.set(key, fmt);
+  }
+  return fmt;
+}
+
+/**
+ * Relative time in minute steps: "just now", "5m ago", "3h ago", "2d ago",
+ * then "12 Nov" (or "12 Nov 2025" outside the current year). Never shows seconds;
+ * future times (clock skew) read "just now".
+ *
+ * `timeZone` only affects the date form. Leave it unset for the user's own zone;
+ * pass "UTC" when server and client must render identical text.
+ */
+export function timeAgo(iso: string, now: number = Date.now(), timeZone?: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const elapsed = Math.max(0, now - then);
+  if (elapsed < MINUTE) return "just now";
+  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`;
+  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`;
+  if (elapsed < 7 * DAY) return `${Math.floor(elapsed / DAY)}d ago`;
+
+  const yearOf = cached(yearFmt, timeZone, { year: "numeric" });
+  const sameYear = yearOf.format(then) === yearOf.format(now);
+  return sameYear
+    ? cached(shortDateFmt, timeZone, { day: "numeric", month: "short" }).format(then)
+    : cached(shortDateYearFmt, timeZone, { day: "numeric", month: "short", year: "numeric" }).format(then);
+}
+
+/** Exact date and 24-hour time, e.g. "13 Nov 2026, 14:32". Defaults to the user's own time zone. */
+export function formatExactTime(iso: string, timeZone?: string): string {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  return cached(exactFmt, timeZone, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(then);
 }
