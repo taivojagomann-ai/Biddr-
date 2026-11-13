@@ -104,7 +104,9 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
         <p className="px-4 pb-4 text-sm text-mute">
           {auction.status === "upcoming"
             ? "Bidding opens when the timer runs out. Ask the seller questions below in the meantime."
-            : "This auction has closed."}
+            : auction.status === "withdrawn"
+              ? "This auction was withdrawn. No one won the car, and all bids were cancelled."
+              : "This auction has closed."}
         </p>
       )}
     </section>

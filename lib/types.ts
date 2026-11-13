@@ -3,7 +3,8 @@
 
 export type Country = "EE" | "LV" | "LT";
 export type ConditionType = "clean" | "restored_accident";
-export type AuctionStatus = "draft" | "upcoming" | "live" | "ended" | "sold" | "reserve_not_met";
+export type AuctionStatus =
+  | "draft" | "upcoming" | "live" | "ended" | "sold" | "reserve_not_met" | "rejected" | "withdrawn";
 export type HoldStatus = "pending" | "authorized" | "released" | "captured" | "failed";
 export type UserRole = "user" | "seller" | "admin";
 export type InspectionCity = "Tallinn" | "Riga" | "Vilnius";
@@ -62,6 +63,17 @@ export interface AuctionPrivate {
   requested_reserve: number | null;
   inspection_preferred_dates: string | null;
   contact_notes: string | null;
+  rejection_reason: string | null;
+}
+
+/** Row in admin_actions (service role only). */
+export interface AdminActionRow {
+  id: string;
+  admin_id: string | null;
+  auction_id: string | null;
+  action: string;
+  details: Record<string, unknown>;
+  created_at: string;
 }
 
 /** Columns the feed needs; keeps list queries light. */

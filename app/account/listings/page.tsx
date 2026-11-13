@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
 import { STATUS_LABELS } from "@/lib/sell";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,8 @@ const STATUS_STYLES: Record<Auction["status"], string> = {
   sold: "border-verified text-verified",
   ended: "border-line text-mute",
   reserve_not_met: "border-line text-mute",
+  rejected: "border-signal/60 text-signal",
+  withdrawn: "border-line text-mute",
 };
 
 export default async function MyListingsPage() {
@@ -37,6 +39,20 @@ export default async function MyListingsPage() {
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
   const listings = data ?? [];
+
+  // Rejection reasons live in auction_private, which only admins can read. Read them
+  // with the service role, strictly for this seller's own rejected listings.
+  const rejectedIds = listings.filter((l) => l.status === "rejected").map((l) => l.id);
+  const reasons = new Map<string, string>();
+  if (rejectedIds.length) {
+    const { data: rows } = await getAdminSupabase()
+      .from("auction_private")
+      .select("auction_id, rejection_reason, auction:auctions!inner(seller_id)")
+      .in("auction_id", rejectedIds)
+      .eq("auction.seller_id", user.id)
+      .returns<{ auction_id: string; rejection_reason: string | null }[]>();
+    for (const r of rows ?? []) if (r.rejection_reason) reasons.set(r.auction_id, r.rejection_reason);
+  }
 
   return (
     <main className="container max-w-3xl py-12 sm:py-16">
@@ -57,7 +73,8 @@ export default async function MyListingsPage() {
         <ul className="mt-8 divide-y divide-line rounded-lg border border-line bg-panel">
           {listings.map((l) => {
             const cover = l.gallery_urls?.exterior?.[0];
-            const isPublic = l.status !== "draft";
+            const isPublic = l.status !== "draft" && l.status !== "rejected";
+            const reason = reasons.get(l.id);
             const body = (
               <>
                 <div className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-asphalt sm:w-32">
@@ -80,6 +97,12 @@ export default async function MyListingsPage() {
                       </span>
                     ) : null}
                   </p>
+                  {l.status === "rejected" ? (
+                    <p className="mt-2 rounded-md border border-line bg-asphalt/60 px-2.5 py-2 text-sm">
+                      <span className="text-mute">Why: </span>
+                      {reason ?? "We couldn't accept this listing. Contact us for details."}
+                    </p>
+                  ) : null}
                   <p className="mt-1 text-xs text-mute">
                     Submitted {new Date(l.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
