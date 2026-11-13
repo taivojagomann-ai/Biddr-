@@ -120,6 +120,24 @@ export type AuctionCard = Pick<
   | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo" | "watch_count"
 >;
 
+/**
+ * auctions.search_text / search_words (0012) are kept by a trigger and only used
+ * inside the search functions; the app never reads or writes them.
+ *
+ * One row of search_auctions(p_query, p_tab, p_country, p_condition, p_limit, p_offset):
+ * the card columns, the row's position and the total number of matches.
+ */
+export type AuctionSearchRow = AuctionCard & { sort_rank: number; total_count: number };
+
+/** One row of search_suggestions(p_query, p_limit): a make, or a make + model (+ variant). */
+export interface SearchSuggestion {
+  label: string;
+  make: string;
+  model: string | null;
+  variant: string | null;
+  listing_count: number;
+}
+
 export interface BidHistoryRow {
   id: string;
   amount: number;

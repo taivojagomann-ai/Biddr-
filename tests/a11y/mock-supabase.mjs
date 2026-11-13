@@ -198,6 +198,56 @@ function crc32(buf) {
 }
 const IMAGE = png(96, 64);
 
+// --- Search (simplified copy of search_auctions / search_suggestions, 0012) ----
+const SEARCH_ALIASES = { vw: "volkswagen", merc: "mercedes", amg: "mercedes amg", beemer: "bmw", bimmer: "bmw" };
+const spaced = (t) => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const isYear = (w) => /^\d{4}$/.test(w) && +w >= 1950 && +w <= new Date().getFullYear() + 1;
+function searchWords(q) {
+  const out = [];
+  for (const t of spaced(q).split(" ").filter(Boolean).flatMap((t) => spaced(SEARCH_ALIASES[t] ?? t).split(" "))) {
+    const last = out[out.length - 1];
+    const join = last && !isYear(t) && !isYear(last) &&
+      ((/[a-z]$/.test(last) && /^\d/.test(t)) || (/\d$/.test(last) && /^[a-z]/.test(t)));
+    if (join) out[out.length - 1] = last + t;
+    else if (!out.includes(t)) out.push(t);
+  }
+  return out.slice(0, 8);
+}
+const compactOf = (a) => spaced([a.make, a.model, a.variant, a.title, a.year].filter(Boolean).join(" ")).replace(/ /g, "");
+const matches = (a, words) => words.every((w) => (isYear(w) ? a.year === +w : compactOf(a).includes(w)));
+const TAB_STATUS = { live: ["live"], newest: ["live"], ending: ["live"], upcoming: ["upcoming"], past: ["ended", "sold", "reserve_not_met"] };
+function searchAuctions({ p_query, p_tab = "live", p_country, p_condition, p_limit = 48, p_offset = 0 }) {
+  const words = searchWords(p_query);
+  if (!words.length) return [];
+  const rows = AUCTIONS.filter((a) => (TAB_STATUS[p_tab] ?? TAB_STATUS.live).includes(a.status))
+    .filter((a) => p_tab !== "ending" || new Date(a.ends_at).getTime() <= Date.now() + 24 * H)
+    .filter((a) => !p_country || a.location_country === p_country)
+    .filter((a) => p_condition !== "clean" || a.condition_type === "clean")
+    .filter((a) => p_condition !== "restored" || (a.condition_type === "restored_accident" && a.inspection_partner_name))
+    .filter((a) => matches(a, words));
+  const key = p_tab === "newest" || p_tab === "upcoming" ? "starts_at" : "ends_at";
+  const dir = p_tab === "newest" || p_tab === "past" ? -1 : 1;
+  rows.sort((a, b) => dir * (new Date(a[key]).getTime() - new Date(b[key]).getTime()));
+  return rows.slice(p_offset, p_offset + p_limit).map((a, i) => ({ ...a, sort_rank: p_offset + i + 1, total_count: rows.length }));
+}
+function searchSuggestions({ p_query, p_limit = 6 }) {
+  const words = searchWords(p_query).filter((w) => !isYear(w));
+  if (spaced(p_query).length < 2 || !words.length) return [];
+  const groups = new Map();
+  for (const a of AUCTIONS.filter((x) => !["draft", "rejected"].includes(x.status))) {
+    for (const [kind, label, model, variant] of [[0, a.make, null, null], [1, [a.make, a.model, a.variant].filter(Boolean).join(" "), a.model, a.variant ?? null]]) {
+      const g = groups.get(label) ?? { kind, label, make: a.make, model, variant, listing_count: 0 };
+      g.listing_count++;
+      groups.set(label, g);
+    }
+  }
+  return [...groups.values()]
+    .filter((g) => words.every((w) => spaced(g.label).replace(/ /g, "").includes(w)))
+    .sort((a, b) => a.kind - b.kind || b.listing_count - a.listing_count || a.label.localeCompare(b.label))
+    .slice(0, p_limit)
+    .map(({ kind: _kind, ...g }) => g);
+}
+
 // --- PostgREST-style filtering -------------------------------------------------
 const RESERVED = new Set(["select", "order", "limit", "offset", "on_conflict", "columns"]);
 function applyFilters(rows, params) {
@@ -276,6 +326,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (path === "/rest/v1/rpc/accept_bidding_terms") {
     return send(res, 200, { profile_complete: true, terms_accepted: true, current_version: TERMS_VERSION });
+  }
+  if (path === "/rest/v1/rpc/search_auctions" || path === "/rest/v1/rpc/search_suggestions") {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    const args = JSON.parse(body || "{}");
+    return send(res, 200, path.endsWith("search_auctions") ? searchAuctions(args) : searchSuggestions(args));
   }
   if (path.startsWith("/rest/v1/rpc/")) return send(res, 200, null);
 
