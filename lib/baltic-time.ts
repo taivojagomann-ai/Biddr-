@@ -1,5 +1,5 @@
-// Converts between UTC instants and wall-clock date/time in Europe/Tallinn
-// ("Baltic time"; Riga and Vilnius use the same zone rules). Pure functions,
+// Converts between UTC instants and wall-clock date/time in Europe/Tallinn, i.e.
+// Eastern European time (Helsinki, Riga and Vilnius follow the same rules). Pure functions,
 // safe on the server and in the browser.
 
 export const BALTIC_TZ = "Europe/Tallinn";

@@ -282,7 +282,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
           />
         </Section>
 
-        <Section id="schedule" title="Schedule" intro="Times are Baltic time (Tallinn, Riga, Vilnius) and stored in UTC.">
+        <Section id="schedule" title="Schedule" intro="Times are Eastern European time and stored in UTC.">
           {a.status === "draft" || a.status === "upcoming" ? (
             <ScheduleForm auctionId={a.id} startsAt={a.starts_at} endsAt={a.ends_at} />
           ) : (

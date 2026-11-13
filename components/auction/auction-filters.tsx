@@ -57,7 +57,7 @@ export function AuctionFilters({ makes, status }: { makes: string[]; status: Fee
         <div className="flex flex-col gap-1">
           <label className="text-xs text-mute" htmlFor="f-country">Country</label>
           <select id="f-country" className={selectClass} value={params.get("country") ?? ""} onChange={(e) => setParam("country", e.target.value)}>
-            <option value="">All three countries</option>
+            <option value="">All countries</option>
             {(Object.keys(COUNTRY_NAMES) as Country[]).map((c) => (
               <option key={c} value={c}>{COUNTRY_NAMES[c]}</option>
             ))}
