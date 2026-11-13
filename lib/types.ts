@@ -50,6 +50,8 @@ export interface Auction {
   starts_at: string | null;
   ends_at: string | null;
   status: AuctionStatus;
+  /** Created by the admin "Demo data" tools; bidding is refused (0006). */
+  is_demo: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -78,13 +80,13 @@ export interface AdminActionRow {
 
 /** Columns the feed needs; keeps list queries light. */
 export const AUCTION_CARD_COLUMNS =
-  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status" as const;
+  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status,is_demo" as const;
 
 export type AuctionCard = Pick<
   Auction,
   | "id" | "title" | "make" | "model" | "year" | "mileage_km" | "location_city" | "location_country"
   | "condition_type" | "inspection_partner_name" | "gallery_urls" | "starting_bid" | "has_reserve"
-  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status"
+  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo"
 >;
 
 export interface BidHistoryRow {

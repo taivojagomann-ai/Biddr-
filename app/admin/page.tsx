@@ -2,8 +2,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Car, ChevronRight } from "lucide-react";
+import { DemoBadge } from "@/components/auction/badges";
 import { Countdown } from "@/components/auction/countdown";
 import { requireAdmin } from "@/lib/admin";
+import { isDemoDataEnabled } from "@/lib/demo/config";
+import { countDemoAuctions } from "@/lib/demo/seed";
+import { DemoDataPanel } from "./demo-data-panel";
 import { ADMIN_STATUS_LABELS, ADMIN_TABS, type AdminTab } from "@/lib/admin-schemas";
 import { formatEur } from "@/lib/format";
 import type { Auction, Country } from "@/lib/types";
@@ -12,11 +16,14 @@ import { cn } from "@/lib/utils";
 type Row = Pick<
   Auction,
   | "id" | "title" | "status" | "condition_type" | "location_country" | "created_at" | "gallery_urls"
-  | "current_bid" | "bid_count" | "ends_at" | "starts_at"
+  | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "is_demo"
 > & { seller: { username: string | null; country: Country | null } | null };
 
+// Loading demo data uploads ~75 files; give the server action time to finish.
+export const maxDuration = 60;
+
 const ROW_COLUMNS =
-  "id,title,status,condition_type,location_country,created_at,gallery_urls,current_bid,bid_count,ends_at,starts_at,seller:profiles!auctions_seller_id_fkey(username,country)";
+  "id,title,status,is_demo,condition_type,location_country,created_at,gallery_urls,current_bid,bid_count,ends_at,starts_at,seller:profiles!auctions_seller_id_fkey(username,country)";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Tallinn" });
 
@@ -42,6 +49,8 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
   const { data, error } = await query.returns<Row[]>();
   const rows = data ?? [];
   const now = Date.now();
+  const demoEnabled = isDemoDataEnabled();
+  const demoAuctions = demoEnabled ? await countDemoAuctions(ctx.db) : 0;
 
   return (
     <main className="container py-8 sm:py-12">
@@ -100,7 +109,10 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
                   </div>
                   <div className="grid min-w-0 flex-1 gap-1 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-center md:gap-4">
                     <div className="min-w-0">
-                      <p className="truncate font-semibold">{r.title}</p>
+                      <p className="truncate font-semibold">
+                        {r.is_demo ? <DemoBadge className="mr-2 align-middle" /> : null}
+                        {r.title}
+                      </p>
                       <p className="truncate text-xs text-mute">
                         {r.seller?.username ?? "No username"} · {r.location_country} ·{" "}
                         {r.condition_type === "restored_accident" ? "Restored" : "Clean"}
@@ -135,6 +147,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
           })}
         </ul>
       )}
+      {demoEnabled ? <DemoDataPanel demoAuctions={demoAuctions} /> : null}
     </main>
   );
 }

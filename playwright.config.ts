@@ -42,6 +42,7 @@ export default defineConfig({
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "pk_test_a11y",
         STRIPE_SECRET_KEY: "sk_test_a11y",
         NEXT_TELEMETRY_DISABLED: "1",
+        ENABLE_DEMO_DATA: "true",
       },
     },
   ],

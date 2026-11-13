@@ -92,12 +92,14 @@ lib/
   admin.ts                      server-only: requireAdmin(), logAdminAction()
   admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
   baltic-time.ts                Europe/Tallinn date + time inputs <-> UTC
+  demo/                         demo data: seed/remove, placeholder photos and PDF, bid generator
   site.ts                       footer links, support email and company placeholders
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
 supabase/migrations/0003_sell.sql
 supabase/migrations/0004_admin.sql
+supabase/migrations/0006_demo_data.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -108,7 +110,7 @@ The site targets WCAG 2.2 AA. See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what 
 
 ## Environment variables
 
-See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `CRON_SECRET` are server-only.
+See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `CRON_SECRET` are server-only. `ENABLE_DEMO_DATA=true` turns on the admin demo-data tools; keep it `false` in production.
 
 ## Setup
 
@@ -134,6 +136,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0002_service_role_grants.sql` | Gives `service_role` access to everything in `public`, now and for future objects | Applied in production |
 | `0003_sell.sql` | `auctions.variant`, seller fields on `auction_private`, one open listing per VIN, `auction-photos` bucket and its policies | Run before using `/sell` |
 | `0004_admin.sql` | `rejected` and `withdrawn` statuses, `rejection_reason`, `admin_actions` audit log, `inspection-reports` bucket, `admin_set_reserve` and `admin_set_schedule` | Run before using `/admin` |
+| `0006_demo_data.sql` | `is_demo` on auctions and profiles, demo listings refuse bids, comment trigger lets the server set the author, comments insert grant tightened | Run before using demo data |
 
 ## Selling a car (`/sell`)
 
@@ -169,6 +172,32 @@ To remove admin access, set `role = 'user'` the same way. The header shows an "A
 - **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
 - **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. A restored car can't be scheduled without an inspection partner and report. Auctions run at most 7 days because card holds expire after about 7 days.
 - **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The inspection PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only.
+
+## Demo data (for testing)
+
+The admin panel can fill the site with six example auctions, with bids, comments and placeholder photos, and remove them again with one click. Use it to try the site before real cars are listed.
+
+### Turn it on
+1. Run `supabase/migrations/0006_demo_data.sql` in the Supabase SQL Editor (once).
+2. In Vercel: Project → Settings → Environment Variables, add `ENABLE_DEMO_DATA` with the value `true`, then redeploy. Locally, put `ENABLE_DEMO_DATA=true` in `.env.local`.
+3. Sign in as an admin and open **Admin**. The **Demo data** panel is at the bottom of the page.
+
+### Use it
+- **Load demo data** creates 1 demo seller and 5 demo bidders, and six auctions marked "Demo":
+  - live and closing in 12 minutes, 21 bids, reserve met;
+  - live, ending in 26 hours, 6 bids, reserve not met yet;
+  - live with no reserve and no bids;
+  - scheduled for tomorrow 12:00;
+  - sold yesterday (a restored car with before photos and a demo report PDF);
+  - ended 3 days ago below its reserve.
+
+  The demo users have `@biddr.invalid` emails and no passwords, so nobody can sign in as them.
+- **Reset demo data** (shown once demo data exists) removes it and creates it again with times relative to now. Demo auctions close on their own like real ones (the 12-minute one closes first), so reset whenever you need the live states back.
+- **Remove demo data** deletes the demo auctions with their bids and comments, the demo files (under `demo/` in both storage buckets) and the demo users. Rows not marked as demo are never touched.
+- Demo auctions show a "Demo" badge and the line "This is a demo listing for testing." Real members can comment on them, but bidding is refused by the database (`DEMO_AUCTION`), and no card hold is ever requested.
+
+### Before launch
+Click **Remove demo data**, then set `ENABLE_DEMO_DATA` to `false` (or delete it) in Vercel and redeploy. With it off, the panel and its actions don't exist.
 
 ## Sign-in setup (Supabase dashboard)
 

@@ -21,10 +21,12 @@ export async function POST(req: Request): Promise<Response> {
   const admin = getAdminSupabase();
 
   const { data: auction } = await admin
-    .from("auctions").select("id,title,status,seller_id").eq("id", auctionId).maybeSingle<{
-      id: string; title: string; status: string; seller_id: string;
+    .from("auctions").select("id,title,status,seller_id,is_demo").eq("id", auctionId).maybeSingle<{
+      id: string; title: string; status: string; seller_id: string; is_demo: boolean;
     }>();
   if (!auction) return jsonError("This auction no longer exists.", 404);
+  // Never ask a real card for a hold on a demo listing.
+  if (auction.is_demo) return jsonError("This is a demo listing. Bidding is turned off.", 409);
   if (auction.seller_id === user.id) return jsonError("You can't bid on your own car.", 403);
   if (!["live", "upcoming"].includes(auction.status)) return jsonError("Bidding has closed on this car.", 409);
 
