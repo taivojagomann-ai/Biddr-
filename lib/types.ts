@@ -151,6 +151,23 @@ export interface PlaceBidResult {
   min_next: number;
 }
 
+export type NotificationType =
+  | "question" | "answer" | "outbid" | "listing_approved" | "listing_rejected"
+  | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted";
+
+/** A row of public.notifications (0009) with the car title joined in. */
+export interface NotificationRow {
+  id: string;
+  type: NotificationType;
+  auction_id: string | null;
+  comment_id: string | null;
+  actor_id: string | null;
+  data: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+  auction: { title: string } | null;
+}
+
 /** What the signed-in user still needs before bidding (bidder_status(), 0008). */
 export interface BidderStatus {
   profile_complete: boolean;

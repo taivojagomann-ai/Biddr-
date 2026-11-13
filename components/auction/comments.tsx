@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getBrowserSupabase } from "@/lib/supabase/client";
@@ -22,6 +22,31 @@ interface CommentsProps {
 export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, canComment, initialNow }: CommentsProps) {
   const now = useMinuteNow(initialNow);
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
+
+  // Links like /auctions/<id>#comment-<id> (from notifications): scroll to the comment,
+  // move focus to it and highlight it briefly. No smooth scrolling for reduced motion.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const focusHash = () => {
+      const match = /^#comment-([0-9a-f-]{36})$/i.exec(window.location.hash);
+      const el = match ? document.getElementById(`comment-${match[1]}`) : null;
+      if (!el) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ block: "center", behavior: reduced ? "auto" : "smooth" });
+      el.focus({ preventScroll: true });
+      el.dataset.highlight = "true";
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        el.dataset.highlight = "false";
+      }, 2500);
+    };
+    focusHash();
+    window.addEventListener("hashchange", focusHash);
+    return () => {
+      window.removeEventListener("hashchange", focusHash);
+      clearTimeout(timer);
+    };
+  }, []);
 
   const { roots, replies } = useMemo(() => {
     const roots = comments.filter((c) => !c.parent_id);
@@ -64,7 +89,7 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
       ) : (
         <ul className="flex flex-col gap-3">
           {roots.map((c) => (
-            <li key={c.id} className="rounded-lg border border-line bg-panel p-4">
+            <li key={c.id} id={`comment-${c.id}`} tabIndex={-1} className="scroll-mt-24 rounded-lg border border-line bg-panel p-4 transition-colors duration-700 data-[highlight=true]:border-signal data-[highlight=true]:bg-signal/10">
               <CommentBody comment={c} sellerId={sellerId} now={now} />
               {currentUserId && canComment && (
                 <button type="button" onClick={() => setReplyTo(replyTo?.id === c.id ? null : c)}
@@ -77,7 +102,9 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
               {(replies.get(c.id) ?? []).length > 0 && (
                 <ul className="mt-3 flex flex-col gap-3 border-l-2 border-line pl-4">
                   {(replies.get(c.id) ?? []).map((r) => (
-                    <li key={r.id}><CommentBody comment={r} sellerId={sellerId} now={now} /></li>
+                    <li key={r.id} id={`comment-${r.id}`} tabIndex={-1} className="scroll-mt-24 rounded-md transition-colors duration-700 data-[highlight=true]:bg-signal/10">
+                      <CommentBody comment={r} sellerId={sellerId} now={now} />
+                    </li>
                   ))}
                 </ul>
               )}

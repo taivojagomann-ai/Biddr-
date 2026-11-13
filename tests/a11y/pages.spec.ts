@@ -97,6 +97,7 @@ const PUBLIC_PAGES = [
 const SIGNED_IN_PAGES = [
   ["Profile", "/account/setup"],
   ["My listings", "/account/listings"],
+  ["Notifications", "/account/notifications"],
   ["Sell, step 1", "/sell"],
   ["Listing submitted", `/sell/submitted?id=${MY_DRAFT}`],
   ["Admin list", "/admin"],
@@ -228,6 +229,32 @@ test.describe("keyboard", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(trigger).toBeFocused();
+  });
+});
+
+test.describe("notifications", () => {
+  test.beforeEach(async ({ context }) => signIn(context));
+
+  test("bell names the unread count, opens a panel with focus inside, and Escape returns focus", async ({ page }) => {
+    await page.goto("/");
+    // The mock has 2 unread notifications for the signed-in user.
+    const bell = page.getByRole("button", { name: "Notifications, 2 unread" }).filter({ visible: true });
+    await expect(bell).toHaveCount(1);
+    await expect(bell).toContainText("2"); // the number is visible, not just a red dot
+    await bell.click();
+    const panel = page.getByRole("dialog", { name: "Notifications" });
+    await expect(panel).toBeVisible();
+    await expect(panel.getByRole("heading", { name: "Notifications" })).toBeFocused();
+    await expect(panel.getByText("New").first()).toBeVisible();
+    await expectNoSeriousViolations(page, "Notifications panel");
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(bell).toBeFocused();
+  });
+
+  test("a comment link focuses that comment", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}#comment-20000000-0000-4000-8000-000000000002`);
+    await expect(page.locator("#comment-20000000-0000-4000-8000-000000000002")).toBeFocused();
   });
 });
 

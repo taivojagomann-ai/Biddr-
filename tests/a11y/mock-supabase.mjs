@@ -117,7 +117,21 @@ const BIDS = [52500, 51000, 50000, 48000, 46500, 45000].map((amount, i) => ({
   bidder: { username: i % 2 ? "test_admin" : "rs_fan" },
 }));
 
+const NOTIFICATIONS = [
+  { id: "40000000-0000-4000-8000-000000000001", user_id: ME, type: "outbid", auction_id: AUCTIONS[0].id, comment_id: null,
+    actor_id: BIDDER, data: { amount: 52500 }, read_at: null, created_at: iso(-0.2 * H), auction: { title: AUCTIONS[0].title } },
+  { id: "40000000-0000-4000-8000-000000000002", user_id: ME, type: "answer", auction_id: AUCTIONS[0].id,
+    comment_id: "20000000-0000-4000-8000-000000000002", actor_id: SELLER, data: {}, read_at: null, created_at: iso(-3 * H),
+    auction: { title: AUCTIONS[0].title } },
+  { id: "40000000-0000-4000-8000-000000000003", user_id: ME, type: "listing_submitted", auction_id: AUCTIONS[4].id, comment_id: null,
+    actor_id: SELLER, data: {}, read_at: iso(-20 * H), created_at: iso(-30 * H), auction: { title: AUCTIONS[4].title } },
+  { id: "40000000-0000-4000-8000-000000000004", user_id: ME, type: "auction_ended", auction_id: AUCTIONS[3].id, comment_id: null,
+    actor_id: null, data: { status: "sold", final_bid: 44750 }, read_at: iso(-40 * H), created_at: iso(-48 * H),
+    auction: { title: AUCTIONS[3].title } },
+];
+
 const TABLES = {
+  notifications: NOTIFICATIONS,
   auctions: AUCTIONS,
   profiles: PROFILES,
   comments: COMMENTS,
@@ -169,6 +183,7 @@ function applyFilters(rows, params) {
     const [op, ...rest] = raw.split(".");
     const value = rest.join(".");
     if (op === "eq") out = out.filter((r) => String(r[key]) === value);
+    else if (op === "is" && value === "null") out = out.filter((r) => r[key] === null || r[key] === undefined);
     else if (op === "neq") out = out.filter((r) => String(r[key]) !== value);
     else if (op === "in") {
       const set = new Set(value.replace(/^\(|\)$/g, "").split(",").map((v) => v.replace(/^"|"$/g, "")));
@@ -180,7 +195,13 @@ function applyFilters(rows, params) {
 }
 
 function send(res, status, body, headers = {}) {
-  res.writeHead(status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", ...headers });
+  // Like real Supabase, let browsers read Content-Range (used for counts).
+  res.writeHead(status, {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "Content-Range",
+    ...headers,
+  });
   res.end(body === undefined ? "" : JSON.stringify(body));
 }
 
