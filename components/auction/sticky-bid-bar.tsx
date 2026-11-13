@@ -1,5 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/info-tip";
+import { HELP } from "@/lib/help";
 import { Countdown } from "./countdown";
 import { formatEur } from "@/lib/format";
 import { minNextBid } from "@/lib/pricing";
@@ -19,7 +21,12 @@ export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash,
           <p className="font-wide text-lg font-black leading-tight tabular">{formatEur(auction.current_bid ?? auction.starting_bid)}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-mute">{auction.status === "upcoming" ? "Opens in" : "Ends in"}</p>
+          <p className="flex items-center justify-end gap-1 text-xs text-mute">
+            {auction.status === "upcoming" ? "Opens in" : "Ends in"}
+            {live || auction.status === "upcoming" ? (
+              <InfoTip topic={HELP.extension} className="[@media(pointer:coarse)]:-mx-2.5" />
+            ) : null}
+          </p>
           <Countdown endsAt={auction.ends_at} startsAt={auction.starts_at} status={auction.status}
             initialNow={initialNow} className="font-wide text-lg font-black leading-tight" />
         </div>

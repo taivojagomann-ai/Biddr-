@@ -383,6 +383,53 @@ test.describe("phone auction cards", () => {
   });
 });
 
+test.describe("contextual help", () => {
+  test("home page has no how-it-works strip", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "How buying works" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "How it works", exact: true }).first()).toBeAttached(); // menu link stays
+  });
+
+  test("info tip opens by keyboard, focus moves in, Escape returns focus", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    const tip = page.getByRole("button", { name: "What does Partner verified mean?" });
+    await tip.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "What does Partner verified mean?" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeFocused();
+    await expect(dialog).toContainText("An independent workshop inspected this car");
+    await expect(dialog.getByRole("link", { name: /Learn more/ })).toHaveAttribute("href", "/how-it-works#badges");
+    await expect(tip).toHaveAttribute("aria-expanded", "true");
+    await expectNoSeriousViolations(page, "Info tip", '[role="dialog"]');
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(tip).toBeFocused();
+  });
+
+  test("bid box has the reserve, premium, hold and countdown tips", async ({ page, isMobile }) => {
+    test.skip(isMobile, "The bid box is shown from 1024px; phones use the sticky bar.");
+    await page.goto(`/auctions/${LIVE}`);
+    const box = page.locator("section[aria-labelledby=bid-heading]");
+    for (const name of ["What is a reserve?", "What is the buyer's premium?", "What is the card hold?", "Why can the end time change?"]) {
+      await expect(box.getByRole("button", { name })).toBeVisible();
+    }
+  });
+
+  test("on phones the tip is a full-width bottom sheet and a tap outside closes it", async ({ page, isMobile }) => {
+    test.skip(!isMobile, "Phone layout only.");
+    await page.goto(`/auctions/${LIVE}`);
+    const tip = page.locator("[data-sticky-bottom] button[aria-label='Why can the end time change?']");
+    await tip.click();
+    const dialog = page.getByRole("dialog", { name: "Why can the end time change?" });
+    const box = await dialog.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport && Math.round(box.width) >= viewport.width - 1 && Math.round(box.y + box.height) >= viewport.height - 1).toBeTruthy();
+    await page.mouse.click(10, 200);
+    await expect(dialog).toHaveCount(0);
+  });
+});
+
 test.describe("listing details", () => {
   test("long lists show 8 items until Show all is pressed", async ({ page }) => {
     await page.goto(`/auctions/${LIVE}`);
