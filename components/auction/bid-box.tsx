@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
-import { Gavel, Info, TimerReset } from "lucide-react";
+import { Gavel, TimerReset } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Countdown } from "./countdown";
+import { InfoTip } from "@/components/info-tip";
+import { HELP, holdHelp } from "@/lib/help";
 import { ReserveBadge } from "./badges";
 import { WatchButton, WatchCount } from "./watch-button";
 import { formatEur } from "@/lib/format";
@@ -55,10 +57,16 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
           <p className="text-xs text-mute">{auction.bid_count} {auction.bid_count === 1 ? "bid" : "bids"}</p>
         </div>
         <div className="border-l border-line p-4">
-          <p className="text-xs text-mute">{auction.status === "upcoming" ? "Opens" : "Time left"}</p>
+          <p className="flex items-center gap-1 text-xs text-mute">
+            {auction.status === "upcoming" ? "Opens" : "Time left"}
+            {auction.status === "live" || auction.status === "upcoming" ? <InfoTip topic={HELP.extension} /> : null}
+          </p>
           <Countdown endsAt={auction.ends_at} startsAt={auction.starts_at} status={auction.status}
             initialNow={initialNow} className="font-wide text-2xl font-black" />
-          <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} className="mt-1 inline-block" />
+          <span className="mt-1 flex items-center gap-1">
+            <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} className="inline-block" />
+            <InfoTip topic={auction.has_reserve ? HELP.reserve : HELP.noReserve} />
+          </span>
         </div>
       </div>
 
@@ -100,11 +108,14 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
               aria-invalid={tooLow} aria-describedby="bid-premium" />
           </div>
 
-          <p id="bid-premium" className="text-xs text-mute">
-            {tooLow
-              ? `Enter at least ${formatEur(minNext)}.`
-              : `If you win, you pay ${formatEur(amount + buyersPremium(amount))}, including the ${formatEur(buyersPremium(amount))} buyer's premium.`}
-          </p>
+          <div className="flex items-start justify-between gap-1">
+            <p id="bid-premium" className="min-w-0 text-xs text-mute">
+              {tooLow
+                ? `Enter at least ${formatEur(minNext)}.`
+                : `If you win, you pay ${formatEur(amount + buyersPremium(amount))}, including the ${formatEur(buyersPremium(amount))} buyer's premium.`}
+            </p>
+            <InfoTip topic={HELP.premium} className="-mt-1" />
+          </div>
 
           <Button size="lg" onClick={onPlaceBid} disabled={tooLow || isLeading}>
             <Gavel aria-hidden />
@@ -112,7 +123,7 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
           </Button>
 
           <p className="flex gap-2 text-xs text-mute">
-            <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <InfoTip topic={holdHelp(holdEur)} className="-mt-1" />
             <span>
               Before your first bid we place a refundable {formatEur(holdEur)} hold on your card. It is released when the auction ends unless you win.{" "}
               <Link href="/how-it-works#bidding" className="inline-block py-1 text-chalk underline underline-offset-4 hover:text-signal">

@@ -15,7 +15,9 @@ import {
 } from "@/components/auction/listing-sections";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
-import { DemoBadge, InspectionBadge, RestoredBadge } from "@/components/auction/badges";
+import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
+import { InfoTip } from "@/components/info-tip";
+import { HELP } from "@/lib/help";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatEur, formatKm } from "@/lib/format";
 import { WatchButton, WatchCount } from "@/components/auction/watch-button";
@@ -131,7 +133,17 @@ export default async function AuctionPage({ params }: { params: { id: string } }
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-mute">
           <span>{formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}</span>
-          <InspectionBadge partner={auction.inspection_partner_name} />
+          {auction.inspection_partner_name ? (
+            <span className="inline-flex items-center gap-0.5">
+              <InspectionBadge partner={auction.inspection_partner_name} />
+              <InfoTip topic={HELP.partnerVerified} />
+            </span>
+          ) : null}
+          {/* Phones and tablets have no bid box, so the reserve shows here (lg+ shows it in the bid box). */}
+          <span className="inline-flex items-center gap-0.5 lg:hidden">
+            <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
+            <InfoTip topic={auction.has_reserve ? HELP.reserve : HELP.noReserve} />
+          </span>
           {auction.condition_type === "restored_accident" && <RestoredBadge />}
         </div>
       </div>
