@@ -8,7 +8,9 @@ import { formatBaltic } from "@/lib/baltic-time";
 import { COUNTRY_NAMES, formatEur, formatExactTime, formatKm } from "@/lib/format";
 import { COMMENT_COLUMNS, type Auction, type AuctionPrivate, type CommentRow, type Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { asServiceHistory, asTextList, toServiceRows } from "@/lib/listing-details";
 import { CommentsPanel } from "./comments-panel";
+import { DetailsForm } from "./details-form";
 import { InspectionPanel } from "./inspection-panel";
 import { ListingForm } from "./listing-form";
 import { PhotosPanel } from "./photos-panel";
@@ -30,6 +32,7 @@ const NAV = [
   ["status", "Status"],
   ["seller", "Seller"],
   ["listing", "Listing"],
+  ["details", "Details"],
   ["photos", "Photos"],
   ["inspection", "Inspection"],
   ["pricing", "Pricing"],
@@ -203,6 +206,36 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
               country: a.location_country,
               damageSummary: a.damage_history_summary ?? "",
               videoUrl: a.video_url ?? "",
+              bodyStyle: a.body_style ?? "",
+              interiorColor: a.interior_color ?? "",
+              ownerCount: a.owner_count ? String(a.owner_count) : "",
+              sellerType: a.seller_type === "dealer" ? "dealer" : "private",
+              dealerName: a.dealer_name ?? "",
+              dealerRegistryCode: a.dealer_registry_code ?? "",
+              registrationCountry: a.registration_country ?? "",
+              isRegistered: a.is_registered === null || a.is_registered === undefined ? "" : a.is_registered ? "yes" : "no",
+            }}
+          />
+        </Section>
+
+        <Section
+          id="details"
+          title="Details"
+          intro="Highlights, equipment, modifications, known flaws, service history, items included, seller notes and Biddr's take."
+        >
+          <DetailsForm
+            auctionId={a.id}
+            initial={{
+              editorTake: a.editor_take ?? "",
+              highlights: withBlank(asTextList(a.highlights)),
+              equipment: withBlank(asTextList(a.equipment)),
+              modifications: withBlank(asTextList(a.modifications)),
+              noModifications: Boolean(a.no_modifications),
+              knownFlaws: withBlank(asTextList(a.known_flaws)),
+              noKnownFlaws: Boolean(a.no_known_flaws),
+              serviceHistory: toServiceRows(asServiceHistory(a.service_history)),
+              itemsIncluded: withBlank(asTextList(a.items_included)),
+              sellerNotes: a.seller_notes ?? "",
             }}
           />
         </Section>
@@ -306,6 +339,8 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
     </main>
   );
 }
+
+const withBlank = (list: string[]) => (list.length ? list : [""]);
 
 function Item({ label, value }: { label: string; value: React.ReactNode }) {
   return (

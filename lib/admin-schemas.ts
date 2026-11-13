@@ -2,6 +2,14 @@
 // No "use client" here; server code imports this.
 import { z } from "zod";
 import { fromBalticInputs } from "@/lib/baltic-time";
+import {
+  EDITOR_TAKE_MAX,
+  bodyStyleSchema,
+  detailsSchema,
+  registrationSchema,
+  sellerTypeSchema,
+  type DetailsInput,
+} from "@/lib/listing-details";
 import { DRIVETRAINS, MAX_PRICE, MIN_STARTING_BID, normalizeVideoUrl } from "@/lib/sell";
 import type { AuctionStatus } from "@/lib/types";
 
@@ -89,8 +97,39 @@ export const listingSchema = z.object({
     .max(500)
     .refine((v) => v === "" || normalizeVideoUrl(v) !== null, "Paste a YouTube or Vimeo link, or leave this empty.")
     .transform((v) => (v === "" ? null : normalizeVideoUrl(v))),
+  // Ownership and registration (0007). Optional for admins, since older listings may lack them.
+  bodyStyle: z.union([bodyStyleSchema, z.literal("")]).transform((v) => (v === "" ? null : v)),
+  interiorColor: optionalText(60, "interior colour"),
+  ownerCount: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 30), "Enter 1 to 30 owners, or leave it empty.")
+    .transform((v) => (v === "" ? null : Number(v))),
+  sellerType: sellerTypeSchema,
+  dealerName: optionalText(120, "company name"),
+  dealerRegistryCode: optionalText(40, "registry code"),
+  registrationCountry: z.union([registrationSchema, z.literal("")]).transform((v) => (v === "" ? null : v)),
+  isRegistered: z.enum(["", "yes", "no"]).transform((v) => (v === "" ? null : v === "yes")),
+}).superRefine((v, ctx) => {
+  if (v.sellerType === "dealer") {
+    if (!v.dealerName) ctx.addIssue({ code: "custom", path: ["dealerName"], message: "Enter the dealer's company name." });
+    if (!v.dealerRegistryCode) ctx.addIssue({ code: "custom", path: ["dealerRegistryCode"], message: "Enter the dealer's registry code." });
+  }
 });
 export type ListingInput = z.input<typeof listingSchema>;
+
+/** Details lists for admins: same limits as sellers, but older listings may have no highlights or declarations. */
+export const adminDetailsSchema = detailsSchema({ highlightsMin: 0, requireDeclarations: false });
+export type AdminDetailsInput = DetailsInput & { auctionId: string; editorTake: string };
+
+export const editorTakeSchema = z.object({
+  auctionId: id,
+  editorTake: z
+    .string()
+    .trim()
+    .max(EDITOR_TAKE_MAX, `Keep Biddr's take under ${EDITOR_TAKE_MAX.toLocaleString("en-IE")} characters.`)
+    .transform((v) => (v === "" ? null : v)),
+});
 
 export const photoSectionSchema = z.enum(["exterior", "interior", "mechanical", "before"]);
 export const photoActionSchema = z.object({ auctionId: id, section: photoSectionSchema, url: z.string().url().max(500) });

@@ -56,8 +56,8 @@ The automated suite (`npm run test:a11y`) runs 110 checks, desktop and phone. Al
 - **No screen reader testing yet.** This pass used axe, scripted keyboard tests and a code review. Before launch, test the bid flow and the sell form with VoiceOver on iOS and NVDA with Firefox.
 - **Stripe card form.** It's a third-party iframe. Its accessibility is Stripe's, and the test can't reach it (it uses a mock Stripe key). Only its border colour is set here.
 - **Admin form errors** show under each field and are announced in the section's message, but the inputs aren't linked to their own error with `aria-describedby`, as they are on public forms.
-- **Admin highlight and time inputs** have screen-reader labels inside a visibly labelled group, not a visible label each.
-- **The video embed** can be partly under the phone bid bar when it gets focus. That meets 2.4.11 (it's never entirely hidden); smaller controls are always fully visible.
+- **Admin time inputs** have screen-reader labels inside a visibly labelled group, not a visible label each. List editors (highlights, equipment, flaws and so on) show a visible number per row, named "Highlight 1" and so on for screen readers.
+- **The video embed** can be partly under the phone bid bar when it gets focus. The keyboard test skips iframes: in the offline test browser the YouTube player can't load, so there is no control inside it to focus and scroll into view. That meets 2.4.11 (it's never entirely hidden); smaller controls are always fully visible.
 - **Text spacing (1.4.12)** and **200% text-only zoom** haven't been tested automatically. Layouts use relative units, and the 320 px reflow test covers zooming the whole page.
 - **Date and time pickers** in the admin follow the browser's locale, not en-GB.
 - **Placeholders** to fill before launch: the support email and company details (`lib/site.ts`), and the Terms and Privacy pages. The "Help and contact" link is `mailto:[support email]` until then.

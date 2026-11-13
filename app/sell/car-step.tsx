@@ -1,9 +1,11 @@
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { COUNTRY_NAMES } from "@/lib/format";
+import { BODY_STYLES, REGISTRATION_OPTIONS, SELLER_TYPES } from "@/lib/listing-details";
 import { COUNTRIES, DRIVETRAINS, MAKES, type Drivetrain, type MakeOption } from "@/lib/sell";
-import type { Country } from "@/lib/types";
-import { Field, StepHeading, fieldProps } from "./field";
+import type { BodyStyle, Country, RegistrationCountry } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { Field, FieldError, StepHeading, fieldId, fieldProps } from "./field";
 import type { StepProps } from "./types";
 
 const DRIVETRAIN_LABELS: Record<Drivetrain, string> = {
@@ -157,6 +159,43 @@ export function CarStep({ values, errors, set }: StepProps) {
           />
         </Field>
 
+        <Field field="bodyStyle" label="Body style" error={errors.bodyStyle}>
+          <NativeSelect
+            {...fieldProps("bodyStyle", errors.bodyStyle)}
+            value={values.bodyStyle}
+            onChange={(e) => set("bodyStyle", e.target.value as BodyStyle | "")}
+          >
+            <option value="" disabled>
+              Choose a body style
+            </option>
+            {BODY_STYLES.map((b) => (
+              <option key={b.value} value={b.value}>
+                {b.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+
+        <Field field="interiorColor" label="Interior colour" error={errors.interiorColor} hint="Colour and material, e.g. Black Merino leather">
+          <Input
+            {...fieldProps("interiorColor", errors.interiorColor, true)}
+            value={values.interiorColor}
+            onChange={(e) => set("interiorColor", e.target.value)}
+            maxLength={60}
+          />
+        </Field>
+
+        <Field field="ownerCount" label="Number of owners" error={errors.ownerCount} hint="Including you.">
+          <Input
+            {...fieldProps("ownerCount", errors.ownerCount, true)}
+            value={values.ownerCount}
+            onChange={(e) => set("ownerCount", e.target.value.replace(/\D/g, "").slice(0, 2))}
+            inputMode="numeric"
+            maxLength={2}
+            className="sm:max-w-[8rem]"
+          />
+        </Field>
+
         <Field field="city" label="City where the car is" error={errors.city}>
           <Input
             {...fieldProps("city", errors.city)}
@@ -183,6 +222,100 @@ export function CarStep({ values, errors, set }: StepProps) {
             ))}
           </NativeSelect>
         </Field>
+      </div>
+
+      <fieldset className="mt-8 min-w-0">
+        <legend className="text-sm font-semibold">Who is selling?</legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {SELLER_TYPES.map((t, i) => (
+            <label
+              key={t.value}
+              className={cn(
+                "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border bg-panel px-4 py-3",
+                values.sellerType === t.value ? "border-signal" : "border-field hover:border-chalk",
+              )}
+            >
+              <input
+                type="radio"
+                name="sellerType"
+                id={i === 0 ? fieldId("sellerType") : undefined}
+                value={t.value}
+                checked={values.sellerType === t.value}
+                onChange={() => set("sellerType", t.value)}
+                className="size-4 accent-[#FF5500]"
+              />
+              <span className="font-semibold">{t.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {values.sellerType === "dealer" ? (
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <Field field="dealerName" label="Company name" error={errors.dealerName}>
+            <Input
+              {...fieldProps("dealerName", errors.dealerName)}
+              value={values.dealerName}
+              onChange={(e) => set("dealerName", e.target.value)}
+              autoComplete="organization"
+              maxLength={120}
+            />
+          </Field>
+          <Field field="dealerRegistryCode" label="Registry code" error={errors.dealerRegistryCode} hint="From the business register.">
+            <Input
+              {...fieldProps("dealerRegistryCode", errors.dealerRegistryCode, true)}
+              value={values.dealerRegistryCode}
+              onChange={(e) => set("dealerRegistryCode", e.target.value)}
+              maxLength={40}
+            />
+          </Field>
+        </div>
+      ) : null}
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+        <Field field="registrationCountry" label="Where is the car registered?" error={errors.registrationCountry}>
+          <NativeSelect
+            {...fieldProps("registrationCountry", errors.registrationCountry)}
+            value={values.registrationCountry}
+            onChange={(e) => set("registrationCountry", e.target.value as RegistrationCountry | "")}
+          >
+            <option value="" disabled>
+              Choose a country
+            </option>
+            {REGISTRATION_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+
+        <fieldset className="min-w-0" aria-describedby={errors.isRegistered ? `${fieldId("isRegistered")}-error` : undefined}>
+          <legend className="mb-1.5 text-sm font-semibold">Is it registered right now?</legend>
+          <div className="flex flex-col gap-3 min-[420px]:flex-row">
+            {(["yes", "no"] as const).map((v, i) => (
+              <label
+                key={v}
+                className={cn(
+                  "flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-md border bg-panel px-3",
+                  values.isRegistered === v ? "border-signal" : "border-field hover:border-chalk",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="isRegistered"
+                  id={i === 0 ? fieldId("isRegistered") : undefined}
+                  value={v}
+                  checked={values.isRegistered === v}
+                  onChange={() => set("isRegistered", v)}
+                  className="size-4 accent-[#FF5500]"
+                />
+                {v === "yes" ? "Yes" : "No, deregistered or not yet registered"}
+              </label>
+            ))}
+          </div>
+          <FieldError id={`${fieldId("isRegistered")}-error`} error={errors.isRegistered} />
+        </fieldset>
       </div>
     </section>
   );

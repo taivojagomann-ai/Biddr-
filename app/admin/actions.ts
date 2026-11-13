@@ -6,7 +6,9 @@ import {
   DB_ERROR_MESSAGES,
   INSPECTION_BUCKET,
   MAX_AUCTION_MS,
+  adminDetailsSchema,
   commentDeleteSchema,
+  editorTakeSchema,
   extendSchema,
   fieldErrorsOf,
   inspectionSchema,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/admin-schemas";
 import { formatBaltic, fromBalticInputs } from "@/lib/baltic-time";
 import { releaseAuctionHolds } from "@/lib/holds";
+import { detailsColumns } from "@/lib/listing-details";
 import { PHOTO_BUCKET, publicBucketPrefix } from "@/lib/sell";
 import type { Auction, AuctionStatus, GalleryUrls } from "@/lib/types";
 
@@ -128,6 +131,14 @@ export async function updateListing(input: unknown): Promise<AdminResult> {
     location_country: v.country,
     damage_history_summary: v.damageSummary,
     video_url: v.videoUrl,
+    body_style: v.bodyStyle,
+    interior_color: v.interiorColor,
+    owner_count: v.ownerCount,
+    seller_type: v.sellerType,
+    dealer_name: v.sellerType === "dealer" ? v.dealerName : null,
+    dealer_registry_code: v.sellerType === "dealer" ? v.dealerRegistryCode : null,
+    registration_country: v.registrationCountry,
+    is_registered: v.isRegistered,
   };
   const { error } = await ctx.db.from("auctions").update(changes).eq("id", v.auctionId);
   if (error) return { ok: false, error: dbMessage(error) };
@@ -135,6 +146,39 @@ export async function updateListing(input: unknown): Promise<AdminResult> {
   await logAdminAction(ctx, v.auctionId, "listing.update", { changes });
   refresh(v.auctionId);
   return { ok: true, message: "Listing details saved." };
+}
+
+// -----------------------------------------------------------------------------
+// Details lists and Biddr's take
+// -----------------------------------------------------------------------------
+export async function updateDetails(input: unknown): Promise<AdminResult> {
+  const g = await guard(editorTakeSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+
+  const details = adminDetailsSchema.safeParse(input);
+  if (!details.success) {
+    const fieldErrors = fieldErrorsOf(details.error);
+    return { ok: false, error: Object.values(fieldErrors)[0] ?? "Check the form.", fieldErrors };
+  }
+
+  const changes = { ...detailsColumns(details.data), editor_take: v.editorTake };
+  const { data, error } = await ctx.db.from("auctions").update(changes).eq("id", v.auctionId).select("id");
+  if (error) return { ok: false, error: dbMessage(error) };
+  if (!data?.length) return NOT_FOUND;
+
+  await logAdminAction(ctx, v.auctionId, "details.update", {
+    highlights: changes.highlights.length,
+    equipment: changes.equipment.length,
+    modifications: changes.no_modifications ? "none" : changes.modifications.length,
+    known_flaws: changes.no_known_flaws ? "none" : changes.known_flaws.length,
+    service_history: changes.service_history.length,
+    items_included: changes.items_included.length,
+    seller_notes: changes.seller_notes ? changes.seller_notes.length : 0,
+    editor_take: changes.editor_take,
+  });
+  refresh(v.auctionId);
+  return { ok: true, message: "Details saved." };
 }
 
 // -----------------------------------------------------------------------------

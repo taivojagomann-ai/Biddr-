@@ -1,20 +1,43 @@
 import { Button } from "@/components/ui/button";
 import { COUNTRY_NAMES, formatEur, formatKm } from "@/lib/format";
-import { photoSectionsFor, type SellErrors, type SellPhotos, type StepId } from "@/lib/sell";
+import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
+import { STEP, photoSectionsFor, type SellErrors, type SellPhotos, type StepId } from "@/lib/sell";
 import { cn } from "@/lib/utils";
 import { FieldError, StepHeading, fieldId } from "./field";
 import type { SellValues } from "./types";
+
+function isEmpty(v: React.ReactNode): boolean {
+  if (v === null || v === undefined || v === false || v === "") return true;
+  // <Bullets> with nothing to show
+  if (typeof v === "object" && "props" in v && Array.isArray((v.props as { items?: unknown }).items)) {
+    return !(v.props as { items: string[] }).items.some((s) => s.trim());
+  }
+  return false;
+}
 
 function num(v: string): number | null {
   const n = Number(v.replace(/[\s.,]/g, ""));
   return v.trim() && Number.isFinite(n) ? n : null;
 }
 
+/** Non-empty items as a bulleted list, or nothing (Row then shows "Not given"). */
+function Bullets({ items }: { items: string[] }) {
+  const list = items.map((s) => s.trim()).filter(Boolean);
+  if (!list.length) return null;
+  return (
+    <ul className="list-disc space-y-0.5 pl-4">
+      {list.map((s, i) => (
+        <li key={i}>{s}</li>
+      ))}
+    </ul>
+  );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[8.5rem_1fr] gap-3 py-2 text-sm sm:grid-cols-[11rem_1fr]">
       <dt className="text-mute">{label}</dt>
-      <dd className="min-w-0 break-words">{value || <span className="text-mute">Not given</span>}</dd>
+      <dd className="min-w-0 break-words">{isEmpty(value) ? <span className="text-mute">Not given</span> : value}</dd>
     </div>
   );
 }
@@ -92,7 +115,7 @@ export function ReviewStep({
       </div>
 
       <div className="mt-6 space-y-4">
-        <Block title="Car" step={1} onEdit={onEdit} hasErrors={stepsWithErrors.has(1)}>
+        <Block title="Car" step={STEP.car} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.car)}>
           <Row label="Make and model" value={[make, values.model, values.variant].filter(Boolean).join(" ")} />
           <Row label="Year" value={values.year} />
           <Row label="VIN" value={<span className="font-mono">{values.vin}</span>} />
@@ -101,13 +124,33 @@ export function ReviewStep({
           <Row label="Transmission" value={values.transmission} />
           <Row label="Drivetrain" value={values.drivetrain} />
           <Row label="Exterior colour" value={values.exteriorColor} />
+          <Row label="Interior" value={values.interiorColor} />
+          <Row label="Body style" value={labelOf(BODY_STYLES, values.bodyStyle || null)} />
+          <Row label="Owners" value={values.ownerCount} />
+          <Row
+            label="Seller"
+            value={
+              values.sellerType === "dealer"
+                ? [`Dealer: ${values.dealerName}`, values.dealerRegistryCode ? `registry code ${values.dealerRegistryCode}` : ""].filter(Boolean).join(", ")
+                : "Private person"
+            }
+          />
+          <Row
+            label="Registration"
+            value={[
+              labelOf(REGISTRATION_OPTIONS, values.registrationCountry || null),
+              values.isRegistered === "yes" ? "registered" : values.isRegistered === "no" ? "not registered right now" : "",
+            ]
+              .filter(Boolean)
+              .join(", ")}
+          />
           <Row
             label="Location"
             value={[values.city, values.country ? COUNTRY_NAMES[values.country] : ""].filter(Boolean).join(", ")}
           />
         </Block>
 
-        <Block title="History" step={2} onEdit={onEdit} hasErrors={stepsWithErrors.has(2)}>
+        <Block title="History" step={STEP.history} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.history)}>
           <Row
             label="Accident damage"
             value={values.hadDamage === "yes" ? "Yes, repaired" : values.hadDamage === "no" ? "No" : ""}
@@ -117,14 +160,39 @@ export function ReviewStep({
           ) : null}
         </Block>
 
-        <Block title="Photos" step={3} onEdit={onEdit} hasErrors={stepsWithErrors.has(3)}>
+        <Block title="Details" step={STEP.details} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.details)}>
+          <Row label="Highlights" value={<Bullets items={values.highlights} />} />
+          <Row label="Equipment" value={<Bullets items={values.equipment} />} />
+          <Row
+            label="Modifications"
+            value={values.noModifications ? "None, factory specification" : <Bullets items={values.modifications} />}
+          />
+          <Row
+            label="Known flaws"
+            value={values.noKnownFlaws ? "Seller is not aware of any flaws" : <Bullets items={values.knownFlaws} />}
+          />
+          <Row
+            label="Service history"
+            value={
+              <Bullets
+                items={values.serviceHistory
+                  .filter((r) => r.date || r.description)
+                  .map((r) => [r.date, r.mileage ? `${r.mileage} km` : "", r.description, r.workshop].filter(Boolean).join(", "))}
+              />
+            }
+          />
+          <Row label="Items included" value={<Bullets items={values.itemsIncluded} />} />
+          <Row label="Seller notes" value={values.sellerNotes ? <span className="whitespace-pre-line">{values.sellerNotes}</span> : ""} />
+        </Block>
+
+        <Block title="Photos" step={STEP.photos} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.photos)}>
           {photoSectionsFor(restored).map((s) => (
             <Row key={s.key} label={s.label} value={`${photos[s.key].length} photos`} />
           ))}
           <Row label="Video" value={values.videoUrl} />
         </Block>
 
-        <Block title="Price and inspection" step={4} onEdit={onEdit} hasErrors={stepsWithErrors.has(4)}>
+        <Block title="Price and inspection" step={STEP.price} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.price)}>
           <Row label="Starting bid" value={start !== null ? formatEur(start) : ""} />
           <Row label="Reserve price" value={reserve !== null ? `${formatEur(reserve)} (private)` : "No reserve"} />
           <Row label="Inspection" value={values.inspectionCity} />

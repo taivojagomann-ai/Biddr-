@@ -1,6 +1,14 @@
 // Shared by /sell (client form), its server action and /account/listings.
 // Keep this file free of "use client" so server code can import it.
 import { z } from "zod";
+import {
+  HIGHLIGHTS_MIN,
+  detailsSchema,
+  emptyServiceRow,
+  ownershipSchema,
+  type DetailsInput,
+  type OwnershipInput,
+} from "@/lib/listing-details";
 import type { AuctionStatus, Country, InspectionCity } from "@/lib/types";
 
 export const PHOTO_BUCKET = "auction-photos";
@@ -17,10 +25,14 @@ export const INSPECTION_CITIES: readonly InspectionCity[] = ["Tallinn", "Riga", 
 export const STEPS = [
   { id: 1, label: "Car" },
   { id: 2, label: "History" },
-  { id: 3, label: "Photos" },
-  { id: 4, label: "Price and inspection" },
-  { id: 5, label: "Review" },
+  { id: 3, label: "Details" },
+  { id: 4, label: "Photos" },
+  { id: 5, label: "Price and inspection" },
+  { id: 6, label: "Review" },
 ] as const;
+
+/** Step numbers by name, so code never hard-codes positions. */
+export const STEP = { car: 1, history: 2, details: 3, photos: 4, price: 5, review: 6 } as const;
 export type StepId = (typeof STEPS)[number]["id"];
 
 export const PHOTO_SECTIONS = [
@@ -36,6 +48,7 @@ export const MAX_SOURCE_FILE_BYTES = 25 * 1024 * 1024;
 export const PHOTO_MAX_EDGE = 2560;
 export const PHOTO_QUALITY = 0.85;
 export const MIN_STARTING_BID = 1000;
+
 export const MAX_PRICE = 10_000_000;
 
 export function photoSectionsFor(restored: boolean) {
@@ -62,7 +75,7 @@ export function storageKey(userId: string): string {
 // -----------------------------------------------------------------------------
 export type SellPhotos = Record<PhotoSection, string[]>;
 
-export interface SellInput {
+export interface SellInput extends OwnershipInput, DetailsInput {
   draftId: string;
   make: MakeOption | "";
   makeOther: string;
@@ -94,11 +107,14 @@ export type SellErrors = Partial<Record<SellField, string>>;
 /** Which step shows each field, so the server can send the user back to the right place. */
 export const FIELD_STEP: Record<SellField, StepId> = {
   make: 1, makeOther: 1, model: 1, variant: 1, year: 1, vin: 1, mileageKm: 1, engine: 1, transmission: 1,
-  drivetrain: 1, exteriorColor: 1, city: 1, country: 1,
+  drivetrain: 1, exteriorColor: 1, bodyStyle: 1, interiorColor: 1, ownerCount: 1, sellerType: 1, dealerName: 1,
+  dealerRegistryCode: 1, registrationCountry: 1, isRegistered: 1, city: 1, country: 1,
   hadDamage: 2, damageSummary: 2,
-  "photos.exterior": 3, "photos.interior": 3, "photos.mechanical": 3, "photos.before": 3, videoUrl: 3,
-  startingBid: 4, reserve: 4, inspectionCity: 4, inspectionDates: 4,
-  confirmed: 5,
+  highlights: 3, equipment: 3, modifications: 3, noModifications: 3, knownFlaws: 3, noKnownFlaws: 3,
+  serviceHistory: 3, itemsIncluded: 3, sellerNotes: 3,
+  "photos.exterior": 4, "photos.interior": 4, "photos.mechanical": 4, "photos.before": 4, videoUrl: 4,
+  startingBid: 5, reserve: 5, inspectionCity: 5, inspectionDates: 5,
+  confirmed: 6,
 };
 
 export function emptySellInput(draftId: string, country: Country | ""): SellInput {
@@ -106,7 +122,11 @@ export function emptySellInput(draftId: string, country: Country | ""): SellInpu
     draftId,
     make: "", makeOther: "", model: "", variant: "", year: "", vin: "", mileageKm: "", engine: "",
     transmission: "", drivetrain: "", exteriorColor: "", city: "", country,
+    bodyStyle: "", interiorColor: "", ownerCount: "", sellerType: "private", dealerName: "", dealerRegistryCode: "",
+    registrationCountry: country, isRegistered: "",
     hadDamage: "", damageSummary: "",
+    highlights: ["", "", ""], equipment: [""], modifications: [""], noModifications: false, knownFlaws: [""],
+    noKnownFlaws: false, serviceHistory: [emptyServiceRow()], itemsIncluded: [""], sellerNotes: "",
     photos: { exterior: [], interior: [], mechanical: [], before: [] },
     videoUrl: "",
     startingBid: "", reserve: "", inspectionCity: "", inspectionDates: "",
@@ -302,6 +322,9 @@ export const priceSchema = z
     }
   });
 
+/** Sellers must give 3 to 10 highlights. */
+export const sellerDetailsSchema = detailsSchema({ highlightsMin: HIGHLIGHTS_MIN });
+
 export const confirmSchema = z.object({
   confirmed: z.literal(true, { errorMap: () => ({ message: "Tick the box to confirm before you submit." }) }),
 });
@@ -317,17 +340,19 @@ function collect(error: z.ZodError, into: SellErrors) {
 export function validateStep(step: StepId, input: SellInput): SellErrors {
   const errors: SellErrors = {};
   const restored = input.hadDamage === "yes";
-  const result =
-    step === 1
-      ? carSchema.safeParse(input)
-      : step === 2
-        ? historySchema.safeParse(input)
-        : step === 3
-          ? photosSchema(restored).safeParse(input)
-          : step === 4
-            ? priceSchema.safeParse(input)
-            : confirmSchema.safeParse(input);
-  if (!result.success) collect(result.error, errors);
+  const results =
+    step === STEP.car
+      ? [carSchema.safeParse(input), ownershipSchema.safeParse(input)]
+      : step === STEP.history
+        ? [historySchema.safeParse(input)]
+        : step === STEP.details
+          ? [sellerDetailsSchema.safeParse(input)]
+          : step === STEP.photos
+            ? [photosSchema(restored).safeParse(input)]
+            : step === STEP.price
+              ? [priceSchema.safeParse(input)]
+              : [confirmSchema.safeParse(input)];
+  for (const r of results) if (!r.success) collect(r.error, errors);
   return errors;
 }
 
@@ -360,19 +385,23 @@ export function parseSubmission(input: unknown) {
   const raw = input as SellInput;
   const restored = raw.hadDamage === "yes";
   const car = carSchema.safeParse(raw);
+  const ownership = ownershipSchema.safeParse(raw);
+  const details = sellerDetailsSchema.safeParse(raw);
   const history = historySchema.safeParse(raw);
   const photos = photosSchema(restored).safeParse(raw);
   const price = priceSchema.safeParse(raw);
   const confirm = confirmSchema.safeParse(raw);
 
   const errors: SellErrors = {};
-  for (const r of [car, history, photos, price, confirm]) if (!r.success) collect(r.error, errors);
-  if (!car.success || !history.success || !photos.success || !price.success || !confirm.success) {
+  for (const r of [car, ownership, history, details, photos, price, confirm]) if (!r.success) collect(r.error, errors);
+  if (!car.success || !ownership.success || !history.success || !details.success || !photos.success || !price.success || !confirm.success) {
     return { success: false as const, errors };
   }
   return {
     success: true as const,
     data: { draftId: base.data.draftId, ...car.data, ...history.data, ...photos.data, ...price.data },
+    ownership: ownership.data,
+    details: details.data,
   };
 }
 

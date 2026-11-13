@@ -9,6 +9,7 @@ import {
   MAX_PHOTOS_PER_SECTION,
   PHOTO_BUCKET,
   PHOTO_SECTION_KEYS,
+  STEP,
   STEPS,
   draftFolder,
   emptySellInput,
@@ -25,12 +26,14 @@ import {
   type SellPhotos,
   type StepId,
 } from "@/lib/sell";
+import { LIST_MAX_ITEMS, type ServiceRowInput } from "@/lib/listing-details";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { submitListing } from "./actions";
 import { CarStep } from "./car-step";
 import { STEP_HEADING_ID, fieldId } from "./field";
+import { DetailsStep } from "./details-step";
 import { HistoryStep } from "./history-step";
 import { PhotosStep } from "./photos-step";
 import { PriceStep } from "./price-step";
@@ -41,8 +44,9 @@ const MAX_PARALLEL_UPLOADS = 3;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PENDING_PHOTOS = "Wait for your photos to finish uploading, or remove the ones that failed.";
 
+// v1 drafts had five steps (no Details); v2 added Details as step 3.
 interface Persisted {
-  v: 1;
+  v: 2;
   draftId: string;
   step: StepId;
   furthest: StepId;
@@ -71,14 +75,43 @@ function asStep(v: unknown): StepId {
   return typeof v === "number" && STEPS.some((s) => s.id === v) ? (v as StepId) : 1;
 }
 
+function isServiceRow(v: unknown): v is ServiceRowInput {
+  return (
+    isRecord(v) &&
+    typeof v.date === "string" && typeof v.mileage === "string" &&
+    typeof v.description === "string" && typeof v.workshop === "string"
+  );
+}
+
 /** Reads a saved draft defensively: unknown keys are dropped, wrong types fall back to defaults. */
 function readPersisted(raw: unknown, country: Country | ""): Persisted | null {
-  if (!isRecord(raw) || raw.v !== 1 || typeof raw.draftId !== "string" || !UUID_RE.test(raw.draftId)) return null;
+  if (!isRecord(raw) || (raw.v !== 1 && raw.v !== 2) || typeof raw.draftId !== "string" || !UUID_RE.test(raw.draftId)) {
+    return null;
+  }
   const values = emptyValues(country);
   const savedValues = isRecord(raw.values) ? raw.values : {};
   for (const key of Object.keys(values) as (keyof SellValues)[]) {
     const saved = savedValues[key];
-    if (typeof saved === typeof values[key]) Object.assign(values, { [key]: saved });
+    const fallback = values[key];
+    if (Array.isArray(fallback)) {
+      if (!Array.isArray(saved)) continue;
+      const list = key === "serviceHistory" ? saved.filter(isServiceRow) : saved.filter((x): x is string => typeof x === "string");
+      if (list.length) Object.assign(values, { [key]: list.slice(0, LIST_MAX_ITEMS) });
+    } else if (typeof saved === typeof fallback) {
+      Object.assign(values, { [key]: saved });
+    }
+  }
+
+  // A v1 draft saved step 3+ as Photos/Price/Review: shift them one along, and send
+  // anyone past History to the new Details step, whose fields are required.
+  let step = asStep(raw.step);
+  let furthest = asStep(raw.furthest);
+  if (raw.v === 1) {
+    const shift = (n: StepId): StepId => (n >= 3 ? (Math.min(n + 1, STEPS.length) as StepId) : n);
+    step = shift(step);
+    furthest = shift(furthest);
+    if (step > STEP.details) step = STEP.details;
+    if (furthest > STEP.details) furthest = STEP.details;
   }
   const photos: SellPhotos = { exterior: [], interior: [], mechanical: [], before: [] };
   const savedPhotos = isRecord(raw.photos) ? raw.photos : {};
@@ -91,7 +124,7 @@ function readPersisted(raw: unknown, country: Country | ""): Persisted | null {
         .slice(0, MAX_PHOTOS_PER_SECTION);
     }
   }
-  return { v: 1, draftId: raw.draftId, step: asStep(raw.step), furthest: asStep(raw.furthest), values, photos };
+  return { v: 2, draftId: raw.draftId, step, furthest, values, photos };
 }
 
 function doneItem(url: string): UploadItem {
@@ -189,7 +222,7 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
 
   useEffect(() => {
     if (!loaded || submittedRef.current) return;
-    const data: Persisted = { v: 1, draftId, step, furthest, values, photos };
+    const data: Persisted = { v: 2, draftId, step, furthest, values, photos };
     try {
       window.localStorage.setItem(key, JSON.stringify(data));
     } catch {
@@ -213,7 +246,17 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
     setValues((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
       const linked: SellField[] =
-        field === "make" ? ["make", "makeOther"] : field === "hadDamage" ? ["hadDamage", "damageSummary"] : [];
+        field === "make"
+          ? ["make", "makeOther"]
+          : field === "hadDamage"
+            ? ["hadDamage", "damageSummary"]
+            : field === "noModifications"
+              ? ["modifications"]
+              : field === "noKnownFlaws"
+                ? ["knownFlaws"]
+                : field === "sellerType"
+                  ? ["dealerName", "dealerRegistryCode"]
+                  : [];
       const keys = [field as SellField, ...linked];
       if (!keys.some((k) => prev[k])) return prev;
       const next = { ...prev };
@@ -374,7 +417,7 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
 
   const onContinue = () => {
     const errs = validateStep(step, input);
-    const pending = step === 3 && hasPendingUploads();
+    const pending = step === STEP.photos && hasPendingUploads();
     setErrors(errs);
     setPendingError(pending ? PENDING_PHOTOS : undefined);
     if (Object.keys(errs).length) {
@@ -415,7 +458,7 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
     }
     if (hasPendingUploads()) {
       setPendingError(PENDING_PHOTOS);
-      setStep(3);
+      setStep(STEP.photos);
       scrollTop();
       return;
     }
@@ -509,13 +552,14 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
         className="mt-8"
         onSubmit={(e) => {
           e.preventDefault();
-          if (step === 5) void onSubmit();
+          if (step === STEP.review) void onSubmit();
           else onContinue();
         }}
       >
-        {step === 1 ? <CarStep values={values} errors={errors} set={set} /> : null}
-        {step === 2 ? <HistoryStep values={values} errors={errors} set={set} /> : null}
-        {step === 3 ? (
+        {step === STEP.car ? <CarStep values={values} errors={errors} set={set} /> : null}
+        {step === STEP.history ? <HistoryStep values={values} errors={errors} set={set} /> : null}
+        {step === STEP.details ? <DetailsStep values={values} errors={errors} set={set} /> : null}
+        {step === STEP.photos ? (
           <PhotosStep
             uploads={uploads}
             restored={restored}
@@ -530,8 +574,8 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
             onMove={movePhoto}
           />
         ) : null}
-        {step === 4 ? <PriceStep values={values} errors={errors} set={set} /> : null}
-        {step === 5 ? (
+        {step === STEP.price ? <PriceStep values={values} errors={errors} set={set} /> : null}
+        {step === STEP.review ? (
           <ReviewStep
             values={values}
             photos={photos}
@@ -561,7 +605,7 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
               Back
             </Button>
             <Button type="submit" size="lg" disabled={submitting} className="flex-[2] md:flex-none">
-              {step === 5 ? (
+              {step === STEP.review ? (
                 submitting ? (
                   <>
                     <Loader2 aria-hidden className="animate-spin" />
