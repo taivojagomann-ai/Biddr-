@@ -7,7 +7,6 @@ import type { BodyStyle, RegistrationCountry, SellerType, ServiceRecord } from "
 export const LIST_MAX_ITEMS = 40;
 export const LIST_ITEM_MAX = 300;
 export const SELLER_NOTES_MAX = 2000;
-export const EDITOR_TAKE_MAX = 1500;
 export const HIGHLIGHTS_MIN = 3;
 export const HIGHLIGHTS_MAX = 10;
 export const PUBLIC_LIST_PREVIEW = 8;

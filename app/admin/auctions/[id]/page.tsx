@@ -221,12 +221,11 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         <Section
           id="details"
           title="Details"
-          intro="Highlights, equipment, modifications, known flaws, service history, items included, seller notes and Biddr's take."
+          intro="Highlights, equipment, modifications, known flaws, service history, items included and seller notes."
         >
           <DetailsForm
             auctionId={a.id}
             initial={{
-              editorTake: a.editor_take ?? "",
               highlights: withBlank(asTextList(a.highlights)),
               equipment: withBlank(asTextList(a.equipment)),
               modifications: withBlank(asTextList(a.modifications)),

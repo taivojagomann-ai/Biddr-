@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AdminDetailsInput } from "@/lib/admin-schemas";
 import {
-  EDITOR_TAKE_MAX,
   HIGHLIGHTS_MAX,
   NO_FLAWS_LABEL,
   NO_MODIFICATIONS_LABEL,
@@ -31,23 +30,6 @@ export function DetailsForm({ auctionId, initial }: { auctionId: string; initial
         void run(updateDetails, { auctionId, ...v });
       }}
     >
-      <div>
-        <Label htmlFor="details-editorTake" optional>
-          Biddr&apos;s take
-        </Label>
-        <Textarea
-          id="details-editorTake"
-          value={v.editorTake}
-          onChange={(e) => set("editorTake", e.target.value)}
-          rows={4}
-          maxLength={EDITOR_TAKE_MAX}
-        />
-        <FieldNote
-          error={fe.editorTake}
-          hint={`Written by the Biddr team and shown first on the auction page. ${v.editorTake.length} of ${EDITOR_TAKE_MAX.toLocaleString("en-IE")} characters.`}
-        />
-      </div>
-
       <ListEditor
         id="details-highlights"
         label="Highlights"
