@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { COUNTRY_NAMES } from "@/lib/format";
 import type { Country } from "@/lib/types";
@@ -12,6 +12,20 @@ export function AuctionFilters({ makes, status }: { makes: string[]; status: Fee
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const navRef = useRef<HTMLElement>(null);
+
+  // On phones the tab row scrolls sideways: bring the active tab into view. Only the
+  // row scrolls (never the page), and without animation if motion is reduced.
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active) return;
+    const left = active.offsetLeft - nav.offsetLeft;
+    const right = left + active.offsetWidth;
+    if (left >= nav.scrollLeft && right <= nav.scrollLeft + nav.clientWidth) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    nav.scrollTo({ left: Math.max(0, left - 16), behavior: reduced ? "auto" : "smooth" });
+  }, [status]);
 
   const hrefWith = (key: string, value: string | null) => {
     const next = new URLSearchParams(params.toString());
@@ -29,7 +43,7 @@ export function AuctionFilters({ makes, status }: { makes: string[]; status: Fee
 
   return (
     <div className={cn("flex flex-col gap-3 md:flex-row md:items-end md:justify-between", pending && "opacity-70")} aria-busy={pending}>
-      <nav aria-label="Auction status" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
+      <nav ref={navRef} aria-label="Auction status" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
         {STATUS_TABS.map((t) => (
           <Link
             key={t.value}

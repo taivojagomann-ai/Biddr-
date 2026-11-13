@@ -383,6 +383,47 @@ test.describe("phone auction cards", () => {
   });
 });
 
+test.describe("newly listed", () => {
+  test("tabs are in order, Newly listed shows its count and announces it", async ({ page }) => {
+    await page.goto("/");
+    const tabs = page.getByRole("navigation", { name: "Auction status" }).getByRole("link");
+    await expect(tabs).toHaveText(["Live", "Newly listed", "Ending in 24h", "Coming up", "Past results"]);
+    await page.getByRole("link", { name: "Newly listed" }).click();
+    await expect(page).toHaveURL(/\?status=newest/);
+    await expect(page.getByRole("link", { name: "Newly listed" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: /^Newly listed \(\d+\)$/ })).toBeVisible();
+    await expect(page.getByText("Closing next")).toHaveCount(0); // no featured block on this tab
+    await expect(page.getByRole("status").filter({ hasText: /^Newly listed: \d+ auctions?\.$/ })).toHaveCount(1);
+    const fresh = page.locator("article.auction-card", { hasText: "Black Series" });
+    await expect(fresh.getByText("New", { exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "Newly listed tab");
+  });
+
+  test("an unknown status falls back to Live", async ({ page }) => {
+    await page.goto("/?status=bogus");
+    await expect(page.getByRole("link", { name: "Live", exact: true })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("cars that went live days ago have no New badge", async ({ page }) => {
+    await page.goto("/?status=newest");
+    const older = page.locator("article.auction-card", { hasText: "Audi RS 4" });
+    await expect(older).toBeVisible();
+    await expect(older.getByText("New", { exact: true })).toHaveCount(0);
+  });
+
+  test("on a narrow phone the active tab is scrolled into view", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto("/?status=past");
+    const nav = page.getByRole("navigation", { name: "Auction status" });
+    const active = nav.getByRole("link", { name: "Past results" });
+    await expect(async () => {
+      const n = await nav.boundingBox();
+      const t = await active.boundingBox();
+      expect(n && t && t.x >= n.x - 1 && t.x + t.width <= n.x + n.width + 1).toBeTruthy();
+    }).toPass();
+  });
+});
+
 test.describe("contextual help", () => {
   test("home page has no how-it-works strip", async ({ page }) => {
     await page.goto("/");
