@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { INSPECTION_BUCKET } from "@/lib/admin-schemas";
 import { addDays, fromBalticInputs, toBalticInputs } from "@/lib/baltic-time";
 import { PHOTO_BUCKET, listingTitle } from "@/lib/sell";
-import type { AuctionStatus, ConditionType, Country, InspectionCity } from "@/lib/types";
+import type { AuctionStatus, BodyStyle, ConditionType, Country, InspectionCity, RegistrationCountry } from "@/lib/types";
 import { renderDemoPhoto, renderDemoReportPdf } from "./assets";
 import { generateBids } from "./bids";
 
@@ -69,7 +69,28 @@ interface CarSpec {
   startingBid: number;
   bids: number;
   highlights: string[];
+  listing: ListingDetails;
 }
+
+/** Structured listing content (0007). `highlights` above are the inspection highlights. */
+interface ListingDetails {
+  bodyStyle: BodyStyle;
+  interior: string;
+  owners: number;
+  dealer: { name: string; code: string } | null;
+  registration: RegistrationCountry;
+  registered: boolean;
+  highlights: string[];
+  equipment: string[];
+  modifications: string[] | "none";
+  flaws: string[] | "none";
+  service: [string, number, string, string?][]; // month, km, work, workshop
+  included: string[];
+  notes: string;
+  take: string;
+}
+
+const DEMO_DEALER = { name: "Tallinn M Garage OÜ (demo)", code: "00000000" };
 
 const CARS: CarSpec[] = [
   {
@@ -78,6 +99,35 @@ const CARS: CarSpec[] = [
     color: "Hockenheim Silver", city: "Tallinn", country: "EE", inspectionCity: "Tallinn", condition: "clean",
     damageSummary: null, startingBid: 38_000, bids: 21,
     highlights: ["Paint thickness measured on all panels", "Clutch and flywheel within spec", "No fault codes stored", "Tyres 6 mm all round"],
+    listing: {
+      bodyStyle: "coupe", interior: "Black Dakota leather with blue stitching", owners: 2, dealer: DEMO_DEALER,
+      registration: "EE", registered: true,
+      highlights: [
+        "Competition package with the 410 hp S55 engine",
+        "6-speed manual gearbox",
+        "Two owners, both in Estonia",
+        "Every service stamped at BMW, the last at 40,000 km",
+        "Never tracked; stored in a heated garage every winter",
+      ],
+      equipment: [
+        "M Sport seats with illuminated badge", "Harman Kardon sound system", "Adaptive M suspension",
+        "M Sport brakes with blue callipers", "19-inch M double-spoke wheels", "Heated front seats", "Reversing camera",
+        "Apple CarPlay", "Lane departure warning", "Adaptive LED headlights",
+      ],
+      modifications: ["M Performance exhaust tips (the original tips are included)"],
+      flaws: ["Stone chips on the front bumper", "Light kerb mark on the right rear wheel", "Small wear on the driver's seat bolster"],
+      service: [
+        ["2020-10", 1_200, "Running-in check", "BMW Tallinn"],
+        ["2021-08", 10_300, "Oil and filter service", "BMW Tallinn"],
+        ["2022-07", 19_800, "Oil service and brake fluid", "BMW Tallinn"],
+        ["2023-06", 28_900, "Oil service, front brake pads", "BMW Tallinn"],
+        ["2024-05", 35_600, "Oil service and spark plugs", "BMW Tallinn"],
+        ["2025-06", 40_100, "Oil service, clutch fluid, cabin filter", "BMW Tallinn"],
+      ],
+      included: ["Second key", "Winter tyres on 18-inch wheels", "Service book", "Original exhaust tips"],
+      notes: "Bought from the first owner in 2022. Used on dry summer days only; winters in a heated garage.",
+      take: "A manual M2 Competition with two owners and every service stamped. The S55 is the engine to have in this car, and the flaws listed are minor and easy to put right.",
+    },
   },
   {
     scenario: "reserve_not_met_yet", make: "Audi", model: "RS6", variant: "Avant", year: 2021, wmi: "WUA",
@@ -85,6 +135,23 @@ const CARS: CarSpec[] = [
     color: "Nardo Grey", city: "Riga", country: "LV", inspectionCity: "Riga", condition: "clean",
     damageSummary: null, startingBid: 88_000, bids: 6,
     highlights: ["Full Audi service history", "Brake discs and pads at 70%", "Air suspension holds height overnight"],
+    listing: {
+      bodyStyle: "estate", interior: "Black Valcona leather with honeycomb stitching", owners: 1, dealer: null,
+      registration: "LV", registered: true,
+      highlights: ["One owner from new", "Dynamic package with the 280 km/h limit", "Full Audi service history", "Panoramic roof and Bang & Olufsen sound"],
+      equipment: ["Bang & Olufsen 3D sound", "Panoramic glass roof", "Head-up display", "Matrix LED headlights", "Four-zone climate control", "Tow bar, electric"],
+      modifications: "none",
+      flaws: ["Small scratch on the rear bumper from loading"],
+      service: [
+        ["2022-09", 9_800, "Oil service", "Audi Riga"],
+        ["2023-09", 18_900, "Oil service and pollen filter", "Audi Riga"],
+        ["2024-10", 26_400, "Inspection service, brake fluid", "Audi Riga"],
+        ["2025-10", 31_000, "Oil service, front discs and pads", "Audi Riga"],
+      ],
+      included: ["Two keys", "Load cover and luggage net", "Winter tyres on 21-inch wheels"],
+      notes: "Family car, never used for towing. The tow bar was fitted at Audi for a bike rack.",
+      take: "One owner, full dealer history and the spec you want. The reserve is ambitious, but RS6 Avants this clean are rare in the Baltics.",
+    },
   },
   {
     scenario: "no_reserve_no_bids", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
@@ -92,6 +159,23 @@ const CARS: CarSpec[] = [
     color: "Gentian Blue", city: "Vilnius", country: "LT", inspectionCity: "Vilnius", condition: "clean",
     damageSummary: null, startingBid: 105_000, bids: 0,
     highlights: ["PDK serviced at 20,000 km", "Paint thickness measured on all panels", "No signs of track use"],
+    listing: {
+      bodyStyle: "coupe", interior: "Black leather with Chalk stitching", owners: 2, dealer: null,
+      registration: "LT", registered: true,
+      highlights: ["No reserve", "Sport Chrono package and sports exhaust", "Rear-axle steering", "PDK serviced at 20,000 km"],
+      equipment: ["Sport Chrono package", "Sports exhaust", "Rear-axle steering", "BOSE sound", "Front axle lift", "Adaptive sports seats Plus", "LED Matrix headlights"],
+      modifications: "none",
+      flaws: "none",
+      service: [
+        ["2020-11", 6_100, "Oil service", "Porsche Vilnius"],
+        ["2021-11", 12_700, "Oil service and inspection", "Porsche Vilnius"],
+        ["2023-03", 20_000, "PDK fluid change, oil service", "Porsche Vilnius"],
+        ["2025-04", 24_300, "Oil service, brake fluid", "Porsche Vilnius"],
+      ],
+      included: ["Two keys", "Porsche car cover", "Service book"],
+      notes: "Selling with no reserve because I'm moving abroad. Happy to show the car in Vilnius before the auction ends.",
+      take: "A well-optioned 992 Carrera S with no reserve: it sells at whatever the bidding reaches. Front lift and rear steering make it easy to live with.",
+    },
   },
   {
     scenario: "upcoming", make: "Mercedes-AMG", model: "C63 S", variant: "Coupe", year: 2018, wmi: "WDD",
@@ -99,6 +183,24 @@ const CARS: CarSpec[] = [
     color: "Selenite Grey", city: "Tartu", country: "EE", inspectionCity: "Tallinn", condition: "clean",
     damageSummary: null, startingBid: 52_000, bids: 0,
     highlights: ["Spark plugs and coils replaced at 55,000 km", "Rear tyres new in 2026", "No oil leaks found"],
+    listing: {
+      bodyStyle: "coupe", interior: "Black Nappa leather with red stitching", owners: 3, dealer: DEMO_DEALER,
+      registration: "EE", registered: true,
+      highlights: ["510 hp twin-turbo V8", "AMG Performance seats", "Panoramic roof", "Spark plugs and coils done at 55,000 km"],
+      equipment: ["AMG Performance seats", "Burmester sound", "Panoramic roof", "AMG Ride Control", "Keyless entry", "360-degree camera"],
+      modifications: ["Remus valved exhaust", "Tinted rear windows"],
+      flaws: ["Rear tyres new, front tyres at about 4 mm", "Light scratches on the centre console trim"],
+      service: [
+        ["2019-04", 14_500, "Service A", "Mercedes-Benz Tallinn"],
+        ["2020-05", 27_800, "Service B", "Mercedes-Benz Tallinn"],
+        ["2022-03", 41_200, "Service A, rear brake pads", "Mercedes-Benz Tallinn"],
+        ["2024-06", 55_000, "Spark plugs, ignition coils, oil service", "AMG Performance Centre Tallinn"],
+        ["2025-09", 58_100, "Oil service and gearbox software update", "Mercedes-Benz Tallinn"],
+      ],
+      included: ["Second key", "Original exhaust (removed in 2023)", "Service book"],
+      notes: "The Remus exhaust has a quiet mode for cold starts. The original exhaust comes with the car.",
+      take: "The last of the V8 C63 coupes, with the costly plugs and coils job already done. The exhaust is loud but the original comes with it.",
+    },
   },
   {
     scenario: "sold", make: "BMW", model: "M3", variant: "Competition", year: 2022, wmi: "WBS",
@@ -108,6 +210,23 @@ const CARS: CarSpec[] = [
       "Front-left impact at low speed in 2024. Bonnet, left wing, headlight and radiator replaced with new BMW parts at a main-dealer body shop. Airbags did not deploy. Wheel alignment checked after the repair.",
     startingBid: 62_000, bids: 17,
     highlights: ["Chassis measured within factory tolerance", "Paint thickness measured on all panels", "Repair invoices checked against the work", "No fault codes stored"],
+    listing: {
+      bodyStyle: "sedan", interior: "Kyalami Orange and black Merino leather", owners: 1, dealer: null,
+      registration: "LT", registered: true,
+      highlights: ["One owner from new", "Professionally repaired with new BMW parts", "Carbon bucket seats", "M Drive Professional"],
+      equipment: ["M carbon bucket seats", "M Drive Professional", "Harman Kardon sound", "Laser headlights", "Head-up display", "Parking assistant Plus"],
+      modifications: "none",
+      flaws: ["Very slight colour difference on the bonnet under strong light (repaired area)"],
+      service: [
+        ["2023-03", 8_200, "Oil service", "BMW Kaunas"],
+        ["2024-04", 13_900, "Oil service, front-left repair completed", "BMW Kaunas"],
+        ["2024-05", 14_100, "Wheel alignment check after the repair", "BMW Kaunas"],
+        ["2025-05", 19_100, "Oil service and brake fluid", "BMW Kaunas"],
+      ],
+      included: ["Two keys", "Repair invoices and parts list", "Winter tyres on 19-inch wheels"],
+      notes: "The repair was done at the dealer with new parts. Every invoice is with the inspection partner.",
+      take: "An honest restored car: a low-speed hit, repaired at the dealer with new parts, and documented end to end. It sold above the reserve.",
+    },
   },
   {
     scenario: "ended_below_reserve", make: "Audi", model: "RS3", variant: "Sportback", year: 2017, wmi: "WUA",
@@ -115,6 +234,27 @@ const CARS: CarSpec[] = [
     color: "Catalunya Red", city: "Pärnu", country: "EE", inspectionCity: "Tallinn", condition: "clean",
     damageSummary: null, startingBid: 29_000, bids: 9,
     highlights: ["S tronic oil changed at 60,000 km", "Haldex serviced", "Small stone chips on the bonnet"],
+    listing: {
+      bodyStyle: "hatchback", interior: "Black Fine Nappa leather with diamond stitching", owners: 3, dealer: null,
+      registration: "other_eu", registered: true,
+      highlights: ["Five-cylinder 2.5 TFSI", "Imported from Finland in 2025 with full history", "S tronic and Haldex serviced on time"],
+      equipment: ["Bang & Olufsen sound", "Virtual cockpit", "Magnetic Ride", "RS sports exhaust"],
+      modifications: ["Software tune to 450 hp (dyno sheet included)", "Milltek cat-back exhaust"],
+      flaws: ["Stone chips on the bonnet", "Kerbed front left wheel", "Driver's seat bolster worn", "Small crack in the rear diffuser"],
+      service: [
+        ["2018-06", 11_000, "Oil service", "Audi Helsinki"],
+        ["2019-06", 21_500, "Oil service", "Audi Helsinki"],
+        ["2020-08", 31_800, "Oil service, Haldex fluid", "Audi Helsinki"],
+        ["2021-09", 40_200, "S tronic fluid change", "Audi Helsinki"],
+        ["2022-08", 47_900, "Oil service, spark plugs"],
+        ["2023-07", 55_300, "Front discs and pads, brake fluid", "Rautakesko Oy"],
+        ["2024-09", 61_800, "Oil service, Haldex fluid"],
+        ["2025-08", 66_900, "Oil service, software tune and dyno run", "Tuning workshop, Pärnu"],
+      ],
+      included: ["Two keys", "Dyno sheet", "Finnish service records"],
+      notes: "Still on Finnish plates. Registration in Estonia is booked; the buyer can take it over.",
+      take: "A tuned RS3 with a long, honest list of flaws. Bidding stopped below the reserve: the tune puts some buyers off.",
+    },
   },
 ];
 
@@ -358,6 +498,26 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         inspection_report_url: reportUrl,
         inspection_date: inspectionDate,
         inspection_highlights: car.highlights,
+        body_style: car.listing.bodyStyle,
+        interior_color: car.listing.interior,
+        owner_count: car.listing.owners,
+        seller_type: car.listing.dealer ? "dealer" : "private",
+        dealer_name: car.listing.dealer?.name ?? null,
+        dealer_registry_code: car.listing.dealer?.code ?? null,
+        registration_country: car.listing.registration,
+        is_registered: car.listing.registered,
+        highlights: car.listing.highlights,
+        equipment: car.listing.equipment,
+        modifications: car.listing.modifications === "none" ? [] : car.listing.modifications,
+        no_modifications: car.listing.modifications === "none",
+        known_flaws: car.listing.flaws === "none" ? [] : car.listing.flaws,
+        no_known_flaws: car.listing.flaws === "none",
+        service_history: car.listing.service
+          .map(([date, mileage_km, description, workshop]) => ({ date, mileage_km, description, ...(workshop ? { workshop } : {}) }))
+          .sort((a, b) => b.date.localeCompare(a.date)),
+        items_included: car.listing.included,
+        seller_notes: car.listing.notes,
+        editor_take: car.listing.take,
         gallery_urls: { exterior: urls.exterior, interior: urls.interior, mechanical: urls.mechanical },
         before_photos_urls: urls.before,
         starting_bid: car.startingBid,

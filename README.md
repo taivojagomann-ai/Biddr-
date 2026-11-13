@@ -88,6 +88,7 @@ lib/
   redirect.ts                   safeNext(): same-site ?next= paths only
   login.ts, profile.ts          shared copy, types and constants for auth pages
   sell.ts                       /sell constants, zod step schemas, status labels (client + server)
+  listing-details.ts            highlights, equipment, flaws, service history...: schemas, labels, display helpers
   photo-upload.ts               browser-only: resize to WebP, upload with progress
   admin.ts                      server-only: requireAdmin(), logAdminAction()
   admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
@@ -100,6 +101,7 @@ supabase/migrations/0002_service_role_grants.sql
 supabase/migrations/0003_sell.sql
 supabase/migrations/0004_admin.sql
 supabase/migrations/0006_demo_data.sql
+supabase/migrations/0007_listing_details.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -137,16 +139,23 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0003_sell.sql` | `auctions.variant`, seller fields on `auction_private`, one open listing per VIN, `auction-photos` bucket and its policies | Run before using `/sell` |
 | `0004_admin.sql` | `rejected` and `withdrawn` statuses, `rejection_reason`, `admin_actions` audit log, `inspection-reports` bucket, `admin_set_reserve` and `admin_set_schedule` | Run before using `/admin` |
 | `0006_demo_data.sql` | `is_demo` on auctions and profiles, demo listings refuse bids, comment trigger lets the server set the author, comments insert grant tightened | Run before using demo data |
+| `0007_listing_details.sql` | Structured listing details: body style, interior colour, ownership, seller type and dealer, registration, highlights, equipment, modifications, known flaws, service history, items included, seller notes and Biddr's take | Run before deploying this version (the sell form saves these columns) |
 
 ## Selling a car (`/sell`)
 
-Signed-in members with a complete profile (username and country) submit a car in five steps: Car, History, Photos, Price and inspection, Review. The listing is saved as a `draft` for an admin to review; nothing is public until an admin schedules it.
+Signed-in members with a complete profile (username and country) submit a car in six steps: Car, History, Details, Photos, Price and inspection, Review. The listing is saved as a `draft` for an admin to review; nothing is public until an admin schedules it.
 
 - **Draft on the device.** The form keeps all state in `sell/sell-form.tsx` and saves it to `localStorage` under `biddr:sell:v1:<user id>`, so a refresh keeps the work. "Start over" clears it and deletes the uploaded photos.
 - **Photos go straight to Storage.** The browser resizes each photo (longest edge 2560 px, WebP at 0.85; JPEG where the browser can't encode WebP) and uploads it to `auction-photos/<user id>/<draft id>/<section>/<random>.webp`. Storage policies only allow writes inside the user's own folder.
 - **Validated twice.** Each step is checked with the zod schemas in `lib/sell.ts` before Continue, and `submitListing` runs them all again. It also accepts only photo URLs from the user's own draft folder.
 - **What is stored where.** The `auctions` row is inserted with the user's own client, so RLS and column grants apply and `status` stays `draft`. Only after that insert succeeds, the service role writes the requested reserve, inspection city and preferred dates to `auction_private` (admin-only) and sets `has_reserve`. If that second write fails, the draft is deleted so the seller can submit again.
 - **One open listing per VIN.** A VIN that is already a draft, scheduled or live is refused with "This car is already listed or waiting for review."
+- **Structured details.**
+  - The Car step asks for body style, interior colour, number of owners, seller type (dealers give a company name and registry code) and registration.
+  - The Details step collects highlights (3 to 10), equipment, modifications (or "factory specification"), known flaws (or "not aware of any flaws"), service history rows (month, mileage, work, workshop), items included and seller notes.
+  - Every list allows at most 40 items of 300 characters each; the database enforces the same limits (`0007`).
+  - Drafts saved before the Details step existed open on that step.
+- **The auction page** shows, under the gallery: Biddr's take (written by admins), highlights, the inspection, specifications, equipment, modifications, known flaws, service history (a table, newest first), items included, seller notes, then the video. Empty optional sections are hidden, and lists longer than 8 items get a "Show all" button.
 - `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
 
 Photos from a draft that is never submitted stay in the bucket. Clean them up later with a scheduled job that removes folders with no matching auction.
@@ -168,7 +177,7 @@ To remove admin access, set `role = 'user'` the same way. The header shows an "A
 ### What it does
 
 - **Lists** every auction in five tabs with counts: To review (`draft`), Scheduled (`upcoming`), Live (ending soonest first), Finished (`ended`, `sold`, `reserve_not_met`) and Rejected or withdrawn.
-- **Per auction** (`/admin/auctions/<id>`): seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve and inspection preferences. The admin can edit the listing text, remove photos or change the cover, enter the inspection partner, date and highlights, and upload the report PDF. They also set the starting bid, increment and reserve, set the schedule in Baltic time, and see all bids and delete comments.
+- **Per auction** (`/admin/auctions/<id>`): every listing detail is editable, including "Biddr's take", the team's note shown first on the auction page (up to 1,500 characters). Admins aren't held to the seller-only rules (minimum highlights, declaring modifications and flaws), so older listings can be saved. Also on the page: seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve and inspection preferences. The admin can edit the listing text, remove photos or change the cover, enter the inspection partner, date and highlights, and upload the report PDF. They also set the starting bid, increment and reserve, set the schedule in Baltic time, and see all bids and delete comments.
 - **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
 - **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. A restored car can't be scheduled without an inspection partner and report. Auctions run at most 7 days because card holds expire after about 7 days.
 - **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The inspection PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only.

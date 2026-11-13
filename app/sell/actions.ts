@@ -10,6 +10,7 @@ import {
   type SellErrors,
   type SubmitResult,
 } from "@/lib/sell";
+import { detailsColumns, ownershipColumns } from "@/lib/listing-details";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
 const FILE_RE = /^[A-Za-z0-9-]{8,64}\.(webp|jpg)$/;
@@ -45,6 +46,8 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
       : { ok: false, error: "Something in the form is out of date. Reload the page and check each step." };
   }
   const v = parsed.data;
+  const ownership = ownershipColumns(parsed.ownership);
+  const details = detailsColumns(parsed.details);
 
   const photoErrors = checkPhotoUrls(v.photos, user.id, v.draftId);
   if (Object.keys(photoErrors).length) return { ok: false, errors: photoErrors };
@@ -74,6 +77,8 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
       before_photos_urls: v.photos.before,
       video_url: v.videoUrl,
       starting_bid: v.startingBid,
+      ...ownership,
+      ...details,
     })
     .select("id, seller_id, status")
     .single<{ id: string; seller_id: string; status: string }>();

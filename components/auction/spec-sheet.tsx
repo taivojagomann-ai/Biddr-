@@ -1,5 +1,13 @@
 import { COUNTRY_NAMES, formatKm } from "@/lib/format";
+import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
 import type { Auction } from "@/lib/types";
+
+function registration(a: Auction): string | null {
+  const where = labelOf(REGISTRATION_OPTIONS, a.registration_country);
+  if (!where && a.is_registered === null) return null;
+  const status = a.is_registered === true ? "registered" : a.is_registered === false ? "not registered right now" : null;
+  return [where, status].filter(Boolean).join(", ") || null;
+}
 
 export function SpecSheet({ auction }: { auction: Auction }) {
   const rows: [string, string | null][] = [
@@ -8,9 +16,14 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Engine", auction.engine],
     ["Transmission", auction.transmission],
     ["Drivetrain", auction.drivetrain],
+    ["Body style", labelOf(BODY_STYLES, auction.body_style)],
     ["Colour", auction.exterior_color],
+    ["Interior", auction.interior_color],
     ["Location", `${auction.location_city}, ${COUNTRY_NAMES[auction.location_country]}`],
     ["History", auction.condition_type === "clean" ? "Clean, no recorded accidents" : "Accident damage, professionally restored"],
+    ["Owners", auction.owner_count ? String(auction.owner_count) : null],
+    ["Seller", auction.seller_type === "dealer" ? (auction.dealer_name ? `Dealer: ${auction.dealer_name}` : "Dealer") : "Private seller"],
+    ["Registration", registration(auction)],
   ];
 
   const visible = rows.filter((r): r is [string, string] => Boolean(r[1]));

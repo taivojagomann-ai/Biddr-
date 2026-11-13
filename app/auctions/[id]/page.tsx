@@ -4,6 +4,16 @@ import { Suspense } from "react";
 import { AuctionLive } from "@/components/auction/auction-live";
 import { Gallery } from "@/components/auction/gallery";
 import { InspectionCard } from "@/components/auction/inspection-card";
+import {
+  EditorTake,
+  Equipment,
+  Highlights,
+  ItemsIncluded,
+  KnownFlaws,
+  Modifications,
+  SellerNotes,
+  ServiceHistory,
+} from "@/components/auction/listing-sections";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
 import { DemoBadge, InspectionBadge, RestoredBadge } from "@/components/auction/badges";
@@ -84,9 +94,17 @@ export default async function AuctionPage({ params }: { params: { id: string } }
           holdEur={HOLD_EUR}
         >
           <Gallery auction={auction} />
+          <EditorTake auction={auction} />
+          <Highlights auction={auction} />
           <InspectionCard auction={auction} />
-          {auction.video_url && <VideoPlayer url={auction.video_url} title={auction.title} />}
           <SpecSheet auction={auction} />
+          <Equipment auction={auction} />
+          <Modifications auction={auction} />
+          <KnownFlaws auction={auction} />
+          <ServiceHistory auction={auction} />
+          <ItemsIncluded auction={auction} />
+          <SellerNotes auction={auction} />
+          {auction.video_url && <VideoPlayer url={auction.video_url} title={auction.title} />}
         </AuctionLive>
       </Suspense>
     </main>

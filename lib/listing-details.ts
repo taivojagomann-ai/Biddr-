@@ -153,7 +153,8 @@ export interface DetailsInput {
  * Details lists. Sellers need 3 to 10 highlights; admins editing older listings may
  * have fewer. Modifications and known flaws each need a list or the "none" tick.
  */
-export function detailsSchema(opts: { highlightsMin: number }) {
+export function detailsSchema(opts: { highlightsMin: number; requireDeclarations?: boolean }) {
+  const requireDeclarations = opts.requireDeclarations ?? true;
   return z
     .object({
       highlights: textList(LIST_LABELS.highlights, { min: opts.highlightsMin, max: HIGHLIGHTS_MAX }),
@@ -171,6 +172,7 @@ export function detailsSchema(opts: { highlightsMin: number }) {
         .transform((v) => (v === "" ? null : v)),
     })
     .superRefine((v, ctx) => {
+      if (!requireDeclarations) return;
       if (!v.noModifications && v.modifications.length === 0) {
         ctx.addIssue({ code: "custom", path: ["modifications"], message: `List the modifications, or tick “${NO_MODIFICATIONS_LABEL}”.` });
       }
@@ -256,7 +258,7 @@ export function toServiceRows(records: ServiceRecord[]): ServiceRowInput[] {
 export const ownershipSchema = z
   .object({
     bodyStyle: bodyStyleSchema,
-    interiorColor: z.string().trim().min(2, "Enter the interior colour, e.g. Black leather.").max(60, "Keep the interior colour under 60 characters."),
+    interiorColor: z.string().trim().min(2, "Enter the interior colour.").max(60, "Keep the interior colour under 60 characters."),
     ownerCount: ownerCountSchema,
     sellerType: sellerTypeSchema,
     dealerName: z.string().trim().max(120, "Keep the company name under 120 characters."),

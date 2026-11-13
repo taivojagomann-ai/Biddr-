@@ -55,7 +55,7 @@ function sellDraft(step: number) {
   const url = (s: string, i: number) => `${MOCK}/storage/v1/object/public/auction-photos/${ME}/3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f/${s}/${i}0000000-0000-4000-8000-000000000000.webp`;
   const list = (s: string, n: number) => Array.from({ length: n }, (_, i) => url(s, i + 1));
   return JSON.stringify({
-    v: 1,
+    v: 2,
     draftId: "3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
     step,
     furthest: 5,
@@ -63,6 +63,13 @@ function sellDraft(step: number) {
       make: "BMW", makeOther: "", model: "M3", variant: "Touring", year: "2023", vin: "WBS8M9C50G5K12345",
       mileageKm: "12000", engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "AWD",
       exteriorColor: "Frozen Deep Grey", city: "Tallinn", country: "EE", hadDamage: "yes",
+      bodyStyle: "estate", interiorColor: "Black Merino leather", ownerCount: "1", sellerType: "dealer",
+      dealerName: "Example Motors OÜ", dealerRegistryCode: "12345678", registrationCountry: "EE", isRegistered: "yes",
+      highlights: ["One owner from new", "Carbon bucket seats", "Full BMW service history"],
+      equipment: ["Harman Kardon sound", "Head-up display"], modifications: [""], noModifications: true,
+      knownFlaws: ["Stone chips on the bonnet"], noKnownFlaws: false,
+      serviceHistory: [{ date: "2025-06", mileage: "11000", description: "Oil service", workshop: "BMW Tallinn" }],
+      itemsIncluded: ["Second key"], sellerNotes: "Garaged.",
       damageSummary: "Rear bumper replaced at a main-dealer body shop after a car park scrape. Airbags did not deploy.",
       videoUrl: "", startingBid: "60000", reserve: "70000", inspectionCity: "Tallinn", inspectionDates: "", confirmed: false,
     },
@@ -140,7 +147,7 @@ test.describe("signed-in pages", () => {
     await expectNoSeriousViolations(page, "Sell step 1 errors");
   });
 
-  for (const step of [2, 3, 4, 5]) {
+  for (const step of [2, 3, 4, 5, 6]) {
     test(`sell step ${step} has no serious axe violations`, async ({ page }) => {
       await page.addInitScript(
         ([key, value]) => window.localStorage.setItem(key, value),
@@ -210,6 +217,45 @@ test.describe("keyboard", () => {
   });
 });
 
+test.describe("listing details", () => {
+  test("long lists show 8 items until Show all is pressed", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    const equipment = page.getByRole("region", { name: "Equipment" }).or(page.locator("section[aria-labelledby=equipment-heading]"));
+    await expect(equipment.getByRole("listitem")).toHaveCount(8);
+    const toggle = equipment.getByRole("button", { name: "Show all 10 items" });
+    await toggle.click();
+    await expect(equipment.getByRole("listitem")).toHaveCount(10);
+    await expect(equipment.getByRole("button", { name: "Show fewer" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test("service history is a table with column headers", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    const table = page.getByRole("table", { name: "Service history" });
+    await expect(table.getByRole("columnheader", { name: "Month" })).toBeVisible();
+    await expect(table.getByRole("row")).toHaveCount(4); // header + 3 rows
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+    test("list editor adds and removes rows by keyboard, keeping focus in the list", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(3)] as const,
+      );
+      await page.goto("/sell");
+      const add = page.getByRole("button", { name: "Add highlight" });
+      await add.focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByLabel("Highlight 4", { exact: true })).toBeFocused();
+      await page.keyboard.type("Never tracked");
+      await page.getByRole("button", { name: "Remove highlight 4" }).focus();
+      await page.keyboard.press("Enter");
+      await expect(page.getByLabel("Highlight 3", { exact: true })).toBeFocused();
+      await expect(page.getByLabel("Highlight 4", { exact: true })).toHaveCount(0);
+    });
+  });
+});
+
 test.describe("keyboard on a phone", () => {
   test.use({ viewport: { width: 390, height: 700 } });
 
@@ -236,6 +282,9 @@ test.describe("keyboard on a phone", () => {
         const bar = document.querySelector<HTMLElement>("[data-sticky-bottom]");
         if (header?.contains(el) || bar?.contains(el)) return null;
         if (getComputedStyle(el).position === "fixed") return null; // e.g. the skip link, shown on top of everything
+        // Third-party embeds (YouTube/Vimeo) scroll into view by focusing their own first control, which can't
+        // load in the offline test browser; see ACCESSIBILITY.md.
+        if (el.tagName === "IFRAME") return null;
         if (el.closest("footer")) return "end"; // reached the footer: page done
         const r = el.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) return null; // visually hidden helpers

@@ -2,6 +2,7 @@
 // Keep this file free of "use client" so server code can import it.
 import { z } from "zod";
 import {
+  HIGHLIGHTS_MIN,
   detailsSchema,
   emptyServiceRow,
   ownershipSchema,
@@ -47,7 +48,7 @@ export const MAX_SOURCE_FILE_BYTES = 25 * 1024 * 1024;
 export const PHOTO_MAX_EDGE = 2560;
 export const PHOTO_QUALITY = 0.85;
 export const MIN_STARTING_BID = 1000;
-const HIGHLIGHTS_MIN_SELLER = 3;
+
 export const MAX_PRICE = 10_000_000;
 
 export function photoSectionsFor(restored: boolean) {
@@ -322,7 +323,7 @@ export const priceSchema = z
   });
 
 /** Sellers must give 3 to 10 highlights. */
-export const sellerDetailsSchema = detailsSchema({ highlightsMin: HIGHLIGHTS_MIN_SELLER });
+export const sellerDetailsSchema = detailsSchema({ highlightsMin: HIGHLIGHTS_MIN });
 
 export const confirmSchema = z.object({
   confirmed: z.literal(true, { errorMap: () => ({ message: "Tick the box to confirm before you submit." }) }),
