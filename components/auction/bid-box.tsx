@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Countdown } from "./countdown";
 import { ReserveBadge } from "./badges";
+import { WatchButton, WatchCount } from "./watch-button";
 import { formatEur } from "@/lib/format";
 import { buyersPremium, minNextBid, QUICK_INCREMENTS } from "@/lib/pricing";
 import { cn } from "@/lib/utils";
@@ -21,9 +22,11 @@ export interface BidUiState {
   flash: boolean;
   initialNow: number;
   holdEur: number;
+  userId: string | null;
+  watching: boolean;
 }
 
-export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur }: BidUiState) {
+export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur, userId, watching }: BidUiState) {
   // Demo listings look live but never take bids (place_bid refuses them too).
   const live = auction.status === "live" && !auction.is_demo;
   const minNext = minNextBid(auction);
@@ -32,6 +35,16 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
   return (
     <section aria-labelledby="bid-heading" className="rounded-xl border border-line bg-panel">
       <h2 id="bid-heading" className="sr-only">Bidding</h2>
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
+        <WatchCount auctionId={auction.id} initialCount={auction.watch_count} className="text-xs" />
+        <WatchButton
+          auctionId={auction.id}
+          userId={userId}
+          initialWatching={watching}
+          initialCount={auction.watch_count}
+          className="ml-auto"
+        />
+      </div>
 
       <div className="grid grid-cols-2 border-b border-line">
         <div className={cn("p-4", flash && "animate-bid-flash")}>

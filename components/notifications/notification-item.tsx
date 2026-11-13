@@ -1,7 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import {
+  AlarmClock,
   CheckCircle2,
+  Eye,
   Gavel,
   MessageCircleQuestion,
   MessageSquareReply,
@@ -28,6 +30,8 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   auction_ended: Timer,
   auction_won: Trophy,
   listing_submitted: Send,
+  watch_ending_soon: AlarmClock,
+  watch_live: Eye,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

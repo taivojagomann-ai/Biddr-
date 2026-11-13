@@ -59,6 +59,15 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     supabase.from("auctions").select("make").neq("status", "draft").returns<{ make: string }[]>(),
   ]);
 
+  // Which of the shown cars the signed-in user watches (RLS: own rows only).
+  const { data: { user } } = await supabase.auth.getUser();
+  let watchedIds: string[] = [];
+  const shownIds = (data ?? []).map((a) => a.id);
+  if (user && shownIds.length) {
+    const { data: rows } = await supabase.from("watchlist").select("auction_id").in("auction_id", shownIds);
+    watchedIds = (rows ?? []).map((r) => r.auction_id as string);
+  }
+
   const makes = Array.from(new Set((makeRows ?? []).map((r) => r.make))).sort((a, b) => a.localeCompare(b));
   const hasFilters = Boolean(searchParams.make || searchParams.country || searchParams.condition);
 
@@ -113,7 +122,13 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           <p className="mt-1 text-sm text-mute">Refresh the page to try again.</p>
         </div>
       ) : (
-        <AuctionFeed initial={data ?? []} initialNow={now} featureFirst={status === "live" && !hasFilters} />
+        <AuctionFeed
+          initial={data ?? []}
+          initialNow={now}
+          featureFirst={status === "live" && !hasFilters}
+          userId={user?.id ?? null}
+          watchedIds={watchedIds}
+        />
       )}
     </main>
   );

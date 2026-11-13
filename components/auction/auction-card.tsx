@@ -3,12 +3,25 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Countdown } from "./countdown";
+import { WatchButton } from "./watch-button";
 import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
 import { formatEur, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AuctionCard as AuctionCardData } from "@/lib/types";
 
-export function AuctionCard({ auction, initialNow, priority = false }: { auction: AuctionCardData; initialNow: number; priority?: boolean }) {
+export function AuctionCard({
+  auction,
+  initialNow,
+  priority = false,
+  userId,
+  watching,
+}: {
+  auction: AuctionCardData;
+  initialNow: number;
+  priority?: boolean;
+  userId: string | null;
+  watching: boolean;
+}) {
   const cover = auction.gallery_urls.exterior[0];
   const finished = ["ended", "sold", "reserve_not_met"].includes(auction.status);
   const price = auction.current_bid ?? auction.starting_bid;
@@ -26,10 +39,9 @@ export function AuctionCard({ auction, initialNow, priority = false }: { auction
   }, [auction.bid_count]);
 
   return (
-    <Link
-      href={`/auctions/${auction.id}`}
-      className="group flex flex-col overflow-hidden rounded-lg border border-line bg-panel transition-colors hover:border-[#3f3f46]"
-    >
+    // Only the title is a link; its ::after stretches over the whole card, so the card
+    // stays clickable while the Watch button sits above it as a separate control.
+    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line bg-panel transition-colors hover:border-[#3f3f46] has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-signal has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-asphalt">
       <div className="relative aspect-[4/3] overflow-hidden bg-asphalt">
         {cover ? (
           <Image
@@ -50,7 +62,11 @@ export function AuctionCard({ auction, initialNow, priority = false }: { auction
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <h3 className="line-clamp-1 font-semibold leading-tight">{auction.title}</h3>
+        <h3 className="line-clamp-1 font-semibold leading-tight">
+          <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
+            {auction.title}
+          </Link>
+        </h3>
         <p className="text-sm text-mute">
           {formatKm(auction.mileage_km)}, {auction.location_city}, {auction.location_country}
         </p>
@@ -78,6 +94,17 @@ export function AuctionCard({ auction, initialNow, priority = false }: { auction
           </div>
         </div>
       </div>
-    </Link>
+      {/* After the link in the DOM (keyboard order: card, then Watch), above it visually. */}
+      <div className="absolute right-2 top-2 z-10">
+        <WatchButton
+          auctionId={auction.id}
+          title={auction.title}
+          userId={userId}
+          initialWatching={watching}
+          initialCount={auction.watch_count}
+          className="[&_button]:bg-asphalt/85 [&_button]:backdrop-blur"
+        />
+      </div>
+    </article>
   );
 }

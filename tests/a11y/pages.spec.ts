@@ -33,9 +33,15 @@ async function signIn(context: BrowserContext) {
   ]);
 }
 
-/** Runs axe and fails on serious or critical WCAG 2.2 A/AA violations. */
-async function expectNoSeriousViolations(page: Page, label: string) {
-  const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+/**
+ * Runs axe and fails on serious or critical WCAG 2.2 A/AA violations. For open
+ * popovers, pass `include` to scan just the popover: content underneath it can't be
+ * used while it's open, and axe would report those targets as "obscured".
+ */
+async function expectNoSeriousViolations(page: Page, label: string, include?: string) {
+  let builder = new AxeBuilder({ page }).withTags(WCAG_TAGS);
+  if (include) builder = builder.include(include);
+  const results = await builder.analyze();
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   const other = results.violations.filter((v) => !serious.includes(v));
   if (other.length) console.log(`[axe] ${label}: ${other.map((v) => `${v.impact} ${v.id} (${v.nodes.length})`).join(", ")}`);
@@ -98,6 +104,8 @@ const SIGNED_IN_PAGES = [
   ["Profile", "/account/setup"],
   ["My listings", "/account/listings"],
   ["Notifications", "/account/notifications"],
+  ["Watchlist", "/account/watchlist"],
+  ["Watchlist, ended", "/account/watchlist?tab=ended"],
   ["Sell, step 1", "/sell"],
   ["Listing submitted", `/sell/submitted?id=${MY_DRAFT}`],
   ["Admin list", "/admin"],
@@ -246,7 +254,7 @@ test.describe("notifications", () => {
     await expect(panel).toBeVisible();
     await expect(panel.getByRole("heading", { name: "Notifications" })).toBeFocused();
     await expect(panel.getByText("New").first()).toBeVisible();
-    await expectNoSeriousViolations(page, "Notifications panel");
+    await expectNoSeriousViolations(page, "Notifications panel", '[role="dialog"]:not([hidden])');
     await page.keyboard.press("Escape");
     await expect(panel).toBeHidden();
     await expect(bell).toBeFocused();
@@ -255,6 +263,67 @@ test.describe("notifications", () => {
   test("a comment link focuses that comment", async ({ page }) => {
     await page.goto(`/auctions/${LIVE}#comment-20000000-0000-4000-8000-000000000002`);
     await expect(page.locator("#comment-20000000-0000-4000-8000-000000000002")).toBeFocused();
+  });
+});
+
+test.describe("watch and share", () => {
+  test("Open Graph tags are absolute and the share image renders", async ({ page, request }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    const og = await page.locator('meta[property="og:image"]').first().getAttribute("content");
+    expect(og).toMatch(/^https?:\/\/.+\/auctions\/.+\/opengraph-image/);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+    const res = await request.get(`/auctions/${LIVE}/opengraph-image`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("image/png");
+  });
+
+  test("share menu opens, links are safe, Escape returns focus", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    await page.evaluate(() => {
+      // Force the fallback menu even if the test browser has a native share sheet.
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    });
+    const share = page.getByRole("button", { name: "Share" });
+    await share.click();
+    await expect(page.getByRole("button", { name: "Copy link" })).toBeFocused();
+    await expect(page.getByRole("link", { name: /^WhatsApp/ })).toHaveAttribute("rel", "noopener noreferrer");
+    await expectNoSeriousViolations(page, "Share menu", "[aria-controls] + div:not([hidden])");
+    await page.keyboard.press("Escape");
+    await expect(share).toBeFocused();
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("watch button toggles aria-pressed", async ({ page }) => {
+      await page.goto(`/auctions/${RESTORED}`); // not on the test user's watchlist
+      const watch = page.getByRole("button", { name: "Watch", exact: true }).first();
+      await expect(watch).toHaveAttribute("aria-pressed", "false");
+      await watch.click();
+      await expect(page.getByRole("button", { name: "Watching", exact: true }).first()).toHaveAttribute("aria-pressed", "true");
+    });
+
+    test("on a card, Tab goes from the card link to its watch button (no button inside the link)", async ({ page }) => {
+      await page.goto("/?status=upcoming");
+      const link = page.getByRole("link", { name: "2021 Porsche 911 Carrera S" });
+      await link.focus();
+      await page.keyboard.press("Tab");
+      await expect(page.getByRole("button", { name: /^Watch(ing)? 2021 Porsche 911 Carrera S$/ })).toBeFocused();
+      expect(await page.locator("a button, a a").count()).toBe(0);
+    });
+
+    test("account menu opens with focus inside and closes with Escape", async ({ page, isMobile }) => {
+      test.skip(isMobile, "Phones use the full-width Menu sheet, tested separately.");
+      await page.goto("/");
+      const button = page.getByRole("button", { name: /account menu/ });
+      await button.click();
+      await expect(button).toHaveAttribute("aria-expanded", "true");
+      await expect(page.getByRole("link", { name: "Profile" })).toBeFocused();
+      await expect(page.getByRole("link", { name: "Watchlist" })).toBeVisible();
+      await expectNoSeriousViolations(page, "Account menu", "[aria-controls] + div:not([hidden])");
+      await page.keyboard.press("Escape");
+      await expect(button).toBeFocused();
+    });
   });
 });
 

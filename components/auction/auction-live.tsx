@@ -10,6 +10,7 @@ import { StickyBidBar } from "./sticky-bid-bar";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { formatEur } from "@/lib/format";
 import { minNextBid } from "@/lib/pricing";
+import { setWatchCount } from "@/lib/client/watch-store";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow, type PlaceBidResult } from "@/lib/types";
 
 interface AuctionLiveProps {
@@ -20,6 +21,7 @@ interface AuctionLiveProps {
   initialHasHold: boolean;
   /** Signed-in user has a username and country (the comments trigger requires both). */
   canComment: boolean;
+  initialWatching: boolean;
   initialNow: number;
   holdEur: number;
   /** Server-rendered, non-interactive sections (gallery, specs, video) */
@@ -33,7 +35,7 @@ interface AuctionLiveProps {
  * On every (re)subscribe we refetch, so updates missed while offline aren't lost.
  */
 export function AuctionLive({
-  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialNow, holdEur, children,
+  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialWatching, initialNow, holdEur, children,
 }: AuctionLiveProps) {
   const supabase = getBrowserSupabase();
   const router = useRouter();
@@ -86,6 +88,7 @@ export function AuctionLive({
     }
     if (messages.length) setAnnouncement(messages.join(" "));
     prev.current = next;
+    if (typeof next.watch_count === "number") setWatchCount(next.id, next.watch_count);
     setAuction(next);
   }, [refreshBids, userId]);
 
@@ -145,6 +148,7 @@ export function AuctionLive({
   const ui: BidUiState = {
     auction, amount, setAmount, onPlaceBid: () => setModalOpen(true),
     isLeading, wasOutbid, justExtended, flash, initialNow, holdEur,
+    userId, watching: initialWatching,
   };
 
   return (
