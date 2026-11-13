@@ -61,7 +61,7 @@ export function StatusActions({
     return (
       <>
         <p>
-          The auction will end <span className="text-chalk">{formatBaltic(new Date(ms).toISOString())}</span>, Baltic time,
+          The auction will end <span className="text-chalk">{formatBaltic(new Date(ms).toISOString())}</span>, Eastern European time,
           instead of {formatBaltic(endsAt)}. Bidders see the new time straight away.
         </p>
         {long ? (
@@ -112,7 +112,7 @@ export function StatusActions({
                   <p>The listing becomes public as a scheduled auction.</p>
                   <p>
                     Bidding opens <span className="text-chalk">{formatBaltic(startsAt)}</span> and ends{" "}
-                    <span className="text-chalk">{formatBaltic(endsAt)}</span>, Baltic time. If the start has already
+                    <span className="text-chalk">{formatBaltic(endsAt)}</span>, Eastern European time. If the start has already
                     passed, bidding opens within a minute.
                   </p>
                 </>
@@ -159,7 +159,7 @@ export function StatusActions({
       {status === "upcoming" ? (
         <>
           <p className="text-sm text-mute">
-            Bidding opens {formatBaltic(startsAt)} and ends {formatBaltic(endsAt)}, Baltic time.
+            Bidding opens {formatBaltic(startsAt)} and ends {formatBaltic(endsAt)}, Eastern European time.
           </p>
           <div className="flex flex-wrap gap-2">
             <ConfirmButton
@@ -205,7 +205,7 @@ export function StatusActions({
       {status === "live" ? (
         <>
           <p className="text-sm text-mute">
-            Ends {formatBaltic(endsAt)}, Baltic time. {bidCount} {bidCount === 1 ? "bid" : "bids"}
+            Ends {formatBaltic(endsAt)}, Eastern European time. {bidCount} {bidCount === 1 ? "bid" : "bids"}
             {currentBid ? `, high bid ${formatEur(currentBid)}` : ""}.
           </p>
           <div>
@@ -234,7 +234,7 @@ export function StatusActions({
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div>
                 <label htmlFor="extend-date" className="mb-1 block text-xs text-mute">
-                  New end (Baltic time)
+                  New end (Eastern European time)
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <Input id="extend-date" type="date" className="min-w-0 flex-1" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />

@@ -70,7 +70,7 @@ export function HistoryStep({ values, errors, set }: StepProps) {
             onChange={(e) => set("damageSummary", e.target.value)}
             rows={6}
             maxLength={4000}
-            placeholder="e.g. Front-left impact in 2022. Repaired at a main-dealer body shop in Tallinn: new bonnet, wing, headlight and radiator. Airbags did not deploy."
+            placeholder="e.g. Front-left impact in 2022. Repaired at a main-dealer body shop: new bonnet, wing, headlight and radiator. Airbags did not deploy."
           />
         </Field>
       ) : null}

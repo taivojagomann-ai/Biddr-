@@ -148,7 +148,7 @@ export function BidModal(props: BidModalProps) {
           <div className="flex flex-col gap-4">
             <DialogTitle>Sign in to bid</DialogTitle>
             <DialogDescription id="bid-modal-desc">
-              Bidding is open to registered members in Estonia, Latvia and Lithuania.
+              Sign in or create a free account to bid. It takes a minute.
             </DialogDescription>
             <Button asChild size="lg"><Link href={`/login?next=/auctions/${auction.id}`}>Sign in</Link></Button>
           </div>

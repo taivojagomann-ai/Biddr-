@@ -39,8 +39,8 @@ export default function HowItWorksPage() {
     <main className="container max-w-3xl py-10 sm:py-14">
       <h1 className="font-wide text-3xl font-extrabold tracking-tight md:text-4xl">How it works</h1>
       <p className="mt-3 text-mute">
-        Biddr runs week-long online auctions for performance cars in Estonia, Latvia and Lithuania. Here is what happens
-        when you bid, and when you sell.
+        Biddr runs week-long online auctions for performance cars. Here is what happens when you bid, and when you
+        sell.
       </p>
 
       <nav aria-labelledby="toc-heading" className="mt-8 rounded-lg border border-line bg-panel p-4">
@@ -188,7 +188,7 @@ export default function HowItWorksPage() {
               form, and your answers are saved as you go.
             </li>
             <li>
-              <strong>Inspection.</strong> We book an independent inspection in Tallinn, Riga or Vilnius. Restored cars are
+              <strong>Inspection.</strong> We book an independent inspection at a partner workshop. Restored cars are
               welcome; every one is inspected before it&apos;s listed.
             </li>
             <li>

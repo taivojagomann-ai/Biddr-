@@ -350,7 +350,7 @@ export async function saveSchedule(input: unknown): Promise<AdminResult> {
 
   await logAdminAction(ctx, v.auctionId, "schedule.update", { starts_at: v.startsAt, ends_at: v.endsAt });
   refresh(v.auctionId);
-  return { ok: true, message: `Schedule saved: ${formatBaltic(v.startsAt)} to ${formatBaltic(v.endsAt)}, Baltic time.` };
+  return { ok: true, message: `Schedule saved: ${formatBaltic(v.startsAt)} to ${formatBaltic(v.endsAt)}, Eastern European time.` };
 }
 
 export async function extendAuction(input: unknown): Promise<AdminResult> {
@@ -384,7 +384,7 @@ export async function extendAuction(input: unknown): Promise<AdminResult> {
   const longRun = Date.parse(newEnd) - Date.parse(auction.starts_at) > MAX_AUCTION_MS;
   return {
     ok: true,
-    message: `The auction now ends ${formatBaltic(newEnd)}, Baltic time.${
+    message: `The auction now ends ${formatBaltic(newEnd)}, Eastern European time.${
       longRun ? " It now runs longer than 7 days, so some card holds may expire before it closes." : ""
     }`,
   };
@@ -422,7 +422,7 @@ export async function approveAuction(input: unknown): Promise<AdminResult> {
     ok: true,
     message: startsNow
       ? "Approved. Bidding opens within a minute."
-      : `Approved. Bidding opens ${formatBaltic(a.starts_at)}, Baltic time.`,
+      : `Approved. Bidding opens ${formatBaltic(a.starts_at)}, Eastern European time.`,
   };
 }
 
