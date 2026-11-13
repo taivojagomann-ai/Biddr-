@@ -27,14 +27,20 @@ export async function SiteHeader() {
           <Link href="/" className="hidden rounded-md px-3 py-2 text-mute hover:text-chalk sm:inline-flex">
             Auctions
           </Link>
-          <Link href="/sell" className="rounded-md px-3 py-2 text-mute hover:text-chalk">
+          <Link href="/sell" className="whitespace-nowrap rounded-md px-2 py-2 text-mute hover:text-chalk sm:px-3">
             Sell a car
           </Link>
           {user ? (
             <>
+              {username ? (
+                <Link href="/account/listings" className="rounded-md px-2 py-2 text-mute hover:text-chalk sm:px-3">
+                  <span className="sm:hidden">Listings</span>
+                  <span className="hidden sm:inline">My listings</span>
+                </Link>
+              ) : null}
               <Link
                 href="/account/setup"
-                className="max-w-[10rem] truncate rounded-md border border-line px-3 py-2 hover:border-mute"
+                className="max-w-[7rem] truncate sm:max-w-[10rem] rounded-md border border-line px-3 py-2 hover:border-mute"
               >
                 {username ?? "Finish profile"}
               </Link>

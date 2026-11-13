@@ -50,6 +50,12 @@ app/
   auth/callback/route.ts        code exchange, sends new users to profile setup
   auth/signout/route.ts         POST only
   account/setup/                profile form (page, client form, server action)
+  account/listings/page.tsx     the member's own listings, any status
+  sell/page.tsx                 profile gate, renders the form
+  sell/sell-form.tsx            client state owner: steps, localStorage draft, upload queue
+  sell/*-step.tsx, field.tsx    one component per step, shared field wrapper
+  sell/actions.ts               submitListing(): re-validates, inserts the draft
+  sell/submitted/page.tsx       confirmation and next steps
   api/stripe/hold/route.ts
   api/stripe/hold/confirm/route.ts
   api/stripe/webhook/route.ts
@@ -63,15 +69,19 @@ components/
     gallery.tsx, inspection-card.tsx, spec-sheet.tsx, video-player.tsx
     comments.tsx, countdown.tsx, badges.tsx
   site-header.tsx               signed-in state, profile link, sign-out
-  ui/                           shadcn/ui: button, dialog, input, tabs
+  ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select
 hooks/use-server-clock.ts       shared 1 Hz ticker + server clock offset
 lib/
   supabase/client.ts, server.ts
   stripe.ts, holds.ts, pricing.ts, errors.ts, format.ts, types.ts, utils.ts
   redirect.ts                   safeNext(): same-site ?next= paths only
   login.ts, profile.ts          shared copy, types and constants for auth pages
+  sell.ts                       /sell constants, zod step schemas, status labels (client + server)
+  photo-upload.ts               browser-only: resize to WebP, upload with progress
 middleware.ts                   session refresh, guards /sell, /admin and /account
 supabase/migrations/0001_init.sql
+supabase/migrations/0002_service_role_grants.sql
+supabase/migrations/0003_sell.sql
 vercel.json                     cron for hold release
 ```
 
@@ -92,6 +102,29 @@ npm run dev
 ```
 
 In Supabase: enable the `pg_cron` extension if `db push` reports it missing, and add your storage bucket host to `next.config.mjs` if you serve images from elsewhere.
+
+## Run in Supabase
+
+Migrations are applied by hand in the Supabase SQL Editor. Each file is idempotent, so running one twice is safe.
+
+| File | What it does | Status |
+| --- | --- | --- |
+| `0001_init.sql` | Schema, RLS, `place_bid`, cron | Applied |
+| `0002_service_role_grants.sql` | Gives `service_role` access to everything in `public`, now and for future objects | Applied in production |
+| `0003_sell.sql` | `auctions.variant`, seller fields on `auction_private`, one open listing per VIN, `auction-photos` bucket and its policies | Run before using `/sell` |
+
+## Selling a car (`/sell`)
+
+Signed-in members with a complete profile (username and country) submit a car in five steps: Car, History, Photos, Price and inspection, Review. The listing is saved as a `draft` for an admin to review; nothing is public until an admin schedules it.
+
+- **Draft on the device.** The form keeps all state in `sell/sell-form.tsx` and saves it to `localStorage` under `biddr:sell:v1:<user id>`, so a refresh keeps the work. "Start over" clears it and deletes the uploaded photos.
+- **Photos go straight to Storage.** The browser resizes each photo (longest edge 2560 px, WebP at 0.85; JPEG where the browser can't encode WebP) and uploads it to `auction-photos/<user id>/<draft id>/<section>/<random>.webp`. Storage policies only allow writes inside the user's own folder.
+- **Validated twice.** Each step is checked with the zod schemas in `lib/sell.ts` before Continue, and `submitListing` runs them all again. It also accepts only photo URLs from the user's own draft folder.
+- **What is stored where.** The `auctions` row is inserted with the user's own client, so RLS and column grants apply and `status` stays `draft`. Only after that insert succeeds, the service role writes the requested reserve, inspection city and preferred dates to `auction_private` (admin-only) and sets `has_reserve`. If that second write fails, the draft is deleted so the seller can submit again.
+- **One open listing per VIN.** A VIN that is already a draft, scheduled or live is refused with "This car is already listed or waiting for review."
+- `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
+
+Photos from a draft that is never submitted stay in the bucket. Clean them up later with a scheduled job that removes folders with no matching auction.
 
 ## Sign-in setup (Supabase dashboard)
 
@@ -126,7 +159,7 @@ The migration was run on PostgreSQL 16 with Supabase-style stubs and these cases
 ## Next phases
 
 1. ~~`/login` (Supabase Auth: magic link + Google), profile completion (username, country, phone).~~ Done.
-2. `/sell` multi-step form: details and VIN, history, photo upload to Storage, inspection city (Tallinn, Riga, Vilnius) stored in `auction_private.inspection_city`.
+2. ~~`/sell` multi-step form: details and VIN, history, photo upload to Storage, inspection city (Tallinn, Riga, Vilnius) stored in `auction_private.inspection_city`.~~ Done.
 3. `/admin`: approve or reject drafts, attach the inspection PDF, set reserve, schedule. Admin writes go through server actions using the service-role client after checking `role = 'admin'`, because column grants intentionally stop browser clients from touching money and status columns.
 4. Winner checkout: premium charge, invoices, seller payout flow.
 5. i18n: wrap copy with `next-intl`, locales `en`, `et`, `lv`, `lt`.

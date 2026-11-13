@@ -6,6 +6,7 @@ export type ConditionType = "clean" | "restored_accident";
 export type AuctionStatus = "draft" | "upcoming" | "live" | "ended" | "sold" | "reserve_not_met";
 export type HoldStatus = "pending" | "authorized" | "released" | "captured" | "failed";
 export type UserRole = "user" | "seller" | "admin";
+export type InspectionCity = "Tallinn" | "Riga" | "Vilnius";
 
 export interface GalleryUrls {
   exterior: string[];
@@ -19,6 +20,7 @@ export interface Auction {
   title: string;
   make: string;
   model: string;
+  variant: string | null;
   year: number;
   vin: string;
   mileage_km: number;
@@ -49,6 +51,17 @@ export interface Auction {
   status: AuctionStatus;
   created_at: string;
   updated_at: string;
+}
+
+/** Admin-only row in auction_private. Never select this with the browser client. */
+export interface AuctionPrivate {
+  auction_id: string;
+  reserve_price: number | null;
+  admin_notes: string | null;
+  inspection_city: InspectionCity | null;
+  requested_reserve: number | null;
+  inspection_preferred_dates: string | null;
+  contact_notes: string | null;
 }
 
 /** Columns the feed needs; keeps list queries light. */
