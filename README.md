@@ -81,6 +81,7 @@ components/
   site-header.tsx               signed-in state, profile link, sign-out; "Menu" on small screens
   mobile-menu.tsx               disclosure menu for small screens
   site-footer.tsx               the same help links on every page
+  notifications/                header bell and the shared notification item
   ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select
 hooks/use-server-clock.ts       shared 1 Hz ticker + server clock offset
 lib/
@@ -97,6 +98,7 @@ lib/
   demo/                         demo data: seed/remove, placeholder photos and PDF, bid generator
   site.ts                       footer links, support email and company placeholders
   bidder.ts                     server-only: bidder_status() check used by the hold route
+  notifications.ts              notification wording, links and select columns (client + server)
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
@@ -105,6 +107,7 @@ supabase/migrations/0004_admin.sql
 supabase/migrations/0006_demo_data.sql
 supabase/migrations/0007_listing_details.sql
 supabase/migrations/0008_bidder_requirements.sql
+supabase/migrations/0009_notifications.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -144,6 +147,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0006_demo_data.sql` | `is_demo` on auctions and profiles, demo listings refuse bids, comment trigger lets the server set the author, comments insert grant tightened | Run before using demo data |
 | `0007_listing_details.sql` | Structured listing details: body style, interior colour, ownership, seller type and dealer, registration, highlights, equipment, modifications, known flaws, service history, items included and seller notes. Also adds an `editor_take` column the app doesn't use. | Run before deploying this version (the sell form saves these columns) |
 | `0008_bidder_requirements.sql` | Bidders need a complete profile and the current bidding terms: `accept_bidding_terms`, `bidder_status`, `current_bidding_terms_version`, and triggers on `bids` and `comments` | Run before deploying this version (bidding stays closed until it is run) |
+| `0009_notifications.sql` | `notifications` table (own rows only, browser may only set `read_at`), Realtime, triggers for questions, answers, outbids, listing and auction status changes, and a daily cleanup of notifications older than 90 days | Run before deploying this version (the header bell reads this table) |
 
 ## Selling a car (`/sell`)
 
@@ -217,6 +221,27 @@ The version lives in one place: the database function `current_bidding_terms_ver
    ```
 
 From then on, everyone who accepted an older version sees the terms step again before their next bid, and the database refuses their bids until they accept. Nothing else needs to change: the page, the dialog and the checks all read the version from this function.
+
+## Notifications
+
+Signed-in members get a bell in the header. It shows the number of unread notifications and opens a panel with the 20 newest. `/account/notifications` has the full list, 50 per page, with an Unread filter. Both update live over Realtime.
+
+| Type | Who | When |
+| --- | --- | --- |
+| `question` | Seller | Someone asks a question on their car |
+| `answer` | Asker | The seller replies to their question |
+| `outbid` | Previous high bidder | Someone outbids them |
+| `listing_approved`, `listing_rejected` | Seller | An admin approves or rejects their listing |
+| `auction_live`, `auction_ended` | Seller | Bidding opens; the auction closes |
+| `auction_won` | Winning bidder | The car is sold to them |
+| `listing_submitted` | Every admin | A new car is submitted for review |
+
+How they're created and stored:
+- **Triggers only.** Database triggers (`0009`) create them. Nobody is told about their own action, and demo auctions never notify.
+- **Data, not sentences.** Rows hold only the type and ids/data. The wording lives in `lib/notifications.ts`, so it can be translated.
+- **Cleanup.** A daily `pg_cron` job deletes notifications older than 90 days.
+
+Opening a question or answer goes to the auction page at `#comment-<id>`. The comment is scrolled into view, focused and briefly highlighted.
 
 ## Demo data (for testing)
 
