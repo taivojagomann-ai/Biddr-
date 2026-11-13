@@ -92,7 +92,7 @@ const AUCTIONS = [
     damage_history_summary: "Rear bumper replaced after a car park scrape.", inspection_partner_name: "Autotest Tallinn",
     inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r7.pdf`, gallery_urls: gallery("gt"),
     starting_bid: 900000, current_bid: 1250000, bid_count: 31, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
-    watch_count: 140, starts_at: iso(-3 * 24 * H), ends_at: iso(4 * 24 * H + 7 * H), status: "live",
+    watch_count: 140, starts_at: iso(-6 * H), ends_at: iso(4 * 24 * H + 7 * H), status: "live", // went live 6h ago: "New"
   },
   // The signed-in test user's own listings.
   {

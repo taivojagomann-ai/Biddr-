@@ -16,11 +16,16 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const status = parseFeedStatus(searchParams.status);
   const now = Date.now();
 
-  let query = supabase.from("auctions").select(AUCTION_CARD_COLUMNS).limit(48);
+  // count: total matches for the tab (the grid shows up to 48), for the heading and announcement.
+  let query = supabase.from("auctions").select(AUCTION_CARD_COLUMNS, { count: "exact" }).limit(48);
 
   switch (status) {
     case "live":
       query = query.eq("status", "live").order("ends_at", { ascending: true });
+      break;
+    case "newest":
+      // When bidding opened, not when the car was submitted.
+      query = query.eq("status", "live").order("starts_at", { ascending: false });
       break;
     case "ending":
       query = query
@@ -45,7 +50,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     query = query.eq("condition_type", "restored_accident").not("inspection_partner_name", "is", null);
   }
 
-  const [{ data, error }, { data: makeRows }] = await Promise.all([
+  const [{ data, error, count }, { data: makeRows }] = await Promise.all([
     query.returns<AuctionCard[]>(),
     supabase.from("auctions").select("make").neq("status", "draft").returns<{ make: string }[]>(),
   ]);
@@ -87,6 +92,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       ) : (
         <AuctionFeed
           initial={data ?? []}
+          status={status}
+          total={count ?? (data ?? []).length}
           initialNow={now}
           featureFirst={status === "live" && !hasFilters}
           userId={user?.id ?? null}

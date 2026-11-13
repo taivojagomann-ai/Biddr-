@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
-import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { useMinuteNow } from "@/hooks/use-minute-now";
+import { isNewListing } from "@/lib/feed";
 import { formatEur, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AuctionCard as AuctionCardData } from "@/lib/types";
@@ -25,6 +27,8 @@ export function AuctionCard({
   const cover = auction.gallery_urls.exterior[0];
   const finished = ["ended", "sold", "reserve_not_met"].includes(auction.status);
   const price = auction.current_bid ?? auction.starting_bid;
+  // One shared minute timer, so the badge drops off 24 hours after going live.
+  const now = useMinuteNow(initialNow);
 
   // Flash the price when a new bid arrives via Realtime.
   const [flash, setFlash] = useState(false);
@@ -63,6 +67,7 @@ export function AuctionCard({
         <div className="absolute left-1.5 top-1.5 flex max-w-[calc(100%-3.25rem)] flex-wrap gap-1 sm:left-2 sm:top-2 sm:max-w-[calc(100%-7rem)]">
           {auction.is_demo && <DemoBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
+          {isNewListing(auction, now) && <NewBadge />}
         </div>
       </div>
 

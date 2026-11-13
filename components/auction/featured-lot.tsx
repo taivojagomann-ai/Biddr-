@@ -3,7 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
-import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { useMinuteNow } from "@/hooks/use-minute-now";
+import { isNewListing } from "@/lib/feed";
 import { formatEur, formatKm } from "@/lib/format";
 import type { AuctionCard } from "@/lib/types";
 
@@ -20,6 +22,7 @@ export function FeaturedLot({
   watching: boolean;
 }) {
   const cover = auction.gallery_urls.exterior[0];
+  const now = useMinuteNow(initialNow);
   return (
     <article className="group relative grid overflow-hidden rounded-xl border border-line bg-panel md:grid-cols-[1.4fr_1fr] has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-signal has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-asphalt">
       <div className="relative aspect-[16/10] bg-asphalt md:aspect-auto md:min-h-[360px]">
@@ -28,6 +31,7 @@ export function FeaturedLot({
         )}
         <div className="absolute left-3 top-3 flex gap-1">
           {auction.is_demo && <DemoBadge />}
+          {isNewListing(auction, now) && <NewBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
         </div>
       </div>

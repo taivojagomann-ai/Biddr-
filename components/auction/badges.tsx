@@ -29,6 +29,13 @@ export function InspectionBadge({ partner, compact = false, className }: { partn
   );
 }
 
+/** Auctions that went live in the last 24 hours. Text, so it doesn't rely on colour. */
+export function NewBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn("rounded-sm bg-chalk px-1.5 py-0.5 text-xs font-bold text-asphalt", className)}>New</span>
+  );
+}
+
 /** Neutral tag for listings created by the admin demo-data tools. */
 export function DemoBadge({ className }: { className?: string }) {
   return (
