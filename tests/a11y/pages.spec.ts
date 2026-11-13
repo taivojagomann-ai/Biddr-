@@ -77,7 +77,7 @@ const PUBLIC_PAGES = [
   ["Live auction", `/auctions/${LIVE}`],
   ["Restored car", `/auctions/${RESTORED}`],
   ["Upcoming auction", `/auctions/${UPCOMING}`],
-  ["Sold auction", `/auctions/${SOLD}`],
+  ["Sold auction (demo listing)", `/auctions/${SOLD}`],
   ["Sign in", "/login"],
   ["Sign in, expired link", "/login?error=link"],
   ["How it works", "/how-it-works"],
@@ -151,6 +151,13 @@ test.describe("signed-in pages", () => {
       await expectNoSeriousViolations(page, `Sell step ${step}`);
     });
   }
+
+  test("demo data dialog has no serious axe violations", async ({ page }) => {
+    await page.goto("/admin");
+    await page.getByRole("button", { name: "Reset demo data" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expectNoSeriousViolations(page, "Demo data dialog");
+  });
 
   test("admin confirmation dialog has no serious axe violations", async ({ page }) => {
     await page.goto(`/admin/auctions/${LIVE}`);

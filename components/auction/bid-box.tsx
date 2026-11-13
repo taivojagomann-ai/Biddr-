@@ -24,7 +24,8 @@ export interface BidUiState {
 }
 
 export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur }: BidUiState) {
-  const live = auction.status === "live";
+  // Demo listings look live but never take bids (place_bid refuses them too).
+  const live = auction.status === "live" && !auction.is_demo;
   const minNext = minNextBid(auction);
   const tooLow = amount < minNext;
 
@@ -109,7 +110,9 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
         </div>
       ) : (
         <p className="px-4 pb-4 text-sm text-mute">
-          {auction.status === "upcoming"
+          {auction.is_demo
+            ? "This is a demo listing. Bidding is turned off."
+            : auction.status === "upcoming"
             ? "Bidding opens when the timer runs out. Ask the seller questions below in the meantime."
             : auction.status === "withdrawn"
               ? "This auction was withdrawn. No one won the car, and all bids were cancelled."

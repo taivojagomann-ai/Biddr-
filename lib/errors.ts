@@ -1,7 +1,7 @@
 /** Maps stable error codes raised by place_bid / API routes to user-facing copy. */
 export type BidErrorCode =
   | "NOT_AUTHENTICATED" | "NOT_VERIFIED" | "HOLD_REQUIRED" | "AUCTION_NOT_FOUND" | "AUCTION_NOT_LIVE"
-  | "AUCTION_ENDED" | "OWN_AUCTION" | "ALREADY_LEADING" | "BID_TOO_LOW" | "INVALID_AMOUNT";
+  | "AUCTION_ENDED" | "OWN_AUCTION" | "ALREADY_LEADING" | "BID_TOO_LOW" | "INVALID_AMOUNT" | "DEMO_AUCTION";
 
 const MESSAGES: Record<BidErrorCode, string> = {
   NOT_AUTHENTICATED: "Sign in to place a bid.",
@@ -14,6 +14,7 @@ const MESSAGES: Record<BidErrorCode, string> = {
   ALREADY_LEADING: "You already have the high bid.",
   BID_TOO_LOW: "Someone bid first. Raise your bid to at least the new minimum.",
   INVALID_AMOUNT: "Enter a bid in whole euros.",
+  DEMO_AUCTION: "This is a demo listing. Bidding is turned off.",
 };
 
 export function isBidErrorCode(v: string): v is BidErrorCode {

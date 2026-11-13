@@ -29,6 +29,15 @@ export function InspectionBadge({ partner, compact = false, className }: { partn
   );
 }
 
+/** Neutral tag for listings created by the admin demo-data tools. */
+export function DemoBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn("rounded-sm border border-field bg-asphalt/90 px-1.5 py-0.5 text-xs font-semibold text-chalk", className)}>
+      Demo
+    </span>
+  );
+}
+
 export function RestoredBadge({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs text-mute", className)}>

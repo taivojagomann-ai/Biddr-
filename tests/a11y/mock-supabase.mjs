@@ -24,6 +24,7 @@ const gallery = (p) => ({
 });
 
 const base = {
+  is_demo: false,
   variant: null, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "AWD",
   exterior_color: "Isle of Man Green", location_country: "EE", damage_history_summary: null,
   inspection_partner_name: null, inspection_report_url: null, inspection_date: null, inspection_highlights: [],
@@ -64,7 +65,7 @@ const AUCTIONS = [
     make: "Mercedes-AMG", model: "C 63 S", year: 2018, vin: "WDD2050871F512345", mileage_km: 74000,
     location_city: "Tallinn", condition_type: "clean", gallery_urls: gallery("c63"), starting_bid: 38000,
     current_bid: 44750, bid_count: 11, reserve_met: true, has_reserve: true,
-    starts_at: iso(-9 * 24 * H), ends_at: iso(-2 * 24 * H), status: "sold",
+    starts_at: iso(-9 * 24 * H), ends_at: iso(-2 * 24 * H), status: "sold", is_demo: true,
   },
   // The signed-in test user's own listings.
   {

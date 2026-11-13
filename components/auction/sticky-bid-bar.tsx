@@ -8,7 +8,7 @@ import type { BidUiState } from "./bid-box";
 
 /** Below the lg breakpoint (no sidebar), this bar pinned to the bottom of the viewport on the auction page. */
 export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash, initialNow, setAmount }: BidUiState) {
-  const live = auction.status === "live";
+  const live = auction.status === "live" && !auction.is_demo;
   return (
     <div data-sticky-bottom="bid" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 pb-safe pt-3 backdrop-blur lg:hidden">
       <div className="container flex items-center gap-3">
@@ -25,7 +25,7 @@ export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash,
         </div>
         <Button size="lg" className="shrink-0" disabled={!live || isLeading}
           onClick={() => { setAmount(minNextBid(auction)); onPlaceBid(); }}>
-          {isLeading ? "Leading" : "Place bid"}
+          {auction.is_demo ? "Demo only" : isLeading ? "Leading" : "Place bid"}
         </Button>
       </div>
     </div>

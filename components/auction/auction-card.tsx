@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Countdown } from "./countdown";
-import { InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
 import { formatEur, formatKm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AuctionCard as AuctionCardData } from "@/lib/types";
@@ -44,6 +44,7 @@ export function AuctionCard({ auction, initialNow, priority = false }: { auction
           <div className="flex h-full items-center justify-center text-sm text-mute">Photos coming soon</div>
         )}
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+          {auction.is_demo && <DemoBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
         </div>
       </div>

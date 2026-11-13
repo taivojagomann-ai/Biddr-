@@ -6,7 +6,7 @@ import { Gallery } from "@/components/auction/gallery";
 import { InspectionCard } from "@/components/auction/inspection-card";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
-import { InspectionBadge, RestoredBadge } from "@/components/auction/badges";
+import { DemoBadge, InspectionBadge, RestoredBadge } from "@/components/auction/badges";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { formatKm } from "@/lib/format";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
@@ -58,6 +58,12 @@ export default async function AuctionPage({ params }: { params: { id: string } }
 
   return (
     <main className="container py-6">
+      {auction.is_demo && (
+        <p className="mb-4 flex items-center gap-2 rounded-md border border-field bg-panel px-3 py-2 text-sm">
+          <DemoBadge />
+          This is a demo listing for testing. Bidding is turned off.
+        </p>
+      )}
       <div className="mb-5 flex flex-col gap-2">
         <h1 className="font-wide text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">{auction.title}</h1>
         <div className="flex flex-wrap items-center gap-2 text-sm text-mute">

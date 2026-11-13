@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Countdown } from "./countdown";
-import { InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
 import { formatEur, formatKm } from "@/lib/format";
 import type { AuctionCard } from "@/lib/types";
 
@@ -18,7 +18,8 @@ export function FeaturedLot({ auction, initialNow }: { auction: AuctionCard; ini
         {cover && (
           <Image src={cover} alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover" />
         )}
-        <div className="absolute left-3 top-3">
+        <div className="absolute left-3 top-3 flex gap-1">
+          {auction.is_demo && <DemoBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
         </div>
       </div>
