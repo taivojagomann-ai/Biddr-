@@ -75,11 +75,11 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     <main className="container flex flex-col gap-6 py-6 pb-16 md:py-10">
       <div className="max-w-2xl">
         <h1 className="font-wide text-3xl font-extrabold tracking-tight md:text-4xl">
-          Performance cars, bid on in the open.
+          Cars worth chasing
         </h1>
         <p className="mt-2 text-mute">
-          M, RS, AMG and Porsche from Tallinn, Riga and Vilnius. Restored cars are listed only with an
-          independent workshop inspection you can read before you bid.
+          Buy and sell exceptional performance cars with transparent bidding, documented service histories and
+          independent inspections for restored cars.
         </p>
       </div>
 
