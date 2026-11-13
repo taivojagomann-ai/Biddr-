@@ -18,6 +18,7 @@ export function WatchButton({
   initialWatching,
   initialCount,
   size = "sm",
+  variant = "default",
   className,
 }: {
   auctionId: string;
@@ -27,6 +28,11 @@ export function WatchButton({
   initialWatching: boolean;
   initialCount: number;
   size?: ButtonProps["size"];
+  /**
+   * "card": on cards. Below 640px an eye icon in a 32px circle with a 44x44 tap
+   * area, named "Watch <car>" / "Stop watching <car>"; from 640px the text button.
+   */
+  variant?: "default" | "card";
   className?: string;
 }) {
   const router = useRouter();
@@ -59,6 +65,47 @@ export function WatchButton({
       setError(next ? "Couldn't add this car to your watchlist. Try again." : "Couldn't remove this car. Try again.");
     }
     setBusy(false);
+  }
+
+  if (variant === "card" && title) {
+    return (
+      <span className={cn("inline-flex flex-col items-end", className)}>
+        <button
+          type="button"
+          // The name carries the state, so no aria-pressed here (it would double up).
+          aria-label={watching ? `Stop watching ${title}` : `Watch ${title}`}
+          disabled={busy}
+          onClick={() => void toggle()}
+          className={cn(
+            "flex size-11 items-center justify-center rounded-full disabled:opacity-60",
+            "sm:size-auto sm:h-9 sm:gap-2 sm:rounded-md sm:border sm:px-3 sm:text-xs sm:font-semibold sm:backdrop-blur",
+            watching
+              ? "sm:border-transparent sm:bg-line sm:text-chalk"
+              : "sm:border-field sm:bg-asphalt/85 sm:text-chalk sm:hover:border-chalk",
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "flex size-8 items-center justify-center rounded-full border backdrop-blur",
+              "sm:size-auto sm:border-0 sm:bg-transparent sm:text-current sm:backdrop-blur-none",
+              // Watching is shown by inverting the circle (light on dark becomes dark on light), not by colour alone.
+              watching ? "border-chalk bg-chalk text-asphalt" : "border-field bg-asphalt/85 text-chalk",
+            )}
+          >
+            <Eye className="size-4" />
+          </span>
+          <span aria-hidden className="hidden sm:inline">
+            {watching ? "Watching" : "Watch"}
+          </span>
+        </button>
+        {error ? (
+          <span role="alert" className="mt-1 max-w-[9rem] rounded-sm bg-asphalt/90 px-1.5 py-0.5 text-right text-xs text-signal">
+            {error}
+          </span>
+        ) : null}
+      </span>
+    );
   }
 
   return (

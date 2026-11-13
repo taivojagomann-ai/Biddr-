@@ -308,7 +308,7 @@ test.describe("watch and share", () => {
       const link = page.getByRole("link", { name: "2021 Porsche 911 Carrera S" });
       await link.focus();
       await page.keyboard.press("Tab");
-      await expect(page.getByRole("button", { name: /^Watch(ing)? 2021 Porsche 911 Carrera S$/ })).toBeFocused();
+      await expect(page.getByRole("button", { name: /^(Watch|Stop watching) 2021 Porsche 911 Carrera S$/ })).toBeFocused();
       expect(await page.locator("a button, a a").count()).toBe(0);
     });
 
@@ -324,6 +324,62 @@ test.describe("watch and share", () => {
       await page.keyboard.press("Escape");
       await expect(button).toBeFocused();
     });
+  });
+});
+
+test.describe("phone auction cards", () => {
+  for (const width of [320, 360, 390]) {
+    test(`two cards per row fit at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/");
+      const cards = page.locator("ul > li > article.auction-card");
+      await expect(cards.first()).toBeVisible();
+      const problems = await page.evaluate(() => {
+        const out: string[] = [];
+        const articles = Array.from(document.querySelectorAll<HTMLElement>("ul > li > article.auction-card"));
+        const tops = new Map<number, number>();
+        for (const card of articles) {
+          const box = card.getBoundingClientRect();
+          tops.set(Math.round(box.top), (tops.get(Math.round(box.top)) ?? 0) + 1);
+          for (const el of Array.from(card.querySelectorAll<HTMLElement>("*"))) {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 || r.height === 0) continue;
+            const style = getComputedStyle(el);
+            if (style.position === "absolute" && style.clip !== "auto") continue; // visually hidden text
+            if (r.right > box.right + 0.5 || r.left < box.left - 0.5) {
+              out.push(`overflow: <${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim().slice(0, 30)}" in "${card.querySelector("h3")?.textContent?.slice(0, 20)}"`);
+            }
+            const ownText = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+            if (ownText && parseFloat(style.fontSize) < 11) out.push(`text under 11px: "${el.textContent?.trim().slice(0, 30)}" (${style.fontSize})`);
+          }
+          const watch = card.querySelector<HTMLElement>("button[aria-label^='Watch'], button[aria-label^='Stop watching']");
+          const w = watch?.getBoundingClientRect();
+          if (!w || w.width < 44 || w.height < 44) out.push(`watch tap area ${w ? `${w.width}x${w.height}` : "missing"}`);
+        }
+        if (![...tops.values()].some((n) => n === 2)) out.push("no row with two cards");
+        return out;
+      });
+      expect(problems).toEqual([]);
+      await noHorizontalScroll(page, `Home at ${width}px`);
+    });
+  }
+
+  test("the footer follows the card's own width (container query at 180px)", async ({ page }) => {
+    const footDirection = async () =>
+      page.locator("article.auction-card .ac-foot").first().evaluate((el) => getComputedStyle(el).flexDirection);
+    await page.setViewportSize({ width: 320, height: 800 }); // cards ~146px: time chip under the price
+    await page.goto("/");
+    expect(await footDirection()).toBe("column");
+    await page.setViewportSize({ width: 430, height: 800 }); // cards ~187px: side by side
+    expect(await footDirection()).toBe("row");
+  });
+
+  test("restored badge collapses to its icon on narrow cards and keeps its name", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.goto("/");
+    const card = page.locator("article.auction-card", { hasText: "Black Series" });
+    await expect(card.getByText("Professionally restored")).toHaveCSS("position", "absolute");
+    await expect(card.getByRole("button", { name: /^(Watch|Stop watching) 2021 Mercedes-AMG GT Black Series/ })).toBeVisible();
   });
 });
 

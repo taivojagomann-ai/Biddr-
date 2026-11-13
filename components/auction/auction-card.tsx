@@ -38,71 +38,82 @@ export function AuctionCard({
     }
   }, [auction.bid_count]);
 
+  const bids = `${auction.bid_count} ${auction.bid_count === 1 ? "bid" : "bids"}`;
+
   return (
     // Only the title is a link; its ::after stretches over the whole card, so the card
     // stays clickable while the Watch button sits above it as a separate control.
-    <article className="group relative flex flex-col overflow-hidden rounded-lg border border-line bg-panel transition-colors hover:border-[#3f3f46] has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-signal has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-asphalt">
+    // Below 640px the card is compact (two per row); from 640px it keeps the full layout.
+    // `auction-card` is a CSS container: the footer adapts to the card's own width.
+    <article className="auction-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-lg border border-line bg-panel transition-colors hover:border-[#3f3f46] has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-signal has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-asphalt">
       <div className="relative aspect-[4/3] overflow-hidden bg-asphalt">
         {cover ? (
           <Image
             src={cover}
             alt="" // the title below names the car; the photo would repeat it
             fill
-            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 100vw"
+            sizes="(min-width: 1280px) 25vw, (min-width: 1024px) 33vw, 50vw"
             priority={priority}
             className={cn("object-cover transition-transform duration-500 group-hover:scale-[1.02]", finished && "opacity-70")}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-mute">Photos coming soon</div>
+          <div className="flex h-full items-center justify-center p-2 text-center text-xs text-mute sm:text-sm">Photos coming soon</div>
         )}
-        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+        {/* Leaves room on the right for the Watch button. */}
+        <div className="absolute left-1.5 top-1.5 flex max-w-[calc(100%-3.25rem)] flex-wrap gap-1 sm:left-2 sm:top-2 sm:max-w-[calc(100%-7rem)]">
           {auction.is_demo && <DemoBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <h3 className="line-clamp-1 font-semibold leading-tight">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-2.5 sm:gap-2 sm:p-3">
+        <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug sm:line-clamp-1 sm:text-base sm:leading-tight">
           <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
             {auction.title}
           </Link>
         </h3>
-        <p className="text-sm text-mute">
-          {formatKm(auction.mileage_km)}, {auction.location_city}, {auction.location_country}
+        <p className="truncate text-xs text-mute sm:whitespace-normal sm:text-sm">
+          {formatKm(auction.mileage_km)}, {auction.location_city}
+          <span className="hidden sm:inline">, {auction.location_country}</span>
         </p>
-        <div className="flex flex-wrap gap-1">
-          {auction.inspection_partner_name && <InspectionBadge partner={auction.inspection_partner_name} compact />}
-          {auction.condition_type === "restored_accident" && <RestoredBadge />}
-        </div>
+        {(auction.inspection_partner_name || auction.condition_type === "restored_accident") && (
+          <div className="flex flex-wrap gap-1">
+            {auction.inspection_partner_name && <InspectionBadge partner={auction.inspection_partner_name} compact />}
+            {auction.condition_type === "restored_accident" && <RestoredBadge collapsible />}
+          </div>
+        )}
 
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-3">
-          <div className={cn("rounded-md", flash && "animate-bid-flash")}>
-            <p className="text-xs text-mute">
+        <div className="ac-foot mt-auto border-t border-line pt-2 sm:pt-3">
+          <div className={cn("min-w-0 rounded-md", flash && "animate-bid-flash")}>
+            <p className="text-[11px] leading-tight text-mute sm:text-xs">
               {auction.status === "sold" ? "Sold for" : auction.current_bid ? "Current bid" : "Starting bid"}
             </p>
-            <p className="font-wide text-lg font-bold tabular">{formatEur(price)}</p>
+            <p className="break-all font-wide text-base font-bold leading-tight tabular sm:text-lg">{formatEur(price)}</p>
           </div>
-          <div className="text-right">
-            <p className="text-xs text-mute">{auction.bid_count} {auction.bid_count === 1 ? "bid" : "bids"}</p>
-            <Countdown
-              endsAt={auction.ends_at}
-              startsAt={auction.starts_at}
-              status={auction.status}
-              initialNow={initialNow}
-              className="font-wide text-lg font-bold"
-            />
+          <div className="ac-meta min-w-0">
+            <p className="text-[11px] leading-tight text-mute sm:text-xs">{bids}</p>
+            {/* A chip on phones; plain large text from 640px, as before. */}
+            <span className="inline-flex max-w-full rounded-sm border border-line bg-asphalt px-1.5 py-0.5 text-[13px] font-semibold leading-tight sm:border-0 sm:bg-transparent sm:p-0">
+              <Countdown
+                endsAt={auction.ends_at}
+                startsAt={auction.starts_at}
+                status={auction.status}
+                initialNow={initialNow}
+                className="break-words sm:font-wide sm:text-lg sm:font-bold"
+              />
+            </span>
           </div>
         </div>
       </div>
       {/* After the link in the DOM (keyboard order: card, then Watch), above it visually. */}
-      <div className="absolute right-2 top-2 z-10">
+      <div className="absolute right-0.5 top-0.5 z-10 sm:right-2 sm:top-2">
         <WatchButton
+          variant="card"
           auctionId={auction.id}
           title={auction.title}
           userId={userId}
           initialWatching={watching}
           initialCount={auction.watch_count}
-          className="[&_button]:bg-asphalt/85 [&_button]:backdrop-blur"
         />
       </div>
     </article>
