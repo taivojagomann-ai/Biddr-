@@ -19,6 +19,8 @@ export function Countdown({ endsAt, startsAt, status, initialNow, className }: C
   if (status === "sold") return <span className={className}>Sold</span>;
   if (status === "reserve_not_met") return <span className={className}>Reserve not met</span>;
   if (status === "ended") return <span className={className}>Ended</span>;
+  if (status === "withdrawn") return <span className={className}>Withdrawn</span>;
+  if (status === "rejected" || status === "draft") return <span className={className}>Not scheduled</span>;
 
   // Local clock hit zero but the database hasn't closed it yet (a late bid may have extended it).
   if (status === "live" && isOver) {

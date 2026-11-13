@@ -8,13 +8,15 @@ export async function SiteHeader() {
   const { data: { user } } = await supabase.auth.getUser();
 
   let username: string | null = null;
+  let isAdmin = false;
   if (user) {
     const { data } = await supabase
       .from("profiles")
-      .select("username")
+      .select("username, role")
       .eq("id", user.id)
-      .maybeSingle<{ username: string | null }>();
+      .maybeSingle<{ username: string | null; role: string }>();
     username = data?.username ?? null;
+    isAdmin = data?.role === "admin";
   }
 
   return (
@@ -32,6 +34,11 @@ export async function SiteHeader() {
           </Link>
           {user ? (
             <>
+              {isAdmin ? (
+                <Link href="/admin" className="rounded-md px-2 py-2 font-semibold text-signal hover:text-chalk sm:px-3">
+                  Admin
+                </Link>
+              ) : null}
               {username ? (
                 <Link href="/account/listings" className="rounded-md px-2 py-2 text-mute hover:text-chalk sm:px-3">
                   <span className="sm:hidden">Listings</span>

@@ -56,6 +56,12 @@ app/
   sell/*-step.tsx, field.tsx    one component per step, shared field wrapper
   sell/actions.ts               submitListing(): re-validates, inserts the draft
   sell/submitted/page.tsx       confirmation and next steps
+  admin/layout.tsx              admins only; everyone else gets a 404
+  admin/page.tsx                tabs: to review, scheduled, live, finished, rejected or withdrawn
+  admin/auctions/[id]/          one page per auction: seller, listing, photos, inspection,
+                                pricing, schedule, status actions, bids, comments
+  admin/actions.ts              every admin write: requireAdmin() first, then zod, then audit
+  api/admin/inspection-upload/  signed upload URL for the inspection PDF (admins only)
   api/stripe/hold/route.ts
   api/stripe/hold/confirm/route.ts
   api/stripe/webhook/route.ts
@@ -78,10 +84,14 @@ lib/
   login.ts, profile.ts          shared copy, types and constants for auth pages
   sell.ts                       /sell constants, zod step schemas, status labels (client + server)
   photo-upload.ts               browser-only: resize to WebP, upload with progress
-middleware.ts                   session refresh, guards /sell, /admin and /account
+  admin.ts                      server-only: requireAdmin(), logAdminAction()
+  admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
+  baltic-time.ts                Europe/Tallinn date + time inputs <-> UTC
+middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
 supabase/migrations/0003_sell.sql
+supabase/migrations/0004_admin.sql
 vercel.json                     cron for hold release
 ```
 
@@ -112,6 +122,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0001_init.sql` | Schema, RLS, `place_bid`, cron | Applied |
 | `0002_service_role_grants.sql` | Gives `service_role` access to everything in `public`, now and for future objects | Applied in production |
 | `0003_sell.sql` | `auctions.variant`, seller fields on `auction_private`, one open listing per VIN, `auction-photos` bucket and its policies | Run before using `/sell` |
+| `0004_admin.sql` | `rejected` and `withdrawn` statuses, `rejection_reason`, `admin_actions` audit log, `inspection-reports` bucket, `admin_set_reserve` and `admin_set_schedule` | Run before using `/admin` |
 
 ## Selling a car (`/sell`)
 
@@ -125,6 +136,28 @@ Signed-in members with a complete profile (username and country) submit a car in
 - `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
 
 Photos from a draft that is never submitted stay in the bucket. Clean them up later with a scheduled job that removes folders with no matching auction.
+
+## Admin panel (`/admin`)
+
+### Make someone an admin
+
+The person signs in once (that creates their profile), then run this in the SQL Editor:
+
+```sql
+update public.profiles
+   set role = 'admin'
+ where id = (select id from auth.users where email = 'name@example.com');
+```
+
+To remove admin access, set `role = 'user'` the same way. The header shows an "Admin" link to admins; for everyone else `/admin` is a plain 404.
+
+### What it does
+
+- **Lists** every auction in five tabs with counts: To review (`draft`), Scheduled (`upcoming`), Live (ending soonest first), Finished (`ended`, `sold`, `reserve_not_met`) and Rejected or withdrawn.
+- **Per auction** (`/admin/auctions/<id>`): seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve and inspection preferences. The admin can edit the listing text, remove photos or change the cover, enter the inspection partner, date and highlights, and upload the report PDF. They also set the starting bid, increment and reserve, set the schedule in Baltic time, and see all bids and delete comments.
+- **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
+- **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. A restored car can't be scheduled without an inspection partner and report. Auctions run at most 7 days because card holds expire after about 7 days.
+- **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The inspection PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only.
 
 ## Sign-in setup (Supabase dashboard)
 
@@ -150,7 +183,7 @@ Sign-in uses Supabase Auth with Google and email (a magic link plus a 6-digit co
    Do the same in the *Confirm signup* template, since a first sign-in creates the account.
 4. **Custom SMTP before launch.** Supabase's built-in mailer is rate-limited to a few emails per hour and is meant for testing only. Authentication → SMTP Settings: connect your provider (Postmark, Resend, SES…) with a sender on your own domain, and raise the email rate limit under Authentication → Rate Limits.
 
-Make yourself admin: `update profiles set role = 'admin' where id = '<your user id>';`
+Make yourself admin: see [Admin panel](#admin-panel-admin).
 
 ## Verified so far
 
@@ -160,6 +193,6 @@ The migration was run on PostgreSQL 16 with Supabase-style stubs and these cases
 
 1. ~~`/login` (Supabase Auth: magic link + Google), profile completion (username, country, phone).~~ Done.
 2. ~~`/sell` multi-step form: details and VIN, history, photo upload to Storage, inspection city (Tallinn, Riga, Vilnius) stored in `auction_private.inspection_city`.~~ Done.
-3. `/admin`: approve or reject drafts, attach the inspection PDF, set reserve, schedule. Admin writes go through server actions using the service-role client after checking `role = 'admin'`, because column grants intentionally stop browser clients from touching money and status columns.
+3. ~~`/admin`: approve or reject drafts, attach the inspection PDF, set reserve, schedule.~~ Done.
 4. Winner checkout: premium charge, invoices, seller payout flow.
 5. i18n: wrap copy with `next-intl`, locales `en`, `et`, `lv`, `lt`.

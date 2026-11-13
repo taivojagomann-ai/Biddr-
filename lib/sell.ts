@@ -394,4 +394,6 @@ export const STATUS_LABELS: Record<AuctionStatus, string> = {
   sold: "Sold",
   ended: "Ended",
   reserve_not_met: "Reserve not met",
+  rejected: "Not accepted",
+  withdrawn: "Withdrawn",
 };
