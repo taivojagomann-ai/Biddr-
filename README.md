@@ -74,6 +74,7 @@ components/
   auction/
     auction-feed.tsx            client grid + Realtime
     auction-card.tsx, featured-lot.tsx, auction-filters.tsx
+    auction-search.tsx          home page search box with suggestions (ARIA combobox)
     auction-live.tsx            detail page state owner + Realtime channel
     bid-box.tsx, sticky-bid-bar.tsx, bid-modal.tsx, bid-history.tsx
     gallery.tsx, inspection-card.tsx, spec-sheet.tsx, video-player.tsx
@@ -102,6 +103,7 @@ lib/
   site.ts                       footer links, support email and company placeholders
   bidder.ts                     server-only: bidder_status() check used by the hold route
   notifications.ts              notification wording, links and select columns (client + server)
+  search.ts                     ?q= cleanup, debounce and wording for the home page search
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
@@ -112,6 +114,8 @@ supabase/migrations/0007_listing_details.sql
 supabase/migrations/0008_bidder_requirements.sql
 supabase/migrations/0009_notifications.sql
 supabase/migrations/0010_watchlist.sql
+supabase/migrations/0011_newly_listed_index.sql
+supabase/migrations/0012_search.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -153,6 +157,8 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0008_bidder_requirements.sql` | Bidders need a complete profile and the current bidding terms: `accept_bidding_terms`, `bidder_status`, `current_bidding_terms_version`, and triggers on `bids` and `comments` | Run before deploying this version (bidding stays closed until it is run) |
 | `0009_notifications.sql` | `notifications` table (own rows only, browser may only set `read_at`), Realtime, triggers for questions, answers, outbids, listing and auction status changes, and a daily cleanup of notifications older than 90 days | Run before deploying this version (the header bell reads this table) |
 | `0010_watchlist.sql` | `watchlist` table (own rows only), `auctions.watch_count` kept by triggers, auto-watch when you bid, "now live" and "ends within the hour" notifications for watchers (cron every 5 minutes) | Run before deploying this version (Watch buttons and the demo loader use it) |
+| `0011_newly_listed_index.sql` | Index for the Newly listed tab (`status, starts_at desc`) | Optional, speeds up the tab |
+| `0012_search.sql` | Free-text search: `pg_trgm` and `unaccent` extensions, `auctions.search_text` and `search_words` kept by a trigger (and filled for existing cars), a trigram index, the `search_aliases` table (vw, merc, beemer...), and the `search_auctions` and `search_suggestions` functions | Run before deploying this version (the home page search uses it) |
 
 ## Selling a car (`/sell`)
 
@@ -261,6 +267,23 @@ Opening a question or answer goes to the auction page at `#comment-<id>`. The co
 - **Link previews.** Auction pages have Open Graph and Twitter tags and a generated 1200×630 preview image (`app/auctions/[id]/opengraph-image.tsx`). The image shows the cover photo, the title and the result, and demo listings are marked "Demo listing".
 
 **Set `NEXT_PUBLIC_SITE_URL` in Vercel** (Project → Settings → Environment Variables), e.g. `https://biddr.ee`, then redeploy. Shared links and preview images use it to build absolute URLs. Without it, previews fall back to Vercel's deployment URL, and local development uses `http://localhost:3000`.
+
+## Search (home page)
+
+The search box above the tabs replaces the old Make filter. It searches make, model, variant, title and year.
+
+- **Every word must match.** "bmw m3 2018" finds 2018 BMW M3s only. A four-digit number between 1950 and next year is a model year and must match exactly.
+- **Spelling is forgiving.** Capitals, accents, spaces, hyphens and dots between letters and digits don't matter: "rs6", "RS 6" and "RS-6" are the same, as are "Skoda" and "Škoda".
+- **Nicknames.** `search_aliases` turns vw into volkswagen, merc into mercedes, beemer and bimmer into bmw, chevy into chevrolet, landy into land rover, rr into range rover, alfa into alfa romeo and amg into mercedes amg. To add one, run in the SQL Editor (only the service role and the SQL Editor can change this table):
+
+  ```sql
+  insert into public.search_aliases (alias, canonical) values ('porker', 'porsche')
+  on conflict (alias) do update set canonical = excluded.canonical;
+  ```
+- **Order.** Results keep the tab's order (Live: ending soonest first), with exact model matches first, so "m3" shows M3s before an M340i.
+- **Suggestions** appear from two characters: up to six makes and models from listings people can see, with counts, e.g. "Audi RS6 Avant (3)". Use the arrow keys and Enter, or Escape to close.
+- **The search is in the address** (`/?q=rs6`), so it can be shared and works with the tabs and the country and history filters. While searching, the featured car is hidden and the grid is titled "Results for “rs6” (3)". With no results the page offers past results for the same search, when there are any.
+- Drafts and rejected listings never appear: the search functions run with the visitor's own permissions, so the usual access rules apply.
 
 ## Demo data (for testing)
 
