@@ -320,6 +320,7 @@ test.describe("watch and share", () => {
       await expect(button).toHaveAttribute("aria-expanded", "true");
       await expect(page.getByRole("link", { name: "Profile" })).toBeFocused();
       await expect(page.getByRole("link", { name: "Watchlist" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "My listings" })).toHaveAttribute("href", "/account/listings");
       await expectNoSeriousViolations(page, "Account menu", "[aria-controls] + div:not([hidden])");
       await page.keyboard.press("Escape");
       await expect(button).toBeFocused();
