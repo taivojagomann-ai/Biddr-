@@ -17,7 +17,9 @@ import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
 import { DemoBadge, InspectionBadge, RestoredBadge } from "@/components/auction/badges";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { formatKm } from "@/lib/format";
+import { formatEur, formatKm } from "@/lib/format";
+import { WatchButton, WatchCount } from "@/components/auction/watch-button";
+import { ShareButton } from "@/components/share-button";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -31,13 +33,38 @@ async function loadAuction(id: string): Promise<Auction | null> {
   return data;
 }
 
+/** "2019 · 42,800 km · Tallinn. Live auction on Biddr." or the result. */
+function shareDescription(a: Auction): string {
+  const facts = `${a.year} · ${formatKm(a.mileage_km)} · ${a.location_city}.`;
+  const result =
+    a.status === "live"
+      ? "Live auction on Biddr."
+      : a.status === "upcoming"
+        ? "Upcoming auction on Biddr."
+        : a.status === "sold" && a.current_bid
+          ? `Sold for ${formatEur(a.current_bid)} on Biddr.`
+          : a.status === "reserve_not_met"
+            ? "Auction ended: reserve not met."
+            : a.status === "withdrawn"
+              ? "Auction withdrawn."
+              : a.status === "ended"
+                ? "Auction ended with no bids."
+                : "On Biddr.";
+  return `${a.is_demo ? "Demo listing. " : ""}${facts} ${result}`;
+}
+
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   const a = await loadAuction(params.id);
   if (!a) return { title: "Auction not found" };
+  const description = shareDescription(a);
+  const url = `/auctions/${a.id}`;
+  // og:image comes from ./opengraph-image.tsx (absolute via metadataBase in the root layout).
   return {
     title: a.title,
-    description: `${a.year} ${a.make} ${a.model}, ${formatKm(a.mileage_km)}, ${a.location_city}. ${a.inspection_partner_name ? `Inspected by ${a.inspection_partner_name}.` : ""}`,
-    openGraph: { images: a.gallery_urls.exterior.slice(0, 1) },
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "website", siteName: "Biddr", title: a.title, description, url },
+    twitter: { card: "summary_large_image", title: a.title, description, images: [`${url}/opengraph-image`] },
   };
 }
 
@@ -55,7 +82,15 @@ export default async function AuctionPage({ params }: { params: { id: string } }
 
   let hasHold = false;
   let canComment = false;
+  let watching = false;
   if (user) {
+    const { data: watchRow } = await supabase
+      .from("watchlist")
+      .select("auction_id")
+      .eq("auction_id", auction.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    watching = Boolean(watchRow);
     const { data: me } = await supabase
       .from("profiles")
       .select("username, country")
@@ -81,7 +116,19 @@ export default async function AuctionPage({ params }: { params: { id: string } }
         </p>
       )}
       <div className="mb-5 flex flex-col gap-2">
-        <h1 className="font-wide text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">{auction.title}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="min-w-0 font-wide text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">{auction.title}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <WatchCount auctionId={auction.id} initialCount={auction.watch_count} />
+            <WatchButton
+              auctionId={auction.id}
+              userId={user?.id ?? null}
+              initialWatching={watching}
+              initialCount={auction.watch_count}
+            />
+            <ShareButton path={`/auctions/${auction.id}`} title={auction.title} />
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-mute">
           <span>{formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}</span>
           <InspectionBadge partner={auction.inspection_partner_name} />
@@ -97,6 +144,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
           userId={user?.id ?? null}
           initialHasHold={hasHold}
           canComment={canComment}
+          initialWatching={watching}
           initialNow={Date.now()}
           holdEur={HOLD_EUR}
         >

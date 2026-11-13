@@ -2,18 +2,26 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Countdown } from "./countdown";
+import { WatchButton } from "./watch-button";
 import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "./badges";
 import { formatEur, formatKm } from "@/lib/format";
 import type { AuctionCard } from "@/lib/types";
 
 /** The lot closing soonest, shown large: the clock is the headline. */
-export function FeaturedLot({ auction, initialNow }: { auction: AuctionCard; initialNow: number }) {
+export function FeaturedLot({
+  auction,
+  initialNow,
+  userId,
+  watching,
+}: {
+  auction: AuctionCard;
+  initialNow: number;
+  userId: string | null;
+  watching: boolean;
+}) {
   const cover = auction.gallery_urls.exterior[0];
   return (
-    <Link
-      href={`/auctions/${auction.id}`}
-      className="group grid overflow-hidden rounded-xl border border-line bg-panel md:grid-cols-[1.4fr_1fr]"
-    >
+    <article className="group relative grid overflow-hidden rounded-xl border border-line bg-panel md:grid-cols-[1.4fr_1fr] has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-signal has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-asphalt">
       <div className="relative aspect-[16/10] bg-asphalt md:aspect-auto md:min-h-[360px]">
         {cover && (
           <Image src={cover} alt="" fill priority sizes="(min-width: 768px) 60vw, 100vw" className="object-cover" />
@@ -27,7 +35,11 @@ export function FeaturedLot({ auction, initialNow }: { auction: AuctionCard; ini
       <div className="flex flex-col justify-between gap-6 p-5 md:p-7">
         <div>
           <p className="text-sm text-mute">Closing next</p>
-          <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">{auction.title}</h2>
+          <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">
+            <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
+              {auction.title}
+            </Link>
+          </h2>
           <p className="mt-2 text-sm text-mute">
             {formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}
           </p>
@@ -52,6 +64,16 @@ export function FeaturedLot({ auction, initialNow }: { auction: AuctionCard; ini
           </div>
         </div>
       </div>
-    </Link>
+      <div className="absolute right-3 top-3 z-10">
+        <WatchButton
+          auctionId={auction.id}
+          title={auction.title}
+          userId={userId}
+          initialWatching={watching}
+          initialCount={auction.watch_count}
+          className="[&_button]:bg-asphalt/85 [&_button]:backdrop-blur"
+        />
+      </div>
+    </article>
   );
 }

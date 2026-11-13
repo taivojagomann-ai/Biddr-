@@ -14,6 +14,7 @@ export const PAGE_SIZE = 50;
 const TYPES: readonly NotificationType[] = [
   "question", "answer", "outbid", "listing_approved", "listing_rejected",
   "auction_live", "auction_ended", "auction_won", "listing_submitted",
+  "watch_ending_soon", "watch_live",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -68,6 +69,10 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
     }
     case "listing_submitted":
       return withTitle("New car submitted for review");
+    case "watch_ending_soon":
+      return titled(`${car} ends in less than an hour`);
+    case "watch_live":
+      return titled(`${car} is now live`);
   }
 }
 
@@ -79,6 +84,8 @@ export function notificationHref(n: NotificationRow): string {
     case "answer":
       return a ? `/auctions/${a}${n.comment_id ? `#comment-${n.comment_id}` : ""}` : "/account/notifications";
     case "outbid":
+    case "watch_ending_soon":
+    case "watch_live":
     case "auction_live":
     case "auction_ended":
     case "auction_won":

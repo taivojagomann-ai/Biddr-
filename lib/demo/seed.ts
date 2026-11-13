@@ -522,6 +522,8 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         starts_at: new Date(schedule.startsAt).toISOString(),
         ends_at: new Date(schedule.endsAt).toISOString(),
         status: schedule.status,
+        // Made-up watcher numbers so counts show; only demo rows are written this way.
+        watch_count: 5 + Math.floor(Math.random() * 146),
       });
       if (auctionError) fail(`Creating the ${car.year} ${car.make} ${car.model}`, auctionError);
 

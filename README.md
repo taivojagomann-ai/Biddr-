@@ -82,6 +82,9 @@ components/
   mobile-menu.tsx               disclosure menu for small screens
   site-footer.tsx               the same help links on every page
   notifications/                header bell and the shared notification item
+  account-menu.tsx              Profile, Selling, Watchlist, Notifications, Sign out
+  share-button.tsx              native share sheet or Copy link / Facebook / WhatsApp / X / Email
+  auction/watch-button.tsx      Watch / Watching toggle and "<n> watching"
   ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select
 hooks/use-server-clock.ts       shared 1 Hz ticker + server clock offset
 lib/
@@ -108,6 +111,7 @@ supabase/migrations/0006_demo_data.sql
 supabase/migrations/0007_listing_details.sql
 supabase/migrations/0008_bidder_requirements.sql
 supabase/migrations/0009_notifications.sql
+supabase/migrations/0010_watchlist.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -118,7 +122,7 @@ The site targets WCAG 2.2 AA. See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what 
 
 ## Environment variables
 
-See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `CRON_SECRET` are server-only. `ENABLE_DEMO_DATA=true` turns on the admin demo-data tools; keep it `false` in production.
+See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `CRON_SECRET` are server-only. `ENABLE_DEMO_DATA=true` turns on the admin demo-data tools; keep it `false` in production. `NEXT_PUBLIC_SITE_URL` (e.g. `https://biddr.ee`) must be set in Vercel for share links and link previews.
 
 ## Setup
 
@@ -148,6 +152,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0007_listing_details.sql` | Structured listing details: body style, interior colour, ownership, seller type and dealer, registration, highlights, equipment, modifications, known flaws, service history, items included and seller notes. Also adds an `editor_take` column the app doesn't use. | Run before deploying this version (the sell form saves these columns) |
 | `0008_bidder_requirements.sql` | Bidders need a complete profile and the current bidding terms: `accept_bidding_terms`, `bidder_status`, `current_bidding_terms_version`, and triggers on `bids` and `comments` | Run before deploying this version (bidding stays closed until it is run) |
 | `0009_notifications.sql` | `notifications` table (own rows only, browser may only set `read_at`), Realtime, triggers for questions, answers, outbids, listing and auction status changes, and a daily cleanup of notifications older than 90 days | Run before deploying this version (the header bell reads this table) |
+| `0010_watchlist.sql` | `watchlist` table (own rows only), `auctions.watch_count` kept by triggers, auto-watch when you bid, "now live" and "ends within the hour" notifications for watchers (cron every 5 minutes) | Run before deploying this version (Watch buttons and the demo loader use it) |
 
 ## Selling a car (`/sell`)
 
@@ -242,6 +247,20 @@ How they're created and stored:
 - **Cleanup.** A daily `pg_cron` job deletes notifications older than 90 days.
 
 Opening a question or answer goes to the auction page at `#comment-<id>`. The comment is scrolled into view, focused and briefly highlighted.
+
+## Watchlist and sharing
+
+- **Watch** (the eye button on cards, on the auction page and in the bid box) adds a car to `/account/watchlist`. Bidding on a car adds it automatically.
+- **Watch counts.** "<n> watching" comes from `auctions.watch_count`. Database triggers keep it in step, and it updates live.
+- **Notifications for watchers:**
+  - one when the auction goes live;
+  - one when it has under an hour left (a `pg_cron` job every 5 minutes).
+
+  Each is sent at most once per car, and never for demo listings.
+- **Share** opens the phone's share sheet. On other devices it shows Copy link, Facebook, WhatsApp, X and Email.
+- **Link previews.** Auction pages have Open Graph and Twitter tags and a generated 1200×630 preview image (`app/auctions/[id]/opengraph-image.tsx`). The image shows the cover photo, the title and the result, and demo listings are marked "Demo listing".
+
+**Set `NEXT_PUBLIC_SITE_URL` in Vercel** (Project → Settings → Environment Variables), e.g. `https://biddr.ee`, then redeploy. Shared links and preview images use it to build absolute URLs. Without it, previews fall back to Vercel's deployment URL, and local development uses `http://localhost:3000`.
 
 ## Demo data (for testing)
 

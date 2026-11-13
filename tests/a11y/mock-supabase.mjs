@@ -25,6 +25,7 @@ const gallery = (p) => ({
 
 const base = {
   is_demo: false,
+  watch_count: 0,
   variant: null, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "AWD",
   exterior_color: "Isle of Man Green", location_country: "EE", damage_history_summary: null,
   inspection_partner_name: null, inspection_report_url: null, inspection_date: null, inspection_highlights: [],
@@ -42,6 +43,7 @@ const AUCTIONS = [
     inspection_highlights: ["Paint thickness measured on all panels", "Brakes at 80%", "No fault codes stored"],
     gallery_urls: gallery("m3"), video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     starting_bid: 45000, current_bid: 52500, bid_count: 6, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
+    watch_count: 37,
     body_style: "sedan", interior_color: "Black Merino leather", seller_type: "dealer", dealer_name: "Example Motors OÜ",
     dealer_registry_code: "12345678", registration_country: "EE", is_registered: true, owner_count: 1,
     highlights: ["One owner from new", "Carbon bucket seats", "Full BMW service history", "M Drive Professional"],
@@ -130,8 +132,19 @@ const NOTIFICATIONS = [
     auction: { title: AUCTIONS[3].title } },
 ];
 
+const pickWatched = (a) => ({
+  id: a.id, title: a.title, status: a.status, current_bid: a.current_bid, starting_bid: a.starting_bid, bid_count: a.bid_count,
+  ends_at: a.ends_at, starts_at: a.starts_at, gallery_urls: a.gallery_urls, leading_bidder_id: a.leading_bidder_id,
+});
+const WATCHLIST = [
+  { user_id: ME, auction_id: AUCTIONS[0].id, created_at: iso(-5 * H), auction: pickWatched(AUCTIONS[0]) },
+  { user_id: ME, auction_id: AUCTIONS[2].id, created_at: iso(-6 * H), auction: pickWatched(AUCTIONS[2]) },
+  { user_id: ME, auction_id: AUCTIONS[3].id, created_at: iso(-50 * H), auction: pickWatched({ ...AUCTIONS[3], leading_bidder_id: ME }) },
+];
+
 const TABLES = {
   notifications: NOTIFICATIONS,
+  watchlist: WATCHLIST,
   auctions: AUCTIONS,
   profiles: PROFILES,
   comments: COMMENTS,

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AccountMenu } from "@/components/account-menu";
 import { MobileMenu, type MenuLink } from "@/components/mobile-menu";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -29,8 +28,9 @@ export async function SiteHeader() {
     { label: "Auctions", href: "/" },
     { label: "How it works", href: "/how-it-works" },
     { label: "Sell a car", href: "/sell" },
-    ...(user && username ? [{ label: "My listings", href: "/account/listings" }] : []),
     ...(user ? [{ label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" }] : []),
+    ...(user ? [{ label: "Selling", href: "/account/listings" }] : []),
+    ...(user ? [{ label: "Watchlist", href: "/account/watchlist" }] : []),
     ...(user ? [{ label: "Notifications", href: "/account/notifications" }] : []),
     ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),
   ];
@@ -72,23 +72,8 @@ export async function SiteHeader() {
                   Admin
                 </Link>
               ) : null}
-              {username ? (
-                <Link href="/account/listings" className={navLink}>
-                  My listings
-                </Link>
-              ) : null}
               <NotificationBell userId={user.id} initialNow={now} />
-              <Link
-                href="/account/setup"
-                className="inline-flex min-h-10 max-w-[10rem] items-center rounded-md border border-field px-3 hover:border-chalk"
-              >
-                <span className="truncate">{username ?? "Finish profile"}</span>
-              </Link>
-              <form action="/auth/signout" method="post">
-                <Button type="submit" variant="ghost" size="icon" aria-label="Sign out" title="Sign out">
-                  <LogOut aria-hidden />
-                </Button>
-              </form>
+              <AccountMenu label={username ?? "Finish profile"} />
             </>
           ) : (
             <Link href="/login" className="inline-flex min-h-10 items-center rounded-md border border-field px-3 hover:border-chalk">

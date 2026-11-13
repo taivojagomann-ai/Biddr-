@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import { AuctionCard } from "./auction-card";
 import { FeaturedLot } from "./featured-lot";
+import { setWatchCount } from "@/lib/client/watch-store";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { Auction, AuctionCard as AuctionCardData } from "@/lib/types";
 
@@ -11,14 +12,23 @@ export function AuctionFeed({
   initial,
   initialNow,
   featureFirst = false,
+  userId,
+  watchedIds,
 }: {
   initial: AuctionCardData[];
   initialNow: number;
+  userId: string | null;
+  /** Auctions the signed-in user watches (server-read, among the ones shown). */
+  watchedIds: string[];
   featureFirst?: boolean;
 }) {
   const [auctions, setAuctions] = useState(initial);
+  const watched = new Set(watchedIds);
 
-  useEffect(() => setAuctions(initial), [initial]);
+  useEffect(() => {
+    setAuctions(initial);
+    for (const a of initial) setWatchCount(a.id, a.watch_count);
+  }, [initial]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -27,6 +37,7 @@ export function AuctionFeed({
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "auctions" },
         (payload: RealtimePostgresUpdatePayload<Auction>) => {
           const next = payload.new;
+          if (typeof next.watch_count === "number") setWatchCount(next.id, next.watch_count);
           setAuctions((list) =>
             list.map((a) =>
               a.id === next.id
@@ -37,6 +48,7 @@ export function AuctionFeed({
                     ends_at: next.ends_at,
                     status: next.status,
                     reserve_met: next.reserve_met,
+                    watch_count: next.watch_count,
                   }
                 : a,
             ),
@@ -61,7 +73,7 @@ export function AuctionFeed({
 
   return (
     <div className="flex flex-col gap-6">
-      {featured && <FeaturedLot auction={featured} initialNow={initialNow} />}
+      {featured && <FeaturedLot auction={featured} initialNow={initialNow} userId={userId} watching={watched.has(featured.id)} />}
       {grid.length > 0 && (
         <h2 className="sr-only">{featured ? "More auctions" : "Auctions"}</h2>
       )}
@@ -69,7 +81,7 @@ export function AuctionFeed({
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {grid.map((a, i) => (
             <li key={a.id}>
-              <AuctionCard auction={a} initialNow={initialNow} priority={i < 4} />
+              <AuctionCard auction={a} initialNow={initialNow} priority={i < 4} userId={userId} watching={watched.has(a.id)} />
             </li>
           ))}
         </ul>

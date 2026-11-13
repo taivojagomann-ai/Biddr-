@@ -63,6 +63,8 @@ export interface Auction {
   status: AuctionStatus;
   /** Created by the admin "Demo data" tools; bidding is refused (0006). */
   is_demo: boolean;
+  /** Number of members watching (0010), kept in step by database triggers. */
+  watch_count: number;
   // Structured listing details (0007)
   body_style: BodyStyle | null;
   interior_color: string | null;
@@ -109,13 +111,13 @@ export interface AdminActionRow {
 
 /** Columns the feed needs; keeps list queries light. */
 export const AUCTION_CARD_COLUMNS =
-  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status,is_demo" as const;
+  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status,is_demo,watch_count" as const;
 
 export type AuctionCard = Pick<
   Auction,
   | "id" | "title" | "make" | "model" | "year" | "mileage_km" | "location_city" | "location_country"
   | "condition_type" | "inspection_partner_name" | "gallery_urls" | "starting_bid" | "has_reserve"
-  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo"
+  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo" | "watch_count"
 >;
 
 export interface BidHistoryRow {
@@ -153,7 +155,8 @@ export interface PlaceBidResult {
 
 export type NotificationType =
   | "question" | "answer" | "outbid" | "listing_approved" | "listing_rejected"
-  | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted";
+  | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted"
+  | "watch_ending_soon" | "watch_live";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

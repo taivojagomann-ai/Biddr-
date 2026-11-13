@@ -14,3 +14,14 @@ export const FOOTER_LINKS = [
   { label: "Bidding terms", href: "/terms/bidding" },
   { label: "Privacy", href: "/privacy" },
 ] as const;
+
+/**
+ * Absolute site origin for shares and Open Graph tags. Set NEXT_PUBLIC_SITE_URL in
+ * Vercel (e.g. https://biddr.ee). Previews fall back to VERCEL_URL, local dev to localhost.
+ */
+export function siteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
