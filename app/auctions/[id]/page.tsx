@@ -5,7 +5,6 @@ import { AuctionLive } from "@/components/auction/auction-live";
 import { Gallery } from "@/components/auction/gallery";
 import { InspectionCard } from "@/components/auction/inspection-card";
 import {
-  EditorTake,
   Equipment,
   Highlights,
   ItemsIncluded,
@@ -94,7 +93,6 @@ export default async function AuctionPage({ params }: { params: { id: string } }
           holdEur={HOLD_EUR}
         >
           <Gallery auction={auction} />
-          <EditorTake auction={auction} />
           <Highlights auction={auction} />
           <InspectionCard auction={auction} />
           <SpecSheet auction={auction} />

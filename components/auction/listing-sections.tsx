@@ -16,19 +16,6 @@ function SectionShell({ id, title, children }: { id: string; title: string; chil
   );
 }
 
-/** The team's editorial note. Only shown when an admin has written one. */
-export function EditorTake({ auction }: Props) {
-  if (!auction.editor_take?.trim()) return null;
-  return (
-    <section aria-labelledby="take-heading" className="rounded-lg border-l-4 border-signal bg-panel px-4 py-4 sm:px-5">
-      <h2 id="take-heading" className="text-xs font-bold uppercase tracking-wider text-signal">
-        Biddr&apos;s take
-      </h2>
-      <p className="mt-2 whitespace-pre-line leading-relaxed">{auction.editor_take}</p>
-    </section>
-  );
-}
-
 export function Highlights({ auction }: Props) {
   const items = asTextList(auction.highlights);
   if (!items.length) return null;

@@ -8,7 +8,6 @@ import {
   MAX_AUCTION_MS,
   adminDetailsSchema,
   commentDeleteSchema,
-  editorTakeSchema,
   extendSchema,
   fieldErrorsOf,
   inspectionSchema,
@@ -149,10 +148,10 @@ export async function updateListing(input: unknown): Promise<AdminResult> {
 }
 
 // -----------------------------------------------------------------------------
-// Details lists and Biddr's take
+// Details lists
 // -----------------------------------------------------------------------------
 export async function updateDetails(input: unknown): Promise<AdminResult> {
-  const g = await guard(editorTakeSchema, input);
+  const g = await guard(auctionIdSchema, input);
   if ("result" in g) return g.result;
   const { ctx, data: v } = g;
 
@@ -162,7 +161,7 @@ export async function updateDetails(input: unknown): Promise<AdminResult> {
     return { ok: false, error: Object.values(fieldErrors)[0] ?? "Check the form.", fieldErrors };
   }
 
-  const changes = { ...detailsColumns(details.data), editor_take: v.editorTake };
+  const changes = detailsColumns(details.data);
   const { data, error } = await ctx.db.from("auctions").update(changes).eq("id", v.auctionId).select("id");
   if (error) return { ok: false, error: dbMessage(error) };
   if (!data?.length) return NOT_FOUND;
@@ -175,7 +174,6 @@ export async function updateDetails(input: unknown): Promise<AdminResult> {
     service_history: changes.service_history.length,
     items_included: changes.items_included.length,
     seller_notes: changes.seller_notes ? changes.seller_notes.length : 0,
-    editor_take: changes.editor_take,
   });
   refresh(v.auctionId);
   return { ok: true, message: "Details saved." };

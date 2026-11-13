@@ -3,7 +3,6 @@
 import { z } from "zod";
 import { fromBalticInputs } from "@/lib/baltic-time";
 import {
-  EDITOR_TAKE_MAX,
   bodyStyleSchema,
   detailsSchema,
   registrationSchema,
@@ -120,16 +119,7 @@ export type ListingInput = z.input<typeof listingSchema>;
 
 /** Details lists for admins: same limits as sellers, but older listings may have no highlights or declarations. */
 export const adminDetailsSchema = detailsSchema({ highlightsMin: 0, requireDeclarations: false });
-export type AdminDetailsInput = DetailsInput & { auctionId: string; editorTake: string };
-
-export const editorTakeSchema = z.object({
-  auctionId: id,
-  editorTake: z
-    .string()
-    .trim()
-    .max(EDITOR_TAKE_MAX, `Keep Biddr's take under ${EDITOR_TAKE_MAX.toLocaleString("en-IE")} characters.`)
-    .transform((v) => (v === "" ? null : v)),
-});
+export type AdminDetailsInput = DetailsInput & { auctionId: string };
 
 export const photoSectionSchema = z.enum(["exterior", "interior", "mechanical", "before"]);
 export const photoActionSchema = z.object({ auctionId: id, section: photoSectionSchema, url: z.string().url().max(500) });

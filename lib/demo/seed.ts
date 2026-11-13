@@ -87,7 +87,6 @@ interface ListingDetails {
   service: [string, number, string, string?][]; // month, km, work, workshop
   included: string[];
   notes: string;
-  take: string;
 }
 
 const DEMO_DEALER = { name: "Tallinn M Garage OÜ (demo)", code: "00000000" };
@@ -126,7 +125,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Second key", "Winter tyres on 18-inch wheels", "Service book", "Original exhaust tips"],
       notes: "Bought from the first owner in 2022. Used on dry summer days only; winters in a heated garage.",
-      take: "A manual M2 Competition with two owners and every service stamped. The S55 is the engine to have in this car, and the flaws listed are minor and easy to put right.",
     },
   },
   {
@@ -150,7 +148,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Two keys", "Load cover and luggage net", "Winter tyres on 21-inch wheels"],
       notes: "Family car, never used for towing. The tow bar was fitted at Audi for a bike rack.",
-      take: "One owner, full dealer history and the spec you want. The reserve is ambitious, but RS6 Avants this clean are rare in the Baltics.",
     },
   },
   {
@@ -174,7 +171,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Two keys", "Porsche car cover", "Service book"],
       notes: "Selling with no reserve because I'm moving abroad. Happy to show the car in Vilnius before the auction ends.",
-      take: "A well-optioned 992 Carrera S with no reserve: it sells at whatever the bidding reaches. Front lift and rear steering make it easy to live with.",
     },
   },
   {
@@ -199,7 +195,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Second key", "Original exhaust (removed in 2023)", "Service book"],
       notes: "The Remus exhaust has a quiet mode for cold starts. The original exhaust comes with the car.",
-      take: "The last of the V8 C63 coupes, with the costly plugs and coils job already done. The exhaust is loud but the original comes with it.",
     },
   },
   {
@@ -225,7 +220,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Two keys", "Repair invoices and parts list", "Winter tyres on 19-inch wheels"],
       notes: "The repair was done at the dealer with new parts. Every invoice is with the inspection partner.",
-      take: "An honest restored car: a low-speed hit, repaired at the dealer with new parts, and documented end to end. It sold above the reserve.",
     },
   },
   {
@@ -253,7 +247,6 @@ const CARS: CarSpec[] = [
       ],
       included: ["Two keys", "Dyno sheet", "Finnish service records"],
       notes: "Still on Finnish plates. Registration in Estonia is booked; the buyer can take it over.",
-      take: "A tuned RS3 with a long, honest list of flaws. Bidding stopped below the reserve: the tune puts some buyers off.",
     },
   },
 ];
@@ -517,7 +510,6 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
           .sort((a, b) => b.date.localeCompare(a.date)),
         items_included: car.listing.included,
         seller_notes: car.listing.notes,
-        editor_take: car.listing.take,
         gallery_urls: { exterior: urls.exterior, interior: urls.interior, mechanical: urls.mechanical },
         before_photos_urls: urls.before,
         starting_bid: car.startingBid,

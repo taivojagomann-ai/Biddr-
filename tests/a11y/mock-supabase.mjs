@@ -44,7 +44,6 @@ const AUCTIONS = [
     starting_bid: 45000, current_bid: 52500, bid_count: 6, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
     body_style: "sedan", interior_color: "Black Merino leather", seller_type: "dealer", dealer_name: "Example Motors OÜ",
     dealer_registry_code: "12345678", registration_country: "EE", is_registered: true, owner_count: 1,
-    editor_take: "A one-owner M3 with every service at the dealer. The flaws listed are small and honest.",
     highlights: ["One owner from new", "Carbon bucket seats", "Full BMW service history", "M Drive Professional"],
     equipment: ["Carbon bucket seats", "Harman Kardon sound", "Laser headlights", "Head-up display", "Adaptive M suspension",
       "Heated seats", "360-degree camera", "Parking assistant", "Apple CarPlay", "Keyless entry"],

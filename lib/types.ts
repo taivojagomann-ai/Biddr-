@@ -81,8 +81,6 @@ export interface Auction {
   no_modifications: boolean;
   service_history: ServiceRecord[];
   seller_notes: string | null;
-  /** "Biddr's take": written by admins only, shown publicly. */
-  editor_take: string | null;
   created_at: string;
   updated_at: string;
 }
