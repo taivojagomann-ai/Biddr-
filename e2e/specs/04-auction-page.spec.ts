@@ -136,7 +136,18 @@ test.describe("auction page", () => {
     await expect(page.getByRole("region", { name: "Preview: only you can see this." })).toContainText("Not accepted:");
   });
 
-  test.fixme("the location links to a Google Maps search for the city and country only", async () => {
-    // Not built: the auction page shows the location as text, without a map link.
+  test("the location links to a Google Maps search for the city and country only", async ({ page }) => {
+    const seller = await createUser({ role: "seller" });
+    const a = await createAuction({ seller, city: "Tartu", country: "EE" });
+    await page.goto(`/auctions/${a.id}`);
+    const specs = page.getByRole("region", { name: "Specifications" });
+    await expect(specs).toContainText("Tartu, Estonia");
+    const link = specs.getByRole("link", { name: "View on map (opens Google Maps in a new tab)" });
+    await expect(link).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=Tartu%2C%20Estonia");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+    // No embedded map and no raw URL on the page.
+    await expect(page.locator('iframe[src*="google"]')).toHaveCount(0);
+    await expect(page.getByText(/google\.com\/maps/)).toHaveCount(0);
   });
 });
