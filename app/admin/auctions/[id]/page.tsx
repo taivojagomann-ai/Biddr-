@@ -162,7 +162,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         <div className="min-w-0">
           <h1 className="font-wide text-2xl font-extrabold tracking-tight sm:text-3xl">{a.title}</h1>
           <p className="mt-1 text-sm text-mute">
-            {restored ? "Restored after accident damage" : "Clean history"} · {formatKm(a.mileage_km)} · {a.location_city},{" "}
+            {restored ? "Accident repaired" : "Clean history"} · {formatKm(a.mileage_km)} · {a.location_city},{" "}
             {COUNTRY_NAMES[a.location_country]} · Submitted {formatExactTime(a.created_at, "Europe/Tallinn")}
           </p>
         </div>
@@ -352,6 +352,8 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             listingMileage={formatKm(a.mileage_km)}
             initialHighlights={a.inspection_type === "authorised_dealer" ? (a.inspection_highlights ?? []) : []}
             reportUrl={a.inspection_report_url}
+            sellerIsDealer={a.seller_type === "dealer"}
+            initialInspectedBySeller={priv?.inspected_by_seller ?? false}
           />
         </Section>
 

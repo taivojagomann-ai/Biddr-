@@ -19,7 +19,7 @@ const SECTIONS = [
   ["buyers-premium", "The buyer's premium"],
   ["reserve", "Reserve or no reserve"],
   ["extensions", "Late bids add 2 minutes"],
-  ["badges", "Dealer inspected and Professionally restored"],
+  ["badges", "Dealer inspected and Accident repaired"],
   ["after-you-win", "After you win"],
   ["selling", "How selling works"],
 ] as const;
@@ -150,24 +150,26 @@ export default function HowItWorksPage() {
         </section>
 
         <section aria-labelledby="badges">
-          <H2 id="badges">Dealer inspected and Professionally restored</H2>
+          <H2 id="badges">Dealer inspected and Accident repaired</H2>
           <dl className="mt-4 space-y-4">
             <div>
               <dt className="font-semibold">Dealer inspected</dt>
               <dd className="mt-1 text-mute">
-                An authorised dealer of the car&apos;s brand, in an EU country, inspected the car before the sale, and Biddr
-                checked the report: that the dealer is authorised for the brand, the VIN and mileage match, and the report
-                is recent. The auction page shows the dealer, the date and highlights from the report, and sometimes a copy
-                you can download. Inspections are optional, so cars without this badge haven&apos;t been inspected by a
-                dealer; the specifications say &ldquo;Not inspected&rdquo;.
+                An authorised dealer of the car&apos;s brand inspected it before the auction. The seller arranged the inspection
+                and sent us the report. We checked that it comes from an official dealer, matches the car&apos;s VIN and
+                mileage, and is no older than 90 days. You can read the highlights on the auction page, and download the
+                report when the seller has agreed to share it. If the seller is a dealer and inspected the car themselves,
+                the auction page says so. Inspections are optional, so cars without this badge haven&apos;t been inspected by
+                a dealer; the specifications say &quot;Not inspected&quot;.
               </dd>
             </div>
             <div>
-              <dt className="font-semibold">Professionally restored</dt>
+              <dt className="font-semibold">Accident repaired</dt>
               <dd className="mt-1 text-mute">
                 The car had accident damage and has been repaired. The seller describes what was damaged and how it was
-                fixed. If an authorised dealer also inspected it, it carries the Dealer inspected badge and you can read the
-                highlights before you bid. If not, the auction page says so clearly: ask the seller for repair documents and photos.
+                fixed. Biddr doesn&apos;t check the repair itself. If the car was also dealer inspected, it carries the Dealer
+                inspected badge and you can read the findings before you bid. If not, the auction page says so clearly: ask
+                the seller for repair documents and photos.
               </dd>
             </div>
           </dl>
@@ -193,8 +195,8 @@ export default function HowItWorksPage() {
             <li>
               <strong>Dealer inspection, if you have one.</strong> If an authorised dealer of your car&apos;s brand, in any
               EU country, has done a pre-sale inspection, upload the report. Reports from independent garages aren&apos;t
-              accepted. Inspected cars get the Dealer inspected badge and give buyers more confidence. Restored cars are
-              welcome either way.
+              accepted. Inspected cars get the Dealer inspected badge and give buyers more confidence. Accident-repaired
+              cars are welcome either way.
             </li>
             <li>
               <strong>We review the listing</strong> (and check the dealer&apos;s report, if there is one) and agree the

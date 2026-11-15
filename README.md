@@ -128,6 +128,7 @@ supabase/migrations/0013_optional_inspections.sql
 supabase/migrations/0014_dealer_inspections.sql
 supabase/migrations/0015_seller_withdraw.sql
 supabase/migrations/0016_seller_inspection_decision.sql
+supabase/migrations/0017_inspected_by_seller.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -175,6 +176,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0014_dealer_inspections.sql` | Authorised dealer inspections: dealer report and review columns on `auction_private`, `auctions.inspection_type`, the private `inspection-uploads` bucket (owners write and delete only in their own folder, no public read), the `inspection_rejected` notification type, and `search_auctions` re-created to return `inspection_type`. The old partner-booking columns stay but are no longer used | Run before deploying this version (the sell form and admin review use it) |
 | `0015_seller_withdraw.sql` | Seller withdrawals: `withdraw_reason`, `withdraw_requested_at` and `withdraw_request_status` on `auction_private`, the `seller_withdraw` and `seller_request_withdrawal` functions (signed-in users only), `auctions.withdrawn_before_review` so a draft withdrawn before review stays private, the schedule rule allowing a withdrawn listing without times, and the `withdrawal_approved` / `withdrawal_declined` notification types | Run before deploying this version (My listings and the admin pages use it) |
 | `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
+| `0017_inspected_by_seller.sql` | `inspected_by_seller` on `auction_private` and `auctions`: the admin confirms a dealer seller inspected its own car, and the listing says "Inspected by the selling dealer" | Run before deploying this version (the admin review and auction page read it) |
 
 ## Selling a car (`/sell`)
 
@@ -206,8 +208,9 @@ The only inspection Biddr accepts is a **pre-sale inspection by an authorised de
   - **Accept report** needs all four boxes ticked ("Dealer is an authorised dealer of this brand", "VIN on the report matches the listing", "Mileage is consistent", "Report date is within 90 days") and 3 to 6 highlights. It sets `inspection_type = 'authorised_dealer'`, the public dealer name and city, date and highlights. The checklist is saved with the decision in `admin_actions`. After accepting, the admin can upload a **redacted** PDF to the public `inspection-reports` bucket for buyers to download.
   - **Reject report** needs a reason and works while the listing is waiting for review. It clears every public inspection field and the **seller decides** what happens next (see below).
   - Approving a listing never requires an inspection.
-- **Buyers** see the **Dealer inspected** badge (cards, featured car, auction page) only when `inspection_type = 'authorised_dealer'`. The inspection card says "Inspected by <dealer, city> (authorised <make> dealer) on <date>. Report checked by Biddr.", lists the highlights, and offers "Download report (PDF)" only when a redacted copy exists. Specifications have an "Inspection" row: "Dealer inspected" or "Not inspected". A restored car without one shows its repair description and "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos."
-- **Home page History filter**: "Restored" (any restored car) and "Restored, dealer inspected".
+- **Buyers** see the **Dealer inspected** badge (cards, featured car, auction page) only when `inspection_type = 'authorised_dealer'`. The inspection card says "Inspected by <dealer, city> (authorised <make> dealer) on <date>. Report checked by Biddr.", lists the highlights, and offers "Download report (PDF)" only when a redacted copy exists. Specifications have an "Inspection" row: "Dealer inspected" or "Not inspected". An accident-repaired car without one shows its repair description and "This accident-repaired car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos." When the admin ticks **Inspected by the selling dealer** (dealer sellers only, `inspected_by_seller`, `0017`), the badge stays but the card says "Inspected by the selling dealer, <dealer, city> …" and the info tip says it isn't an independent check.
+- **Home page History filter**: "Accident repaired" (any accident-repaired car) and "Accident repaired, dealer inspected". The URL values (`restored_any`, `restored`) stay the same so old links keep working.
+- **Badge names**: "Dealer inspected" (accepted authorised-dealer report) and "Accident repaired" (the seller declared accident damage and its repair; Biddr doesn't check the repair itself). Both have info tips on the auction page; /how-it-works explains them in full.
 - Listings that showed "Partner verified" before `0014` have no `inspection_type`, so they show "Not inspected" until a dealer report is accepted for them.
 
 ### Previewing a listing

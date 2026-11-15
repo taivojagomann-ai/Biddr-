@@ -52,6 +52,8 @@ export interface Auction {
   withdrawn_before_review: boolean;
   /** 'authorised_dealer' once an admin accepted the dealer's report (0014); the badge shows only then. */
   inspection_type: InspectionType | null;
+  /** The selling dealer inspected the car itself (0017): shown as "Inspected by the selling dealer". */
+  inspected_by_seller: boolean;
   before_photos_urls: string[];
   gallery_urls: GalleryUrls;
   video_url: string | null;
@@ -131,6 +133,8 @@ export interface AuctionPrivate {
   seller_decision_deadline: string | null;
   seller_decision: SellerInspectionDecision | null;
   seller_decision_at: string | null;
+  /** The admin confirmed the inspecting dealer is the selling dealer (0017). */
+  inspected_by_seller: boolean;
 }
 
 export type SellerInspectionDecision = "new_report" | "without_inspection";

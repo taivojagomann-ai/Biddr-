@@ -149,7 +149,7 @@ export function ListingForm({
           rows={5}
           aria-invalid={fe.damageSummary ? true : undefined}
         />
-        <FieldNote error={fe.damageSummary} hint={restored ? "Shown to bidders. Restored cars must have one." : undefined} />
+        <FieldNote error={fe.damageSummary} hint={restored ? "Shown to bidders. Accident-repaired cars must have one." : undefined} />
       </div>
       {text("videoUrl", "Video link (YouTube or Vimeo)", { optional: true, wide: true, inputMode: "url" })}
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">

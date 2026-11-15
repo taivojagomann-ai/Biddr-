@@ -34,7 +34,18 @@ export const HELP = {
   },
   dealerInspected: {
     label: "What does Dealer inspected mean?",
-    text: "An authorised dealer of this brand inspected the car before the sale, and Biddr checked the report.",
+    text: "An authorised dealer of the car's brand inspected it before the auction. We checked the report comes from an official dealer, matches the VIN and mileage, and is no older than 90 days.",
+    href: "/how-it-works#badges",
+  },
+  /** Dealer inspected, where the selling dealer inspected its own car (0017). */
+  dealerInspectedBySeller: {
+    label: "What does Dealer inspected mean?",
+    text: "Inspected by the selling dealer: the seller is an authorised dealer of the car's brand and inspected the car itself, so this isn't an independent check. We checked the report matches the VIN and mileage and is no older than 90 days.",
+    href: "/how-it-works#badges",
+  },
+  accidentRepaired: {
+    label: "What does Accident repaired mean?",
+    text: "The car had accident damage and has been repaired. The seller describes the repair; Biddr doesn't check the repair itself.",
     href: "/how-it-works#badges",
   },
 } satisfies Record<string, HelpTopic>;

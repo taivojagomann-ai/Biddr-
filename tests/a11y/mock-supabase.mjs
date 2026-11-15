@@ -29,7 +29,7 @@ const base = {
   variant: null, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "AWD",
   exterior_color: "Isle of Man Green", location_country: "EE", damage_history_summary: null,
   inspection_partner_name: null, inspection_report_url: null, inspection_date: null, inspection_highlights: [],
-  inspection_type: null,
+  inspection_type: null, inspected_by_seller: false,
   before_photos_urls: [], video_url: null, has_reserve: false, reserve_met: false, current_bid: null,
   leading_bidder_id: null, bid_count: 0, min_bid_increment: 250, created_at: iso(-72 * H), updated_at: iso(-H),
   seller: { username: "baltic_m", country: "EE" },
@@ -94,13 +94,15 @@ const AUCTIONS = [
     make: "Mercedes-AMG", model: "GT Black Series", year: 2021, vin: "WDD1903791A912345", mileage_km: 1250,
     location_city: "Kohtla-Järve", location_country: "EE", condition_type: "restored_accident",
     damage_history_summary: "Rear bumper replaced after a car park scrape.", inspection_partner_name: "Demo Mercedes-Benz Centre, Helsinki", inspection_type: "authorised_dealer",
+    // A dealer seller that inspected its own car (0017).
+    seller_type: "dealer", dealer_name: "Demo Mercedes-Benz Centre", inspected_by_seller: true,
     inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r7.pdf`, gallery_urls: gallery("gt"),
     starting_bid: 900000, current_bid: 1250000, bid_count: 31, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
     watch_count: 140, starts_at: iso(-6 * H), ends_at: iso(4 * 24 * H + 7 * H), status: "live", // went live 6h ago: "New"
   },
   // The signed-in test user's own listings.
   {
-    ...base, id: "10000000-0000-4000-8000-000000000005", seller_id: ME, title: "2020 BMW M2 Competition",
+    ...base, id: "10000000-0000-4000-8000-000000000005", seller_id: ME, title: "2020 BMW M2 Competition", seller_type: "dealer",
     make: "BMW", model: "M2", variant: "Competition", year: 2020, vin: "WBS2U710X07E12345", mileage_km: 35500,
     location_city: "Tartu", condition_type: "restored_accident",
     damage_history_summary: "Rear bumper and boot lid replaced after a low-speed impact. Airbags did not deploy.",

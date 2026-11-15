@@ -87,7 +87,7 @@ export const PHOTO_SECTIONS = [
   { key: "exterior", label: "Exterior", min: 6, hint: "All four sides, front and rear three-quarters, wheels." },
   { key: "interior", label: "Interior", min: 4, hint: "Dashboard, seats, odometer with the engine running." },
   { key: "mechanical", label: "Engine and underside", min: 2, hint: "Engine bay and the underside from front to back." },
-  { key: "before", label: "Before restoration", min: 2, hint: "The damage before it was repaired." },
+  { key: "before", label: "Before repair", min: 2, hint: "The damage before it was repaired." },
 ] as const;
 export type PhotoSection = (typeof PHOTO_SECTIONS)[number]["key"];
 export const PHOTO_SECTION_KEYS: readonly PhotoSection[] = PHOTO_SECTIONS.map((s) => s.key);

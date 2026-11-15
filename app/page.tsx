@@ -34,7 +34,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const status = parseFeedStatus(searchParams.status);
   const q = parseSearchQuery(searchParams.q);
   const country = searchParams.country && COUNTRIES.includes(searchParams.country as Country) ? searchParams.country : null;
-  // restored = restored and dealer inspected; restored_any = every restored car.
+  // URL values kept for old links: restored = accident repaired and dealer inspected; restored_any = every accident-repaired car.
   const condition = CONDITIONS.find((c) => c === searchParams.condition) ?? null;
   const now = Date.now();
 

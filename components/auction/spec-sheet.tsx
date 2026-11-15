@@ -21,7 +21,7 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Colour", auction.exterior_color],
     ["Interior", auction.interior_color],
     ["Location", `${auction.location_city}, ${COUNTRY_NAMES[auction.location_country]}`],
-    ["History", auction.condition_type === "clean" ? "Clean, no recorded accidents" : "Accident damage, professionally restored"],
+    ["History", auction.condition_type === "clean" ? "Clean, no recorded accidents" : "Accident damage, repaired"],
     ["Owners", auction.owner_count ? String(auction.owner_count) : null],
     ["Seller", auction.seller_type === "dealer" ? (auction.dealer_name ? `Dealer: ${auction.dealer_name}` : "Dealer") : "Private seller"],
     ["Registration", registration(auction)],

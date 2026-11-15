@@ -78,7 +78,7 @@ export function AuctionView({
           {isDealerInspected(auction) ? (
             <span className="inline-flex items-center gap-0.5">
               <InspectionBadge dealer={auction.inspection_partner_name ?? "an authorised dealer"} />
-              <InfoTip topic={HELP.dealerInspected} />
+              <InfoTip topic={auction.inspected_by_seller ? HELP.dealerInspectedBySeller : HELP.dealerInspected} />
             </span>
           ) : null}
           {/* Phones and tablets have no bid box, so the reserve shows here (lg+ shows it in the bid box). */}
@@ -86,7 +86,12 @@ export function AuctionView({
             <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
             <InfoTip topic={auction.has_reserve ? HELP.reserve : HELP.noReserve} />
           </span>
-          {auction.condition_type === "restored_accident" && <RestoredBadge />}
+          {auction.condition_type === "restored_accident" ? (
+            <span className="inline-flex items-center gap-0.5">
+              <RestoredBadge />
+              <InfoTip topic={HELP.accidentRepaired} />
+            </span>
+          ) : null}
         </div>
       </div>
 
