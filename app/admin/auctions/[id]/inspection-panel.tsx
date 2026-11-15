@@ -47,7 +47,12 @@ export function InspectionPanel({
   listingMileage,
   initialHighlights,
   reportUrl,
+  sellerIsDealer = false,
+  initialInspectedBySeller = false,
 }: {
+  /** The seller is a dealer: the admin can mark the report as the seller's own inspection. */
+  sellerIsDealer?: boolean;
+  initialInspectedBySeller?: boolean;
   auctionId: string;
   /** Draft or scheduled: the decision can still change. */
   reviewable: boolean;
@@ -154,7 +159,13 @@ export function InspectionPanel({
         </p>
       ) : reviewable ? (
         <>
-          <AcceptForm auctionId={auctionId} accepted={status === "accepted"} initialHighlights={initialHighlights} />
+          <AcceptForm
+            auctionId={auctionId}
+            accepted={status === "accepted"}
+            initialHighlights={initialHighlights}
+            sellerIsDealer={sellerIsDealer}
+            initialInspectedBySeller={initialInspectedBySeller}
+          />
           <RejectForm auctionId={auctionId} />
         </>
       ) : (
@@ -166,8 +177,21 @@ export function InspectionPanel({
   );
 }
 
-function AcceptForm({ auctionId, accepted, initialHighlights }: { auctionId: string; accepted: boolean; initialHighlights: string[] }) {
+function AcceptForm({
+  auctionId,
+  accepted,
+  initialHighlights,
+  sellerIsDealer,
+  initialInspectedBySeller,
+}: {
+  auctionId: string;
+  accepted: boolean;
+  initialHighlights: string[];
+  sellerIsDealer: boolean;
+  initialInspectedBySeller: boolean;
+}) {
   const action = useAdminAction();
+  const [inspectedBySeller, setInspectedBySeller] = useState(initialInspectedBySeller);
   const [checks, setChecks] = useState<Record<ReportCheckKey, boolean>>({
     authorisedDealer: accepted,
     vinMatches: accepted,
@@ -184,7 +208,7 @@ function AcceptForm({ auctionId, accepted, initialHighlights }: { auctionId: str
       aria-labelledby="accept-report-heading"
       onSubmit={(e) => {
         e.preventDefault();
-        void action.run(acceptInspectionReport, { auctionId, checks, highlights });
+        void action.run(acceptInspectionReport, { auctionId, checks, highlights, inspectedBySeller: sellerIsDealer && inspectedBySeller });
       }}
     >
       <h3 id="accept-report-heading" className="font-semibold">
@@ -218,6 +242,26 @@ function AcceptForm({ auctionId, accepted, initialHighlights }: { auctionId: str
           })}
         </ul>
       </fieldset>
+
+      {sellerIsDealer ? (
+        <div>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={inspectedBySeller}
+              onChange={(e) => setInspectedBySeller(e.target.checked)}
+              aria-describedby="inspected-by-seller-hint"
+              className="mt-0.5 size-4 shrink-0 accent-[#FF5500]"
+            />
+            <span className="font-semibold">Inspected by the selling dealer</span>
+          </label>
+          <p id="inspected-by-seller-hint" className="ml-7 text-xs text-mute">
+            Tick if the inspecting dealer is the same business as the seller. The badge stays, but the listing says
+            &ldquo;Inspected by the selling dealer&rdquo; instead of implying an independent check.
+          </p>
+          <FieldNote error={action.fieldErrors.inspectedBySeller} />
+        </div>
+      ) : null}
 
       <fieldset className="min-w-0">
         <legend className="mb-1.5 text-sm font-semibold">Highlights from the report</legend>

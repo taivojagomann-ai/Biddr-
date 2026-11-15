@@ -7,4 +7,6 @@ export function isDealerInspected(a: Pick<Auction, "inspection_type">): boolean 
 }
 
 export const DEALER_INSPECTED = "Dealer inspected";
+export const ACCIDENT_REPAIRED = "Accident repaired";
+export const INSPECTED_BY_SELLING_DEALER = "Inspected by the selling dealer";
 export const NOT_INSPECTED = "Not inspected";

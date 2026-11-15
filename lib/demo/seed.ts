@@ -166,7 +166,7 @@ const CARS: CarSpec[] = [
     scenario: "no_reserve_no_bids", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
     mileageKm: 24_900, engine: "3.0 flat-6 twin-turbo, 450 hp", transmission: "8-speed PDK", drivetrain: "RWD",
     color: "Gentian Blue", city: "Vilnius", country: "LT", dealer: null, condition: "restored_accident",
-    // Shows a restored car listed without an inspection.
+    // Shows an accident-repaired car listed without an inspection.
     damageSummary:
       "Rear-right impact while parked in 2022. Rear bumper and right rear quarter panel repaired and repainted at an independent body shop in Vilnius. No structural damage according to the shop. Airbags did not deploy.",
     startingBid: 105_000, bids: 0,
@@ -234,7 +234,7 @@ const CARS: CarSpec[] = [
         ["2025-05", 19_100, "Oil service and brake fluid", "BMW Kaunas"],
       ],
       included: ["Two keys", "Repair invoices and parts list", "Winter tyres on 19-inch wheels"],
-      notes: "The repair was done at the dealer with new parts. Every invoice is with the inspection partner.",
+      notes: "The repair was done at the dealer with new parts. Every invoice is available on request.",
     },
   },
   {
@@ -270,7 +270,7 @@ const PHOTO_SET = [
   ...[1, 2, 3, 4, 5, 6].map((n) => ({ section: "exterior", n, caption: `EXTERIOR ${n}` })),
   ...[1, 2, 3, 4].map((n) => ({ section: "interior", n, caption: `INTERIOR ${n}` })),
   ...[1, 2].map((n) => ({ section: "mechanical", n, caption: `ENGINE AND UNDERSIDE ${n}` })),
-  ...[1, 2].map((n) => ({ section: "before", n, caption: `BEFORE RESTORATION ${n}` })),
+  ...[1, 2].map((n) => ({ section: "before", n, caption: `BEFORE REPAIR ${n}` })),
 ] as const;
 
 // -----------------------------------------------------------------------------
@@ -370,7 +370,7 @@ const COMMENTS: DemoComment[] = [
   { car: "no_reserve_no_bids", by: "seller", replyTo: 6, ago: 1 * DAY, text: "Yes, at 20,000 km at Porsche Vilnius. Stamped in the book." },
   { car: "sold", by: "b2", text: "Who did the repair, and do you have the invoices?", ago: 2 * DAY },
   { car: "sold", by: "seller", replyTo: 8, ago: 1.9 * DAY,
-    text: "A main-dealer body shop in Kaunas. All invoices and the parts list are with the inspection partner." },
+    text: "A main-dealer body shop in Kaunas. All invoices and the parts list come with the car." },
   { car: "sold", by: "b3", text: "Did any airbags deploy?", ago: 1.5 * DAY },
   { car: "sold", by: "seller", replyTo: 10, ago: 1.4 * DAY, text: "No, none deployed. The inspection report confirms it." },
 ];

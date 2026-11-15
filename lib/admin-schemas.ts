@@ -144,6 +144,8 @@ const tick = z.literal(true, { errorMap: () => ({ message: "Confirm this before 
 export const acceptReportSchema = z.object({
   auctionId: id,
   checks: z.object({ authorisedDealer: tick, vinMatches: tick, mileageConsistent: tick, dateWithin90Days: tick }),
+  /** Dealer sellers only: the inspecting dealer is the selling business itself. */
+  inspectedBySeller: z.boolean().default(false),
   highlights: z
     .array(z.string().trim().max(140, "Keep each highlight under 140 characters."))
     .transform((list) => list.filter((h) => h.length > 0))

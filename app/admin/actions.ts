@@ -117,7 +117,7 @@ export async function updateListing(input: unknown): Promise<AdminResult> {
   const auction = await loadAuction(ctx, v.auctionId);
   if (!auction) return NOT_FOUND;
   if (auction.condition_type === "restored_accident" && !v.damageSummary) {
-    return { ok: false, error: "Restored cars need a damage and repair summary.", fieldErrors: { damageSummary: "Restored cars need a damage and repair summary." } };
+    return { ok: false, error: "Accident-repaired cars need a damage and repair summary.", fieldErrors: { damageSummary: "Accident-repaired cars need a damage and repair summary." } };
   }
 
   const changes = {
@@ -290,11 +290,19 @@ export async function acceptInspectionReport(input: unknown): Promise<AdminResul
     return { ok: false, error: "This report was rejected. Wait for the seller's new report." };
   }
 
+  if (v.inspectedBySeller) {
+    const { data: seller } = await ctx.db.from("auctions").select("seller_type").eq("id", v.auctionId).maybeSingle<{ seller_type: string }>();
+    if (seller?.seller_type !== "dealer") {
+      return { ok: false, error: "Only a dealer seller can inspect their own car. Untick “Inspected by the selling dealer”.", fieldErrors: { inspectedBySeller: "The seller isn't a dealer." } };
+    }
+  }
+
   const { error: privError } = await ctx.db
     .from("auction_private")
     .update({
       inspection_review_status: "accepted",
       inspection_review_note: null,
+      inspected_by_seller: v.inspectedBySeller,
       inspection_reviewed_by: ctx.adminId,
       inspection_reviewed_at: new Date().toISOString(),
     })
@@ -303,6 +311,7 @@ export async function acceptInspectionReport(input: unknown): Promise<AdminResul
 
   const publicFields = {
     inspection_type: "authorised_dealer",
+    inspected_by_seller: v.inspectedBySeller,
     inspection_partner_name: [report.dealer_name, report.dealer_city].filter(Boolean).join(", "),
     inspection_date: report.dealer_inspection_date,
     inspection_highlights: v.highlights,
@@ -345,6 +354,7 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
       seller_decision_deadline: deadline,
       seller_decision: null,
       seller_decision_at: null,
+      inspected_by_seller: false,
     })
     .eq("auction_id", v.auctionId);
   if (privError) return { ok: false, error: dbMessage(privError) };
@@ -354,6 +364,7 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
     .from("auctions")
     .update({
       inspection_type: null,
+      inspected_by_seller: false,
       inspection_partner_name: null,
       inspection_date: null,
       inspection_highlights: [],

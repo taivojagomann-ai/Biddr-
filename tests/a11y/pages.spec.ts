@@ -385,7 +385,7 @@ test.describe("phone auction cards", () => {
     await page.setViewportSize({ width: 320, height: 800 });
     await page.goto("/");
     const card = page.locator("article.auction-card", { hasText: "Black Series" });
-    await expect(card.getByText("Professionally restored")).toHaveCSS("position", "absolute");
+    await expect(card.getByText("Accident repaired")).toHaveCSS("position", "absolute");
     await expect(card.getByRole("button", { name: /^(Watch|Stop watching) 2021 Mercedes-AMG GT Black Series/ })).toBeVisible();
   });
 });
@@ -446,7 +446,7 @@ test.describe("contextual help", () => {
     const dialog = page.getByRole("dialog", { name: "What does Dealer inspected mean?" });
     await expect(dialog).toBeVisible();
     await expect(dialog).toBeFocused();
-    await expect(dialog).toContainText("An authorised dealer of this brand inspected the car");
+    await expect(dialog).toContainText("An authorised dealer of the car's brand inspected it before the auction");
     await expect(dialog.getByRole("link", { name: /Learn more/ })).toHaveAttribute("href", "/how-it-works#badges");
     await expect(tip).toHaveAttribute("aria-expanded", "true");
     await expectNoSeriousViolations(page, "Info tip", '[role="dialog"]');
@@ -808,7 +808,7 @@ test.describe("dealer inspections", () => {
     await page.goto(`/auctions/${UPCOMING}`);
     const section = page.getByRole("region", { name: "Not inspected by a dealer" });
     await expect(section).toContainText(
-      "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.",
+      "This accident-repaired car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.",
     );
     await expect(section).toContainText("Rear-right quarter panel repaired");
     await expect(page.getByText("Dealer inspected", { exact: true })).toHaveCount(0);
@@ -833,7 +833,7 @@ test.describe("dealer inspections", () => {
   test("the History filter offers any restored car and dealer-inspected restored cars", async ({ page }) => {
     await page.goto("/?status=upcoming");
     const history = page.getByLabel("History");
-    await expect(history.locator("option")).toHaveText(["Any history", "Clean history", "Restored", "Restored, dealer inspected"]);
+    await expect(history.locator("option")).toHaveText(["Any history", "Clean history", "Accident repaired", "Accident repaired, dealer inspected"]);
     await history.selectOption("restored_any");
     await expect(page).toHaveURL(/condition=restored_any/);
     await expect(page.locator("article.auction-card", { hasText: "Porsche 911" })).toBeVisible();
@@ -1074,6 +1074,71 @@ test.describe("seller decides after a rejected inspection report", () => {
       await expect(section).toContainText("Seller's decision: waiting for them to choose");
       await expect(section.getByRole("button", { name: "Accept report" })).toHaveCount(0);
       await expectNoSeriousViolations(page, "Admin waiting for seller");
+    });
+  });
+});
+
+test.describe("Dealer inspected and Accident repaired badges", () => {
+  const GT = "10000000-0000-4000-8000-000000000007";
+
+  test("no page uses the old badge names", async ({ page }) => {
+    for (const path of ["/", `/auctions/${RESTORED}`, "/how-it-works"]) {
+      await page.goto(path);
+      await expect(page.getByText(/Professionally restored|Partner verified/)).toHaveCount(0);
+    }
+  });
+
+  test("accident-repaired cars have the badge and an info tip", async ({ page }) => {
+    await page.goto(`/auctions/${RESTORED}`);
+    await expect(page.getByText("Accident repaired", { exact: true }).first()).toBeVisible();
+    const tip = page.getByRole("button", { name: "What does Accident repaired mean?" }).first();
+    await tip.click();
+    await expect(page.getByRole("dialog", { name: "What does Accident repaired mean?" })).toContainText(
+      "Biddr doesn't check the repair itself",
+    );
+  });
+
+  test("a selling dealer's own inspection says so on the card and in the tip", async ({ page }) => {
+    await page.goto(`/auctions/${GT}`);
+    const card = page.getByRole("region", { name: "Dealer inspected" });
+    await expect(card).toContainText("Inspected by the selling dealer, Demo Mercedes-Benz Centre, Helsinki");
+    const tip = page.getByRole("button", { name: "What does Dealer inspected mean?" }).first();
+    await tip.click();
+    await expect(page.getByRole("dialog", { name: "What does Dealer inspected mean?" })).toContainText(
+      "this isn't an independent check",
+    );
+    await expectNoSeriousViolations(page, "Selling dealer inspection");
+  });
+
+  test("the accident damage photo section is called Before repair", async ({ page }) => {
+    await page.goto(`/auctions/${RESTORED}`);
+    await expect(page.getByRole("tab", { name: /^Before repair/ })).toBeVisible();
+    await expect(page.getByText(/Before restoration/i)).toHaveCount(0);
+  });
+
+  test("an independent dealer's inspection doesn't mention the seller", async ({ page }) => {
+    await page.goto(`/auctions/${RESTORED}`);
+    await expect(page.getByRole("region", { name: "Dealer inspected" })).not.toContainText("selling dealer");
+  });
+
+  test("how it works explains both badges with the agreed text", async ({ page }) => {
+    await page.goto("/how-it-works");
+    const section = page.getByRole("region", { name: "Dealer inspected and Accident repaired" });
+    await expect(section).toContainText(
+      "An authorised dealer of the car's brand inspected it before the auction. The seller arranged the inspection and sent us the report.",
+    );
+    await expect(section).toContainText('the specifications say "Not inspected".');
+    await expect(section).toContainText("Biddr doesn't check the repair itself.");
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("admins can mark a dealer seller's own inspection", async ({ page }) => {
+      await page.goto(`/admin/auctions/${MY_DRAFT}`);
+      const box = page.locator("#inspection").getByRole("checkbox", { name: "Inspected by the selling dealer" });
+      await expect(box).not.toBeChecked();
+      await expect(box).toHaveAccessibleDescription(/same business as the seller/);
     });
   });
 });

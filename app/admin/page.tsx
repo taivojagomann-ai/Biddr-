@@ -157,7 +157,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
                       ) : null}
                       <p className="truncate text-xs text-mute">
                         {r.seller?.username ?? "No username"} · {r.location_country} ·{" "}
-                        {r.condition_type === "restored_accident" ? "Restored" : "Clean"}
+                        {r.condition_type === "restored_accident" ? "Accident repaired" : "Clean"}
                         {active.key === "closed" || active.key === "finished" ? ` · ${ADMIN_STATUS_LABELS[r.status]}` : ""}
                       </p>
                     </div>

@@ -1,5 +1,5 @@
 import { ShieldCheck, Wrench } from "lucide-react";
-import { DEALER_INSPECTED } from "@/lib/inspection";
+import { ACCIDENT_REPAIRED, DEALER_INSPECTED } from "@/lib/inspection";
 import { cn } from "@/lib/utils";
 
 export function ReserveBadge({ hasReserve, reserveMet, className }: { hasReserve: boolean; reserveMet: boolean; className?: string }) {
@@ -47,15 +47,15 @@ export function DemoBadge({ className }: { className?: string }) {
   );
 }
 
-/** `collapsible`: on auction cards narrower than 180px only the wrench shows (text stays for screen readers). */
+/** "Accident repaired". `collapsible`: on auction cards narrower than 180px only the wrench shows (text stays for screen readers). */
 export function RestoredBadge({ className, collapsible = false }: { className?: string; collapsible?: boolean }) {
   return (
     <span
       className={cn("inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs text-mute", className)}
-      title={collapsible ? "Professionally restored" : undefined}
+      title={collapsible ? ACCIDENT_REPAIRED : undefined}
     >
       <Wrench className="size-3.5 shrink-0" aria-hidden />
-      <span className={collapsible ? "ac-collapse-text" : undefined}>Professionally restored</span>
+      <span className={collapsible ? "ac-collapse-text" : undefined}>{ACCIDENT_REPAIRED}</span>
     </span>
   );
 }

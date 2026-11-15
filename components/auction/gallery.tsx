@@ -13,7 +13,7 @@ export function Gallery({ auction }: { auction: Auction }) {
     { key: "exterior", label: "Exterior", photos: auction.gallery_urls.exterior },
     { key: "interior", label: "Interior", photos: auction.gallery_urls.interior },
     { key: "mechanical", label: "Engine and underside", photos: auction.gallery_urls.mechanical },
-    { key: "before", label: "Before restoration", photos: auction.before_photos_urls },
+    { key: "before", label: "Before repair", photos: auction.before_photos_urls },
   ].filter((s) => s.photos.length > 0);
 
   // A public, redacted copy of an accepted dealer report.

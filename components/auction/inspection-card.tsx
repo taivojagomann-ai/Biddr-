@@ -1,10 +1,10 @@
 import { Check, ClipboardCheck, Download, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DEALER_INSPECTED, isDealerInspected } from "@/lib/inspection";
+import { DEALER_INSPECTED, INSPECTED_BY_SELLING_DEALER, isDealerInspected } from "@/lib/inspection";
 import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import type { Auction } from "@/lib/types";
 
-/** The restored-car repair story, shown here when there's no inspection card to carry it. */
+/** The accident-repaired car's repair story, shown here when there's no inspection card to carry it. */
 function DamageHistory({ summary }: { summary: string | null }) {
   if (!summary) return null;
   return (
@@ -16,11 +16,11 @@ function DamageHistory({ summary }: { summary: string | null }) {
 }
 
 export const NOT_INSPECTED_NOTICE =
-  "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.";
+  "This accident-repaired car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.";
 
 /**
  * Dealer inspected card when an admin accepted an authorised dealer's report. Without one: nothing for clean
- * cars; for restored cars the seller's repair story with a "not inspected" notice.
+ * cars; for accident-repaired cars the seller's repair story with a "not inspected" notice.
  * In a seller's preview with an inspection on the way, a placeholder instead.
  */
 export function InspectionCard({
@@ -72,7 +72,8 @@ export function InspectionCard({
         <div className="min-w-0 flex-1">
           <h2 id="inspection-heading" className="font-bold">{DEALER_INSPECTED}</h2>
           <p className="text-sm text-mute">
-            Inspected by {auction.inspection_partner_name ?? "an authorised dealer"} (authorised {auction.make} dealer)
+            {auction.inspected_by_seller ? `${INSPECTED_BY_SELLING_DEALER}, ` : "Inspected by "}
+            {auction.inspection_partner_name ?? "an authorised dealer"} (authorised {auction.make} dealer)
             {auction.inspection_date &&
               ` on ${new Date(`${auction.inspection_date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`}
             . Report checked by Biddr.
