@@ -834,10 +834,14 @@ test.describe("optional inspections", () => {
     await expect(page.locator("article.auction-card", { hasText: "Porsche 911" })).toHaveCount(0);
   });
 
-  test("the home page no longer promises inspections for every restored car", async ({ page }) => {
+  test("the home page intro, meta description and link preview use the positioning line", async ({ page }) => {
+    const intro = "Rare finds. Brought back to life. Ready for a new story.";
     await page.goto("/");
-    await expect(page.getByText(/optional independent inspections\./)).toBeVisible();
-    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /optional independent inspections/);
+    await expect(page.getByRole("heading", { level: 1, name: "Cars worth chasing" })).toBeVisible();
+    await expect(page.getByText(intro, { exact: true })).toBeVisible();
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", intro);
+    await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", intro);
+    await expect(page.getByText(/inspect/i)).toHaveCount(0);
   });
 
   test.describe("signed in", () => {

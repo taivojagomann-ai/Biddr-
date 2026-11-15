@@ -1,4 +1,8 @@
-# Biddr: Baltic performance car auctions (MVP, phase 1)
+# Biddr (MVP, phase 1)
+
+Rare finds. Brought back to life. Ready for a new story.
+
+Online auctions for cars worth chasing, restored cars especially. The line above is the site's positioning: the home page intro, the default meta description and the home page link preview all use it (`SITE_INTRO` in `lib/site.ts`).
 
 
 ## Architecture
