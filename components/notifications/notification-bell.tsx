@@ -63,7 +63,7 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
           if (!row) return;
           setItems((list) => (list.some((x) => x.id === row.id) ? list : [row, ...list].slice(0, BELL_LIMIT)));
           setUnread((n) => n + 1);
-          setAnnouncement(`New notification: ${notificationCopy(row).text}`);
+          setAnnouncement(`New notification: ${notificationCopy(row, Intl.DateTimeFormat().resolvedOptions().timeZone).text}`);
         },
       )
       .on(

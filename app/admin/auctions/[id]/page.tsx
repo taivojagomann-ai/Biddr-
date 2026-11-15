@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardCheck, ExternalLink, Mail, Phone } from "lucide-react";
 import { requireAdmin } from "@/lib/admin";
 import { ADMIN_STATUS_LABELS, MAX_AUCTION_MS } from "@/lib/admin-schemas";
-import { formatBaltic } from "@/lib/baltic-time";
-import { COUNTRY_NAMES, formatEur, formatExactTime, formatKm } from "@/lib/format";
+import { LocalDateTime } from "@/components/local-date-time";
+import { COUNTRY_NAMES, formatEur, formatKm } from "@/lib/format";
 import { REPORT_MAX_AGE_DAYS, daysSince, euCountryName } from "@/lib/sell";
 import { COMMENT_COLUMNS, type Auction, type AuctionPrivate, type CommentRow, type Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -163,7 +163,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
           <h1 className="font-wide text-2xl font-extrabold tracking-tight sm:text-3xl">{a.title}</h1>
           <p className="mt-1 text-sm text-mute">
             {restored ? "Accident repaired" : "Clean history"} · {formatKm(a.mileage_km)} · {a.location_city},{" "}
-            {COUNTRY_NAMES[a.location_country]} · Submitted {formatExactTime(a.created_at, "Europe/Tallinn")}
+            {COUNTRY_NAMES[a.location_country]} · Submitted <LocalDateTime iso={a.created_at} />
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -371,12 +371,12 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
           />
         </Section>
 
-        <Section id="schedule" title="Schedule" intro="Times are Eastern European time and stored in UTC.">
+        <Section id="schedule" title="Schedule" intro="Times are in your own time zone and stored in UTC.">
           {a.status === "draft" || a.status === "upcoming" ? (
             <ScheduleForm auctionId={a.id} startsAt={a.starts_at} endsAt={a.ends_at} />
           ) : (
             <p className="text-sm text-mute">
-              {formatBaltic(a.starts_at)} to {formatBaltic(a.ends_at)}.
+              <LocalDateTime iso={a.starts_at} /> to <LocalDateTime iso={a.ends_at} />.
               {a.status === "live" ? " Use Extend end time under Status to give bidders more time." : ""}
             </p>
           )}
@@ -392,7 +392,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
                   <span className={cn("min-w-0 truncate", i === 0 && "font-semibold text-signal")}>{b.bidder?.username ?? "Bidder"}</span>
                   <span className="flex shrink-0 items-baseline gap-4">
                     <time dateTime={b.created_at} className="text-xs text-mute tabular">
-                      {formatExactTime(b.created_at, "Europe/Tallinn")}
+                      <LocalDateTime iso={b.created_at} />
                     </time>
                     <span className="font-semibold tabular">{formatEur(b.amount)}</span>
                   </span>
@@ -414,7 +414,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
               {log.map((l) => (
                 <li key={l.id} className="flex flex-wrap gap-x-3">
                   <time dateTime={l.created_at} className="text-mute tabular">
-                    {formatExactTime(l.created_at, "Europe/Tallinn")}
+                    <LocalDateTime iso={l.created_at} />
                   </time>
                   <span>{l.admin?.username ?? "Admin"}</span>
                   <span className="font-mono text-xs text-mute">{l.action}</span>

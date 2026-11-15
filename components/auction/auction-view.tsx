@@ -11,6 +11,7 @@ import {
   SellerNotes,
   ServiceHistory,
 } from "@/components/auction/listing-sections";
+import { SellerCard, type SellerInfo } from "@/components/auction/seller-card";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
 import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
@@ -39,6 +40,8 @@ export interface AuctionViewProps {
   preview?: boolean;
   /** Preview only: the seller asked for an inspection that hasn't been added yet. */
   inspectionPending?: boolean;
+  /** The public seller card (username, country, member since, private/dealer, stats). */
+  seller?: SellerInfo | null;
 }
 
 /**
@@ -47,7 +50,7 @@ export interface AuctionViewProps {
  * No "use client": it renders on the server for /auctions/[id] and in the browser for /sell.
  */
 export function AuctionView({
-  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false, inspectionPending = false,
+  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false, inspectionPending = false, seller = null,
 }: AuctionViewProps) {
   return (
     <>
@@ -118,6 +121,7 @@ export function AuctionView({
           <ServiceHistory auction={auction} />
           <ItemsIncluded auction={auction} />
           <SellerNotes auction={auction} />
+          {seller ? <SellerCard seller={seller} /> : null}
           {auction.video_url && <VideoPlayer url={auction.video_url} title={auction.title} />}
         </AuctionLive>
       </Suspense>

@@ -34,6 +34,7 @@ import { LIST_MAX_ITEMS, type ServiceRowInput } from "@/lib/listing-details";
 import { previewAuction } from "@/lib/listing-preview";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { PreviewBannerHandle } from "@/components/auction/preview-banner";
+import type { SellerInfo } from "@/components/auction/seller-card";
 import type { Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { submitListing } from "./actions";
@@ -162,9 +163,12 @@ export function SellForm({
   userId,
   defaultCountry,
   intro,
+  sellerStats,
 }: {
   userId: string;
   defaultCountry: Country | "";
+  /** Username, country, member since and stats for the preview's seller card. */
+  sellerStats: SellerInfo;
   /** Page heading and intro, hidden while the preview is open. */
   intro: React.ReactNode;
 }) {
@@ -644,6 +648,12 @@ export function SellForm({
         ref={bannerRef}
         auction={preview}
         inspectionPending={values.dealerInspection === "yes"}
+        seller={{
+          ...sellerStats,
+          sellerType: values.sellerType === "dealer" ? "dealer" : "private",
+          dealerName: values.sellerType === "dealer" ? values.dealerName.trim() || null : null,
+          dealerRegistryCode: values.sellerType === "dealer" ? values.dealerRegistryCode.trim() || null : null,
+        }}
         userId={userId}
         initialNow={previewNow}
         submitting={submitting}

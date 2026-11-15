@@ -1,7 +1,9 @@
+import type { EuCountry } from "@/lib/countries";
 // Domain types mirroring supabase/migrations/0001_init.sql.
 // Run `npm run db:types` to also generate the full Database type from your project.
 
-export type Country = "EE" | "LV" | "LT";
+/** Any of the 27 EU countries (DECISIONS.md, point 2; 0018 widened the database type). */
+export type Country = EuCountry;
 export type ConditionType = "clean" | "restored_accident";
 export type AuctionStatus =
   | "draft" | "upcoming" | "live" | "ended" | "sold" | "reserve_not_met" | "rejected" | "withdrawn";
@@ -10,7 +12,8 @@ export type UserRole = "user" | "seller" | "admin";
 export type InspectionCity = "Tallinn" | "Riga" | "Vilnius";
 export type BodyStyle = "coupe" | "sedan" | "estate" | "hatchback" | "convertible" | "suv" | "other";
 export type SellerType = "private" | "dealer";
-export type RegistrationCountry = "EE" | "LV" | "LT" | "other_eu" | "non_eu";
+/** An EU country, outside the EU, or "other_eu" (only on listings saved before 0018). */
+export type RegistrationCountry = EuCountry | "other_eu" | "non_eu";
 
 /** One row of auctions.service_history (0007). */
 export interface ServiceRecord {

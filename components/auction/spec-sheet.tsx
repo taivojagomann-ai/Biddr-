@@ -1,10 +1,10 @@
 import { COUNTRY_NAMES, formatKm } from "@/lib/format";
 import { DEALER_INSPECTED, NOT_INSPECTED, isDealerInspected } from "@/lib/inspection";
-import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
+import { BODY_STYLES, REGISTRATION_LABELS, labelOf } from "@/lib/listing-details";
 import type { Auction } from "@/lib/types";
 
 function registration(a: Auction): string | null {
-  const where = labelOf(REGISTRATION_OPTIONS, a.registration_country);
+  const where = labelOf(REGISTRATION_LABELS, a.registration_country);
   if (!where && a.is_registered === null) return null;
   const status = a.is_registered === true ? "registered" : a.is_registered === false ? "not registered right now" : null;
   return [where, status].filter(Boolean).join(", ") || null;

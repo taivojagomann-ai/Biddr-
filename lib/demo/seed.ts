@@ -2,7 +2,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { INSPECTION_BUCKET } from "@/lib/admin-schemas";
-import { addDays, fromBalticInputs, toBalticInputs } from "@/lib/baltic-time";
+import { addDays, fromZonedInputs, toZonedInputs } from "@/lib/zoned-time";
+
+/** Demo auctions are scheduled at fixed wall-clock times ("tomorrow 12:00") in this zone. Visitors see them in their own zone. */
+const DEMO_TZ = "Europe/Helsinki";
 import { PHOTO_BUCKET, REPORT_BUCKET, listingTitle, type EuCountry } from "@/lib/sell";
 import type { AuctionStatus, BodyStyle, ConditionType, Country, RegistrationCountry } from "@/lib/types";
 import { renderDemoPhoto, renderDemoReportPdf } from "./assets";
@@ -251,7 +254,7 @@ const CARS: CarSpec[] = [
     highlights: ["S tronic oil changed at 60,000 km", "Haldex serviced", "Small stone chips on the bonnet"],
     listing: {
       bodyStyle: "hatchback", interior: "Black Fine Nappa leather with diamond stitching", owners: 3, dealer: null,
-      registration: "other_eu", registered: true,
+      registration: "FI", registered: true,
       highlights: ["Five-cylinder 2.5 TFSI", "Imported from Finland in 2025 with full history", "S tronic and Haldex serviced on time"],
       equipment: ["Bang & Olufsen sound", "Virtual cockpit", "Magnetic Ride", "RS sports exhaust"],
       modifications: ["Software tune to 450 hp (dyno sheet included)", "Milltek cat-back exhaust"],
@@ -306,10 +309,10 @@ interface Schedule {
   endsAt: number;
 }
 
-/** All times are relative to `now`; "tomorrow 12:00" and "20:00" are Baltic time. */
+/** All times are relative to `now`; "tomorrow 12:00" and "20:00" are in DEMO_TZ. */
 function scheduleFor(scenario: Scenario, now: number): Schedule {
-  const today = toBalticInputs(now).date;
-  const at = (date: string, time: string) => Date.parse(fromBalticInputs(date, time) ?? "");
+  const today = toZonedInputs(now, DEMO_TZ).date;
+  const at = (date: string, time: string) => Date.parse(fromZonedInputs(date, time, DEMO_TZ) ?? "");
   const week = 7 * DAY;
   switch (scenario) {
     case "closing_soon": {
@@ -499,7 +502,7 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       const reserve = reserveFor(car.scenario, car.startingBid, finalBid);
       const reserveMet = bids.length > 0 && (reserve === null || (finalBid ?? 0) >= reserve);
 
-      const inspectionDate = toBalticInputs(schedule.startsAt - 3 * DAY).date;
+      const inspectionDate = toZonedInputs(schedule.startsAt - 3 * DAY, DEMO_TZ).date;
       const { error: auctionError } = await db.from("auctions").insert({
         id,
         is_demo: true,

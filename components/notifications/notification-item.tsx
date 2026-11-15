@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
+import { useTimeZone } from "@/hooks/use-time-zone";
 import { notificationCopy, notificationHref } from "@/lib/notifications";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { NotificationRow, NotificationType } from "@/lib/types";
@@ -69,7 +70,8 @@ export function NotificationItem({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
-  const { text, title } = notificationCopy(n);
+  const tz = useTimeZone();
+  const { text, title } = notificationCopy(n, tz);
   const href = notificationHref(n);
   const Icon = ICONS[n.type];
   const unread = !n.read_at;

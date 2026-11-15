@@ -132,7 +132,7 @@ export function SetupForm({ isNew, next, defaults }: { isNew: boolean; next: str
           type="tel"
           inputMode="tel"
           autoComplete="tel"
-          placeholder="+372 5123 4567"
+          placeholder="+49 151 2345 6789"
           defaultValue={defaults.phone}
           maxLength={32}
           required

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Car, ChevronRight, Eye } from "lucide-react";
+import { LocalDateTime } from "@/components/local-date-time";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
@@ -117,7 +118,7 @@ export default async function MyListingsPage() {
                     </p>
                   ) : null}
                   <p className="mt-1 text-xs text-mute">
-                    Submitted {new Date(l.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    Submitted <LocalDateTime iso={l.created_at} dateOnly />
                   </p>
                   {isPublic ? null : (
                     <Link

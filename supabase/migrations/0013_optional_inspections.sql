@@ -28,7 +28,7 @@ end $$;
 
 -- -----------------------------------------------------------------------------
 -- Home page search: the History filter gains "Restored" (any restored car)
--- next to "Restored, partner verified". Same function as 0012 plus that one
+-- next to the existing restored filter. Same function as 0012 plus that one
 -- branch; needs 0012 to have been run.
 -- -----------------------------------------------------------------------------
 set search_path = public, extensions;

@@ -15,6 +15,8 @@ import {
 } from "@/lib/admin-schemas";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import type { SellerInspectionDecision } from "@/lib/types";
+import { useTimeZone } from "@/hooks/use-time-zone";
+import { formatDateTime } from "@/lib/zoned-time";
 import { acceptInspectionReport, rejectInspectionReport, saveInspectionReport } from "../../actions";
 import { ActionMessage, FieldNote, useAdminAction } from "./action-feedback";
 import { Label } from "./section";
@@ -31,8 +33,7 @@ export interface DealerReportView {
   decision: { required: boolean; deadline: string | null; choice: SellerInspectionDecision | null; at: string | null };
 }
 
-const dateTime = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Tallinn" });
+
 
 const STATUS_TEXT = {
   pending: "Waiting for your review",
@@ -61,6 +62,8 @@ export function InspectionPanel({
   initialHighlights: string[];
   reportUrl: string | null;
 }) {
+  const tz = useTimeZone();
+  const dateTime = (iso: string) => formatDateTime(iso, tz);
   if (report.provided !== true || !report.dealer) {
     return (
       <p className="text-sm text-mute">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Car, ChevronRight } from "lucide-react";
 import { DemoBadge } from "@/components/auction/badges";
 import { Countdown } from "@/components/auction/countdown";
+import { LocalDateTime } from "@/components/local-date-time";
 import { requireAdmin } from "@/lib/admin";
 import { isDemoDataEnabled } from "@/lib/demo/config";
 import { countDemoAuctions } from "@/lib/demo/seed";
@@ -25,7 +26,6 @@ export const maxDuration = 60;
 const ROW_COLUMNS =
   "id,title,status,is_demo,condition_type,location_country,created_at,gallery_urls,current_bid,bid_count,ends_at,starts_at,seller:profiles!auctions_seller_id_fkey(username,country)";
 
-const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Tallinn" });
 
 export default async function AdminPage({ searchParams }: { searchParams: { tab?: string; requests?: string } }) {
   const ctx = await requireAdmin();
@@ -161,7 +161,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
                         {active.key === "closed" || active.key === "finished" ? ` · ${ADMIN_STATUS_LABELS[r.status]}` : ""}
                       </p>
                     </div>
-                    <p className="text-xs text-mute">Submitted {dateFmt.format(new Date(r.created_at))}</p>
+                    <p className="text-xs text-mute">Submitted <LocalDateTime iso={r.created_at} dateOnly /></p>
                     {r.status === "live" ? (
                       <div className="flex flex-wrap items-baseline gap-x-3 text-sm">
                         <span className="font-semibold tabular">{r.current_bid ? formatEur(r.current_bid) : "No bids"}</span>
@@ -177,7 +177,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
                         />
                       </div>
                     ) : r.status === "upcoming" && r.starts_at ? (
-                      <p className="text-xs text-mute">Opens {dateFmt.format(new Date(r.starts_at))}</p>
+                      <p className="text-xs text-mute">Opens <LocalDateTime iso={r.starts_at} /></p>
                     ) : (
                       <span className="hidden md:block" />
                     )}

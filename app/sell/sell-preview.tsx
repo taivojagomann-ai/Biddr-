@@ -5,6 +5,7 @@ import { AuctionView } from "@/components/auction/auction-view";
 import { PreviewBanner, type PreviewBannerHandle } from "@/components/auction/preview-banner";
 import { Button } from "@/components/ui/button";
 import { PREVIEW_TEXT } from "@/lib/listing-preview";
+import type { SellerInfo } from "@/components/auction/seller-card";
 import type { Auction } from "@/lib/types";
 
 /**
@@ -17,6 +18,7 @@ export const SellPreview = forwardRef<
     auction: Auction | null;
     /** The seller uploaded a dealer inspection report (not checked yet). */
     inspectionPending: boolean;
+    seller: SellerInfo;
     userId: string;
     initialNow: number;
     submitting: boolean;
@@ -24,7 +26,7 @@ export const SellPreview = forwardRef<
     onBack: () => void;
     onSubmit: () => void;
   }
->(function SellPreview({ auction, inspectionPending, userId, initialNow, submitting, formError, onBack, onSubmit }, ref) {
+>(function SellPreview({ auction, inspectionPending, seller, userId, initialNow, submitting, formError, onBack, onSubmit }, ref) {
   return (
     <div className="pb-6">
       <PreviewBanner
@@ -72,6 +74,7 @@ export const SellPreview = forwardRef<
             holdEur={0} // the hold text isn't shown in a preview
             preview
             inspectionPending={inspectionPending}
+            seller={seller}
           />
         ) : (
           <div className="rounded-lg border border-dashed border-line p-8 text-center">

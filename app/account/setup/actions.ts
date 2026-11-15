@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { EU_CODES } from "@/lib/countries";
 import type { ProfileField, ProfileFormState } from "@/lib/profile";
 import { safeNext } from "@/lib/redirect";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -17,11 +18,11 @@ const profileSchema = z.object({
     .trim()
     .min(2, "Enter your full name.")
     .max(120, "Keep your name under 120 characters."),
-  country: z.enum(["EE", "LV", "LT"], { errorMap: () => ({ message: "Choose your country." }) }),
+  country: z.enum(EU_CODES, { errorMap: () => ({ message: "Choose your country." }) }),
   phone: z
     .string()
     .transform((v) => v.replace(/[\s\-()]/g, ""))
-    .pipe(z.string().regex(/^\+[1-9]\d{6,14}$/, "Enter the number with its country code, like +372 5123 4567.")),
+    .pipe(z.string().regex(/^\+[1-9]\d{6,14}$/, "Enter the number with its country code, like +49 151 2345 6789.")),
 });
 
 function text(formData: FormData, key: string): string {

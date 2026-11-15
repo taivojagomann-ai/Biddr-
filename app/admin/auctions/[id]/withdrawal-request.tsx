@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { useTimeZone } from "@/hooks/use-time-zone";
+import { formatDateTime } from "@/lib/zoned-time";
 import { approveWithdrawalRequest, declineWithdrawalRequest } from "../../actions";
 import { ActionMessage, useAdminAction } from "./action-feedback";
 import { ConfirmButton } from "./confirm-button";
@@ -27,6 +29,7 @@ export function WithdrawalRequest({
   holdCount: number;
 }) {
   const approve = useAdminAction();
+  const tz = useTimeZone();
   const decline = useAdminAction();
   const [note, setNote] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -50,7 +53,7 @@ export function WithdrawalRequest({
       </h2>
       <p className="mt-1 text-xs text-mute">
         {requestedAt
-          ? `Requested ${new Date(requestedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Tallinn" })}`
+          ? `Requested ${formatDateTime(requestedAt, tz)}`
           : "Requested"}
       </p>
       <blockquote className="mt-3 whitespace-pre-line border-l-2 border-line pl-3 text-sm">{reason ?? "No reason given."}</blockquote>

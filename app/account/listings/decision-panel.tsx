@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
+import { useTimeZone } from "@/hooks/use-time-zone";
 import { EU_COUNTRIES, REPORT_MAX_AGE_DAYS, type ReportFile } from "@/lib/sell";
+import { formatDate } from "@/lib/zoned-time";
 import type { SellerInspectionDecision } from "@/lib/types";
 import { DealerReportUpload } from "../../sell/dealer-report-upload";
 import { listWithoutInspection, submitNewReport } from "./actions";
@@ -15,8 +17,6 @@ import { WithdrawActions } from "./withdraw-actions";
 const WITHOUT_INSPECTION_TEXT =
   "Your listing will go live without a Dealer inspected badge. Buyers will see that the car hasn't been inspected by a dealer.";
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Tallinn" });
 
 /**
  * After Biddr rejects a dealer inspection report, the seller chooses: upload a new
@@ -50,6 +50,7 @@ export function DecisionPanel({
   const [formOpen, setFormOpen] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const doneRef = useRef<HTMLParagraphElement>(null);
+  const tz = useTimeZone();
 
   useEffect(() => {
     if (!done) return;
@@ -90,7 +91,7 @@ export function DecisionPanel({
       </p>
       {deadline ? (
         <p className="mt-1 text-sm">
-          <span className="font-semibold">Please choose by {formatDate(deadline)}.</span>{" "}
+          <span className="font-semibold">Please choose by {formatDate(deadline, tz)}.</span>{" "}
           <span className="text-mute">If you don&apos;t, the listing is withdrawn.</span>
         </p>
       ) : null}

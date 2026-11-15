@@ -11,7 +11,10 @@ import {
   type DetailsInput,
   type OwnershipInput,
 } from "@/lib/listing-details";
+import { EU_CODES, EU_COUNTRIES as EU_LIST, type EuCountry } from "@/lib/countries";
 import type { AuctionStatus, Country } from "@/lib/types";
+
+const EU_COUNTRIES_SORTED = [...EU_LIST].sort((a, b) => a.name.localeCompare(b.name));
 
 export const PHOTO_BUCKET = "auction-photos";
 
@@ -21,7 +24,8 @@ export type MakeOption = (typeof MAKES)[number];
 export const DRIVETRAINS = ["RWD", "AWD", "FWD"] as const;
 export type Drivetrain = (typeof DRIVETRAINS)[number];
 
-export const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
+/** Where a car can be: any EU country, in alphabetical order by name. */
+export const COUNTRIES: readonly Country[] = [...EU_COUNTRIES_SORTED.map((c) => c.code)];
 
 // -----------------------------------------------------------------------------
 // Dealer inspection reports (0014): only a pre-sale inspection by an authorised
@@ -35,23 +39,7 @@ export type ReportContentType = keyof typeof REPORT_TYPES;
 /** A report must be at most this many days old. */
 export const REPORT_MAX_AGE_DAYS = 90;
 
-export const EU_COUNTRIES = [
-  { code: "AT", name: "Austria" }, { code: "BE", name: "Belgium" }, { code: "BG", name: "Bulgaria" },
-  { code: "HR", name: "Croatia" }, { code: "CY", name: "Cyprus" }, { code: "CZ", name: "Czechia" },
-  { code: "DK", name: "Denmark" }, { code: "EE", name: "Estonia" }, { code: "FI", name: "Finland" },
-  { code: "FR", name: "France" }, { code: "DE", name: "Germany" }, { code: "GR", name: "Greece" },
-  { code: "HU", name: "Hungary" }, { code: "IE", name: "Ireland" }, { code: "IT", name: "Italy" },
-  { code: "LV", name: "Latvia" }, { code: "LT", name: "Lithuania" }, { code: "LU", name: "Luxembourg" },
-  { code: "MT", name: "Malta" }, { code: "NL", name: "Netherlands" }, { code: "PL", name: "Poland" },
-  { code: "PT", name: "Portugal" }, { code: "RO", name: "Romania" }, { code: "SK", name: "Slovakia" },
-  { code: "SI", name: "Slovenia" }, { code: "ES", name: "Spain" }, { code: "SE", name: "Sweden" },
-] as const;
-export type EuCountry = (typeof EU_COUNTRIES)[number]["code"];
-const EU_CODES = EU_COUNTRIES.map((c) => c.code) as [EuCountry, ...EuCountry[]];
-
-export function euCountryName(code: string | null | undefined): string | null {
-  return EU_COUNTRIES.find((c) => c.code === code)?.name ?? null;
-}
+export { EU_COUNTRIES, euCountryName, type EuCountry } from "@/lib/countries";
 
 /** An uploaded report file: its path in REPORT_BUCKET and the name the seller saw. */
 export interface ReportFile {
@@ -286,7 +274,7 @@ export const carSchema = z
     drivetrain: z.enum(DRIVETRAINS, { errorMap: () => ({ message: "Choose the drivetrain." }) }),
     exteriorColor: text("exterior colour", 2, 40),
     city: text("city", 2, 60),
-    country: z.enum(["EE", "LV", "LT"], { errorMap: () => ({ message: "Choose the country." }) }),
+    country: z.enum(EU_CODES, { errorMap: () => ({ message: "Choose the country." }) }),
   })
   .superRefine((v, ctx) => {
     if (v.make === "Other" && v.makeOther.length < 2) {

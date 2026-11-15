@@ -21,7 +21,7 @@ export function RelativeTime({ iso, now, className }: { iso: string; now: number
   return (
     <time
       dateTime={iso}
-      title={hydrated ? formatExactTime(iso) : `${formatExactTime(iso, "UTC")} UTC`}
+      title={formatExactTime(iso, timeZone)}
       className={cn("tabular", className)}
     >
       {timeAgo(iso, now, timeZone)}
