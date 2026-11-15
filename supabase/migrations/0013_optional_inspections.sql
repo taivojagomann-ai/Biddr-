@@ -33,6 +33,10 @@ end $$;
 -- -----------------------------------------------------------------------------
 set search_path = public, extensions;
 
+-- A later migration (0014) changes this function's result columns, which
+-- "create or replace" can't undo, so drop it first when running this again.
+drop function if exists public.search_auctions(text, text, text, text, int, int);
+
 create or replace function public.search_auctions(
   p_query     text,
   p_tab       text default 'live',

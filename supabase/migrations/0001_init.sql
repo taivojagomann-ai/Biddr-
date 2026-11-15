@@ -1,5 +1,9 @@
 -- =============================================================================
--- Baltic enthusiast car auctions: initial schema
+-- Biddr: initial schema
+-- Re-runnable: running every migration again in order (0001, 0002, …) leaves the
+-- database as it was. Don't re-run this file on its own on a live database: it
+-- re-creates the first versions of functions and policies that later
+-- migrations replaced.
 -- Money is stored as whole euros (integer). Stripe amounts = euros * 100.
 -- All auction-critical logic lives here; the client is never trusted.
 -- =============================================================================
@@ -10,18 +14,18 @@ create extension if not exists pg_cron;
 -- -----------------------------------------------------------------------------
 -- Enums
 -- -----------------------------------------------------------------------------
-create type public.user_role        as enum ('user', 'seller', 'admin');
-create type public.baltic_country   as enum ('EE', 'LV', 'LT');
-create type public.condition_type   as enum ('clean', 'restored_accident');
-create type public.auction_status   as enum ('draft', 'upcoming', 'live', 'ended', 'sold', 'reserve_not_met');
-create type public.hold_status      as enum ('pending', 'authorized', 'released', 'captured', 'failed');
-create type public.inspection_city  as enum ('Tallinn', 'Riga', 'Vilnius');
+do $$ begin create type public.user_role        as enum ('user', 'seller', 'admin'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.baltic_country   as enum ('EE', 'LV', 'LT'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.condition_type   as enum ('clean', 'restored_accident'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.auction_status   as enum ('draft', 'upcoming', 'live', 'ended', 'sold', 'reserve_not_met'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.hold_status      as enum ('pending', 'authorized', 'released', 'captured', 'failed'); exception when duplicate_object then null; end $$;
+do $$ begin create type public.inspection_city  as enum ('Tallinn', 'Riga', 'Vilnius'); exception when duplicate_object then null; end $$;
 
 -- -----------------------------------------------------------------------------
 -- profiles
 -- Sensitive columns (phone, stripe_customer_id) are hidden with column grants.
 -- -----------------------------------------------------------------------------
-create table public.profiles (
+create table if not exists public.profiles (
   id                  uuid primary key references auth.users (id) on delete cascade,
   full_name           text check (char_length(full_name) <= 120),
   username            text unique check (username ~ '^[a-zA-Z0-9_]{3,24}$'),
@@ -42,6 +46,7 @@ begin
   return new;
 end $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
@@ -56,7 +61,7 @@ $$;
 -- reserve_price is NOT stored here: anything in this table is readable by
 -- everyone (REST + Realtime). The public only sees has_reserve / reserve_met.
 -- -----------------------------------------------------------------------------
-create table public.auctions (
+create table if not exists public.auctions (
   id                      uuid primary key default gen_random_uuid(),
   seller_id               uuid not null references public.profiles (id),
   title                   text not null check (char_length(title) between 5 and 140),
@@ -102,13 +107,13 @@ create table public.auctions (
   )
 );
 
-create index auctions_status_ends_idx on public.auctions (status, ends_at);
-create index auctions_make_idx        on public.auctions (lower(make));
-create index auctions_country_idx     on public.auctions (location_country);
-create index auctions_seller_idx      on public.auctions (seller_id);
+create index if not exists auctions_status_ends_idx on public.auctions (status, ends_at);
+create index if not exists auctions_make_idx        on public.auctions (lower(make));
+create index if not exists auctions_country_idx     on public.auctions (location_country);
+create index if not exists auctions_seller_idx      on public.auctions (seller_id);
 
 -- Private, admin-only data per auction.
-create table public.auction_private (
+create table if not exists public.auction_private (
   auction_id      uuid primary key references public.auctions (id) on delete cascade,
   reserve_price   integer check (reserve_price > 0),
   admin_notes     text,
@@ -118,7 +123,7 @@ create table public.auction_private (
 -- -----------------------------------------------------------------------------
 -- bid_holds: one Stripe manual-capture authorization per (auction, user)
 -- -----------------------------------------------------------------------------
-create table public.bid_holds (
+create table if not exists public.bid_holds (
   id                        uuid primary key default gen_random_uuid(),
   auction_id                uuid not null references public.auctions (id) on delete cascade,
   user_id                   uuid not null references public.profiles (id) on delete cascade,
@@ -129,14 +134,14 @@ create table public.bid_holds (
   updated_at                timestamptz not null default now()
 );
 
-create unique index bid_holds_one_active
+create unique index if not exists bid_holds_one_active
   on public.bid_holds (auction_id, user_id)
   where status in ('pending', 'authorized');
 
 -- -----------------------------------------------------------------------------
 -- bids (insert only through place_bid)
 -- -----------------------------------------------------------------------------
-create table public.bids (
+create table if not exists public.bids (
   id                        uuid primary key default gen_random_uuid(),
   auction_id                uuid not null references public.auctions (id) on delete cascade,
   bidder_id                 uuid not null references public.profiles (id),
@@ -145,13 +150,13 @@ create table public.bids (
   created_at                timestamptz not null default now()
 );
 
-create index bids_auction_created_idx on public.bids (auction_id, created_at desc);
-create index bids_bidder_idx          on public.bids (bidder_id);
+create index if not exists bids_auction_created_idx on public.bids (auction_id, created_at desc);
+create index if not exists bids_bidder_idx          on public.bids (bidder_id);
 
 -- -----------------------------------------------------------------------------
 -- comments
 -- -----------------------------------------------------------------------------
-create table public.comments (
+create table if not exists public.comments (
   id              uuid primary key default gen_random_uuid(),
   auction_id      uuid not null references public.auctions (id) on delete cascade,
   user_id         uuid not null references public.profiles (id) on delete cascade,
@@ -161,7 +166,7 @@ create table public.comments (
   created_at      timestamptz not null default now()
 );
 
-create index comments_auction_idx on public.comments (auction_id, created_at);
+create index if not exists comments_auction_idx on public.comments (auction_id, created_at);
 
 -- is_seller_reply is decided by the database, never by the client.
 create or replace function public.comments_set_flags()
@@ -180,6 +185,7 @@ begin
   return new;
 end $$;
 
+drop trigger if exists comments_before_insert on public.comments;
 create trigger comments_before_insert
   before insert on public.comments
   for each row execute function public.comments_set_flags();
@@ -189,7 +195,9 @@ create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at := now(); return new; end $$;
 
+drop trigger if exists auctions_touch on public.auctions;
 create trigger auctions_touch  before update on public.auctions  for each row execute function public.touch_updated_at();
+drop trigger if exists bid_holds_touch on public.bid_holds;
 create trigger bid_holds_touch before update on public.bid_holds for each row execute function public.touch_updated_at();
 
 -- =============================================================================
@@ -234,40 +242,52 @@ alter table public.bids            enable row level security;
 alter table public.comments        enable row level security;
 
 -- profiles
+drop policy if exists "profiles are public" on public.profiles;
 create policy "profiles are public" on public.profiles for select using (true);
+drop policy if exists "users update own profile" on public.profiles;
 create policy "users update own profile" on public.profiles for update
   using (id = auth.uid()) with check (id = auth.uid());
 
 -- auctions
+drop policy if exists "public auctions are visible" on public.auctions;
 create policy "public auctions are visible" on public.auctions for select
   using (status <> 'draft' or seller_id = auth.uid() or public.is_admin());
+drop policy if exists "sellers submit drafts" on public.auctions;
 create policy "sellers submit drafts" on public.auctions for insert
   with check (seller_id = auth.uid() and status = 'draft');
+drop policy if exists "sellers edit own drafts" on public.auctions;
 create policy "sellers edit own drafts" on public.auctions for update
   using (seller_id = auth.uid() and status = 'draft')
   with check (seller_id = auth.uid() and status = 'draft');
+drop policy if exists "admins manage auctions" on public.auctions;
 create policy "admins manage auctions" on public.auctions for all
   using (public.is_admin()) with check (public.is_admin());
 
 -- auction_private: admins only (sellers set their reserve via the admin flow)
+drop policy if exists "admins manage private auction data" on public.auction_private;
 create policy "admins manage private auction data" on public.auction_private for all
   using (public.is_admin()) with check (public.is_admin());
 
 -- bid_holds: users see their own; writes only via service role (Stripe routes)
+drop policy if exists "users read own holds" on public.bid_holds;
 create policy "users read own holds" on public.bid_holds for select using (user_id = auth.uid());
 
 -- bids: readable by all, no direct writes
+drop policy if exists "bids are public" on public.bids;
 create policy "bids are public" on public.bids for select using (
   exists (select 1 from public.auctions a where a.id = auction_id and a.status <> 'draft')
 );
 
 -- comments
+drop policy if exists "comments are public" on public.comments;
 create policy "comments are public" on public.comments for select using (true);
+drop policy if exists "signed-in users comment" on public.comments;
 create policy "signed-in users comment" on public.comments for insert to authenticated
   with check (
     exists (select 1 from public.auctions a
             where a.id = auction_id and a.status in ('upcoming', 'live', 'ended', 'sold', 'reserve_not_met'))
   );
+drop policy if exists "admins delete comments" on public.comments;
 create policy "admins delete comments" on public.comments for delete using (public.is_admin());
 
 -- =============================================================================
@@ -440,5 +460,5 @@ select cron.schedule('advance-auction-states', '* * * * *', $$select public.adva
 -- auctions: bid/timer/status updates. comments: live Q&A.
 -- bids is intentionally NOT published; clients refetch get_bid_history.
 -- =============================================================================
-alter publication supabase_realtime add table public.auctions;
-alter publication supabase_realtime add table public.comments;
+do $$ begin if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'auctions') then alter publication supabase_realtime add table public.auctions; end if; end $$;
+do $$ begin if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'comments') then alter publication supabase_realtime add table public.comments; end if; end $$;
