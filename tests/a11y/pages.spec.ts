@@ -86,7 +86,9 @@ function sellDraft(step: number) {
 const PUBLIC_PAGES = [
   ["Home", "/"],
   ["Home, past results", "/?status=past"],
-  ["Home, filtered to no results", "/?make=Lotus"],
+  ["Home, search with no results", "/?q=Lotus"],
+  ["Home, search results", "/?q=bmw"],
+  ["Home, search with only past results", "/?q=c63"],
   ["Live auction", `/auctions/${LIVE}`],
   ["Restored car", `/auctions/${RESTORED}`],
   ["Upcoming auction", `/auctions/${UPCOMING}`],
@@ -575,5 +577,108 @@ test.describe("keyboard on a phone", () => {
       await page.goto("/sell");
       await expectFocusNeverObscured(page, "Sell form");
     });
+  });
+});
+
+test.describe("search", () => {
+  const box = (page: Page) => page.getByRole("combobox", { name: "Search make, model or year" });
+
+  test("the Make filter is gone and the search box is labelled", async ({ page }) => {
+    await page.goto("/");
+    await expect(box(page)).toBeVisible();
+    await expect(page.getByLabel("Make", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("search")).toHaveCount(1);
+  });
+
+  test("suggestions work by keyboard and choosing one searches", async ({ page }) => {
+    await page.goto("/");
+    await box(page).click();
+    await box(page).pressSequentially("merc");
+    const list = page.getByRole("listbox", { name: "Suggestions" });
+    await expect(list.getByRole("option").first()).toHaveText("Mercedes-AMG (2 listings)");
+    await expect(box(page)).toHaveAttribute("aria-expanded", "true");
+    await expectNoSeriousViolations(page, "Search suggestions", "[role=search]");
+
+    await box(page).press("ArrowDown");
+    await box(page).press("ArrowDown");
+    const second = list.getByRole("option").nth(1);
+    await expect(second).toHaveAttribute("aria-selected", "true");
+    await expect(box(page)).toHaveAttribute("aria-activedescendant", (await second.getAttribute("id")) ?? "");
+    const label = (await second.locator("span").first().textContent()) ?? "";
+    await box(page).press("Enter");
+
+    await expect(box(page)).toHaveValue(label);
+    await expect(box(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(box(page)).toBeFocused();
+    await expect(page).toHaveURL(new RegExp(`q=${encodeURIComponent(label).replace(/%20/g, "\\+")}`));
+  });
+
+  test("Escape closes the suggestions, then clears the text", async ({ page }) => {
+    await page.goto("/");
+    await box(page).click();
+    await box(page).pressSequentially("audi");
+    await expect(box(page)).toHaveAttribute("aria-expanded", "true");
+    await box(page).press("Escape");
+    await expect(box(page)).toHaveAttribute("aria-expanded", "false");
+    await expect(box(page)).toHaveValue("audi");
+    await box(page).press("Escape");
+    await expect(box(page)).toHaveValue("");
+  });
+
+  test("typing searches after a pause; results get a heading, no featured car, and an announcement", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText("Closing next")).toBeVisible();
+    await box(page).click();
+    await box(page).pressSequentially("bmw");
+    await expect(page).toHaveURL(/q=bmw/);
+    await expect(page.getByRole("heading", { name: "Results for “bmw” (1)" })).toBeVisible();
+    await expect(page.getByText("Closing next")).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Live: 1 result for “bmw”." })).toHaveCount(1);
+    await expect(page.locator("article.auction-card")).toHaveCount(1);
+
+    // Leaving the field closes the suggestions. Filters and tabs keep the search.
+    await box(page).press("Tab");
+    await expect(box(page)).toHaveAttribute("aria-expanded", "false");
+    await page.getByLabel("History").selectOption("clean");
+    await expect(page).toHaveURL(/condition=clean/);
+    await expect(page).toHaveURL(/q=bmw/);
+    await page.getByRole("link", { name: "Past results" }).click();
+    await expect(page).toHaveURL(/status=past/);
+    await expect(page).toHaveURL(/q=bmw/);
+    await expect(box(page)).toHaveValue("bmw");
+  });
+
+  test("no live results offers past results and clearing the search", async ({ page }) => {
+    await page.goto("/?q=c63");
+    await expect(page.getByText("No live results for “c63”.")).toBeVisible();
+    await page.getByRole("link", { name: "See 1 past result for “c63”" }).click();
+    await expect(page).toHaveURL(/status=past/);
+    await expect(page.getByRole("heading", { name: "Results for “c63” (1)" })).toBeVisible();
+    await expect(page.locator("article.auction-card", { hasText: "C 63 S" })).toBeVisible();
+
+    await page.goto("/?q=Lotus");
+    await expect(page.getByText("No live results for “Lotus”.")).toBeVisible();
+    await expect(page.getByRole("link", { name: /past result/ })).toHaveCount(0);
+    await page.getByRole("link", { name: "Clear the search" }).click();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(box(page)).toHaveValue("");
+  });
+
+  test("the clear button empties the search and keeps focus in the field", async ({ page }) => {
+    await page.goto("/?q=bmw");
+    const clear = page.getByRole("button", { name: "Clear search" });
+    await clear.click();
+    await expect(box(page)).toHaveValue("");
+    await expect(box(page)).toBeFocused();
+    await expect(page).not.toHaveURL(/q=/);
+    await expect(clear).toHaveCount(0);
+  });
+
+  test("the search field is full width on a 320px phone", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto("/?q=audi");
+    const field = await box(page).boundingBox();
+    expect(field && field.width).toBeGreaterThan(320 - 2 * 16 - 2);
+    await noHorizontalScroll(page, "search at 320px");
   });
 });
