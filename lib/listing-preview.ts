@@ -35,6 +35,7 @@ export function previewAuction(input: SellInput, sellerId: string): Auction | nu
     inspection_date: null,
     inspection_highlights: [],
     inspection_type: null,
+    withdrawn_before_review: false,
     has_reserve: parsed.data.reserve !== null,
     reserve_met: false,
     current_bid: null,

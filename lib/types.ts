@@ -48,6 +48,8 @@ export interface Auction {
   inspection_report_url: string | null;
   inspection_date: string | null;
   inspection_highlights: string[];
+  /** The seller withdrew it while it was waiting for review (0015): stays private like a draft. */
+  withdrawn_before_review: boolean;
   /** 'authorised_dealer' once an admin accepted the dealer's report (0014); the badge shows only then. */
   inspection_type: InspectionType | null;
   before_photos_urls: string[];
@@ -117,7 +119,15 @@ export interface AuctionPrivate {
   inspection_review_note: string | null;
   inspection_reviewed_by: string | null;
   inspection_reviewed_at: string | null;
+  // Seller withdrawals (0015)
+  /** Why the seller withdrew, or why they asked to withdraw a live auction. */
+  withdraw_reason: string | null;
+  withdraw_requested_at: string | null;
+  /** Only for live auctions, where the seller can only ask. */
+  withdraw_request_status: WithdrawRequestStatus | null;
 }
+
+export type WithdrawRequestStatus = "pending" | "approved" | "declined";
 
 export type InspectionReviewStatus = "pending" | "accepted" | "rejected";
 /** auctions.inspection_type (0014): set when an admin accepted an authorised dealer's report. */
@@ -198,7 +208,8 @@ export interface PlaceBidResult {
 export type NotificationType =
   | "question" | "answer" | "outbid" | "listing_approved" | "listing_rejected"
   | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted"
-  | "watch_ending_soon" | "watch_live" | "inspection_rejected";
+  | "watch_ending_soon" | "watch_live" | "inspection_rejected"
+  | "withdrawal_approved" | "withdrawal_declined";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

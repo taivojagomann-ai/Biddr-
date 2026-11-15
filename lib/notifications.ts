@@ -15,6 +15,7 @@ const TYPES: readonly NotificationType[] = [
   "question", "answer", "outbid", "listing_approved", "listing_rejected",
   "auction_live", "auction_ended", "auction_won", "listing_submitted",
   "watch_ending_soon", "watch_live", "inspection_rejected",
+  "withdrawal_approved", "withdrawal_declined",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -73,6 +74,12 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
       return titled(`${car} ends in less than an hour`);
     case "watch_live":
       return titled(`${car} is now live`);
+    case "withdrawal_approved":
+      return withTitle("Your withdrawal request was approved. The auction is withdrawn.");
+    case "withdrawal_declined": {
+      const note = str(n.data.note);
+      return withTitle(`Your withdrawal request was declined${note ? `: ${note}` : "."}`);
+    }
     case "inspection_rejected": {
       const reason = str(n.data.reason);
       return withTitle(
@@ -99,6 +106,8 @@ export function notificationHref(n: NotificationRow): string {
     case "listing_approved":
     case "listing_rejected":
     case "inspection_rejected":
+    case "withdrawal_approved":
+    case "withdrawal_declined":
       return "/account/listings";
     case "listing_submitted":
       return a ? `/admin/auctions/${a}` : "/admin";

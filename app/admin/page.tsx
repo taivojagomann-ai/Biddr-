@@ -27,7 +27,7 @@ const ROW_COLUMNS =
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Tallinn" });
 
-export default async function AdminPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function AdminPage({ searchParams }: { searchParams: { tab?: string; requests?: string } }) {
   const ctx = await requireAdmin();
   if (!ctx) notFound();
 
@@ -41,7 +41,18 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
   );
   const countOf = Object.fromEntries(counts) as Record<AdminTab, number>;
 
+  // Live auctions whose seller asked to withdraw them (0015).
+  const { data: requestRows } = await ctx.db
+    .from("auction_private")
+    .select("auction_id, auction:auctions!inner(status)")
+    .eq("withdraw_request_status", "pending")
+    .eq("auction.status", "live")
+    .returns<{ auction_id: string }[]>();
+  const requestIds = new Set((requestRows ?? []).map((r) => r.auction_id));
+  const onlyRequests = active.key === "live" && searchParams.requests === "1";
+
   let query = ctx.db.from("auctions").select(ROW_COLUMNS).in("status", [...active.statuses]).limit(200);
+  if (onlyRequests) query = query.in("id", requestIds.size ? [...requestIds] : ["00000000-0000-0000-0000-000000000000"]);
   query =
     active.key === "live"
       ? query.order("ends_at", { ascending: true })
@@ -87,6 +98,34 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
         </ul>
       </nav>
 
+      {active.key === "live" ? (
+        <nav aria-label="Live auction filter" className="mt-4 flex flex-wrap gap-2 text-sm">
+          <Link
+            href="/admin?tab=live"
+            aria-current={onlyRequests ? undefined : "page"}
+            className={cn(
+              "inline-flex min-h-9 items-center rounded-full border px-3 [@media(pointer:coarse)]:min-h-11",
+              onlyRequests ? "border-field text-mute hover:text-chalk" : "border-chalk font-semibold",
+            )}
+          >
+            All live
+          </Link>
+          <Link
+            href="/admin?tab=live&requests=1"
+            aria-current={onlyRequests ? "page" : undefined}
+            className={cn(
+              "inline-flex min-h-9 items-center gap-2 rounded-full border px-3 [@media(pointer:coarse)]:min-h-11",
+              onlyRequests ? "border-chalk font-semibold" : "border-field text-mute hover:text-chalk",
+            )}
+          >
+            Withdrawal requests
+            <span className={cn("rounded-full px-2 py-0.5 text-xs tabular", requestIds.size ? "bg-signal text-asphalt" : "bg-line text-chalk")}>
+              {requestIds.size}
+            </span>
+          </Link>
+        </nav>
+      ) : null}
+
       {error ? (
         <p role="alert" className="mt-6 text-sm text-signal">
           We couldn&apos;t load the auctions. Reload the page.
@@ -113,6 +152,9 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
                         {r.is_demo ? <DemoBadge className="mr-2 align-middle" /> : null}
                         {r.title}
                       </p>
+                      {requestIds.has(r.id) ? (
+                        <p className="text-xs font-semibold text-signal">Withdrawal requested</p>
+                      ) : null}
                       <p className="truncate text-xs text-mute">
                         {r.seller?.username ?? "No username"} · {r.location_country} ·{" "}
                         {r.condition_type === "restored_accident" ? "Restored" : "Clean"}

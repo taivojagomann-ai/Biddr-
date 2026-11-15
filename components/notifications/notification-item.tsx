@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import {
   AlarmClock,
   CheckCircle2,
+  CircleSlash,
   Eye,
   FileX,
   Gavel,
@@ -34,6 +35,8 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   watch_ending_soon: AlarmClock,
   watch_live: Eye,
   inspection_rejected: FileX,
+  withdrawal_approved: CircleSlash,
+  withdrawal_declined: XCircle,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

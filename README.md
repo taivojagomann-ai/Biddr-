@@ -126,6 +126,7 @@ supabase/migrations/0011_newly_listed_index.sql
 supabase/migrations/0012_search.sql
 supabase/migrations/0013_optional_inspections.sql
 supabase/migrations/0014_dealer_inspections.sql
+supabase/migrations/0015_seller_withdraw.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -171,6 +172,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0012_search.sql` | Free-text search: `pg_trgm` and `unaccent` extensions, `auctions.search_text` and `search_words` kept by a trigger (and filled for existing cars), a trigram index, the `search_aliases` table (vw, merc, beemer...), and the `search_auctions` and `search_suggestions` functions | Run before deploying this version (the home page search uses it) |
 | `0013_optional_inspections.sql` | Inspections become optional: drops the `restored_needs_inspection` check so restored cars can be approved without one, adds `auction_private.inspection_requested` (city required only when it is true), and lets the search filter by any restored car | Run before deploying this version (the sell form saves the inspection choice) |
 | `0014_dealer_inspections.sql` | Authorised dealer inspections: dealer report and review columns on `auction_private`, `auctions.inspection_type`, the private `inspection-uploads` bucket (owners write and delete only in their own folder, no public read), the `inspection_rejected` notification type, and `search_auctions` re-created to return `inspection_type`. The old partner-booking columns stay but are no longer used | Run before deploying this version (the sell form and admin review use it) |
+| `0015_seller_withdraw.sql` | Seller withdrawals: `withdraw_reason`, `withdraw_requested_at` and `withdraw_request_status` on `auction_private`, the `seller_withdraw` and `seller_request_withdrawal` functions (signed-in users only), `auctions.withdrawn_before_review` so a draft withdrawn before review stays private, the schedule rule allowing a withdrawn listing without times, and the `withdrawal_approved` / `withdrawal_declined` notification types | Run before deploying this version (My listings and the admin pages use it) |
 
 ## Selling a car (`/sell`)
 
@@ -211,6 +213,21 @@ The only inspection Biddr accepts is a **pre-sale inspection by an authorised de
 - **Before submitting:** on the Review step, **Preview listing** opens the auction page exactly as buyers will see it (`/sell?preview=1`), built from the form's answers and the photos already uploaded. Nothing is saved. A banner at the top has **Back to edit** (the browser's Back button works too) and **Submit for review**.
 - **After submitting:** in **My listings**, drafts and rejected listings have a **Preview** link to their auction page. Only the seller and admins can open it; everyone else gets "This auction isn't listed" (the database already hides these rows). A banner says "Waiting for review." or "Not accepted:" with the reason, and admins also get **Open in admin**. These pages are marked `noindex`.
 - In a preview, bidding ("Bidding opens after review"), questions ("Questions open when the auction starts"), Watch and Share are turned off, and the inspection section says "Your dealer inspection report will show here once Biddr has checked it" when a report is waiting for review. The preview uses the same components as the live auction page (`components/auction/auction-view.tsx`), so the two can't drift apart.
+
+### Withdrawing a listing
+
+Sellers withdraw their own listings from **My listings** (`/account/listings`), as on most auction sites:
+
+| Status | What the seller can do |
+| --- | --- |
+| Waiting for review (`draft`), Scheduled (`upcoming`) | **Withdraw listing**: a confirmation with an optional reason. The status becomes `withdrawn` right away (`seller_withdraw`). |
+| Live | **Request withdrawal** only, with a reason of at least 20 characters and the note that live auctions can only be withdrawn by the Biddr team for a good reason, such as damage or a sale elsewhere (`seller_request_withdrawal`). The row then shows "Withdrawal requested" until an admin decides. |
+| Anything else | Nothing. |
+
+- Both functions lock the auction row, check that the caller is the seller and that the status allows it, and return clear error codes (`NOT_OWNER`, `NOT_WITHDRAWABLE`, `NOT_LIVE`, `REASON_LENGTH`, `ALREADY_REQUESTED`), shown to the seller in plain words.
+- A draft withdrawn before review is marked `withdrawn_before_review` and stays private, like a draft: only the seller and admins can open it. A withdrawn scheduled listing stays public with "This auction was withdrawn", as before.
+- **Admins**: the Live tab has a **Withdrawal requests** count and filter, and rows with a request say so. On the auction page a pending request shows at the top with the reason and two buttons: **Approve and withdraw** (confirmation says bids are cancelled and card holds released; then the same as Withdraw) and **Decline** (optional note to the seller). Both are logged in `admin_actions` and notify the seller.
+- The seller's private fields (rejection reason, request status) are read on the server with the service role, for the seller's own listings only.
 
 ## Admin panel (`/admin`)
 

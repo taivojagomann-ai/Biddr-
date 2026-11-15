@@ -28,7 +28,7 @@ export function Label({ htmlFor, children, optional }: { htmlFor: string; childr
   return (
     <label htmlFor={htmlFor} className="mb-1.5 block text-sm font-semibold">
       {children}
-      {optional ? <span className="ml-1.5 font-normal text-mute">(optional)</span> : null}
+      {optional ? <span className="ml-1 font-normal text-mute"> (optional)</span> : null}
     </label>
   );
 }

@@ -13,6 +13,7 @@ import { asServiceHistory, asTextList, toServiceRows } from "@/lib/listing-detai
 import { CommentsPanel } from "./comments-panel";
 import { DetailsForm } from "./details-form";
 import { InspectionPanel, type DealerReportView } from "./inspection-panel";
+import { WithdrawalRequest } from "./withdrawal-request";
 import { ListingForm } from "./listing-form";
 import { PhotosPanel } from "./photos-panel";
 import { PricingForm } from "./pricing-form";
@@ -176,6 +177,22 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         </div>
       </div>
 
+      {priv?.withdraw_request_status && (priv.withdraw_request_status === "pending" || a.status === "withdrawn" || a.status === "live") ? (
+        <WithdrawalRequest
+          auctionId={a.id}
+          status={priv.withdraw_request_status}
+          reason={priv.withdraw_reason}
+          requestedAt={priv.withdraw_requested_at}
+          bidCount={a.bid_count}
+          holdCount={holdsRes.count ?? 0}
+        />
+      ) : null}
+      {priv?.withdraw_reason && !priv.withdraw_request_status && a.status === "withdrawn" ? (
+        <p className="mt-4 rounded-md border border-field px-3 py-2 text-sm">
+          <span className="font-semibold">Withdrawn by the seller: </span>
+          {priv.withdraw_reason}
+        </p>
+      ) : null}
       <p
         className={cn(
           "mt-4 inline-flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm",

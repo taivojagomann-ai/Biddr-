@@ -11,6 +11,7 @@ import {
   extendSchema,
   fieldErrorsOf,
   acceptReportSchema,
+  declineWithdrawalSchema,
   rejectReportSchema,
   listingSchema,
   photoActionSchema,
@@ -553,6 +554,80 @@ export async function moveBackToReview(input: unknown): Promise<AdminResult> {
   await logAdminAction(ctx, v.auctionId, "status.back_to_review");
   refresh(v.auctionId);
   return { ok: true, message: "Moved back to review. It won't go live until you approve it again." };
+}
+
+// -----------------------------------------------------------------------------
+// Seller withdrawal requests (live auctions, 0015)
+// -----------------------------------------------------------------------------
+async function pendingWithdrawal(ctx: AdminContext, auctionId: string): Promise<{ reason: string | null } | null> {
+  const { data } = await ctx.db
+    .from("auction_private")
+    .select("withdraw_reason, withdraw_request_status")
+    .eq("auction_id", auctionId)
+    .maybeSingle<{ withdraw_reason: string | null; withdraw_request_status: string | null }>();
+  return data?.withdraw_request_status === "pending" ? { reason: data.withdraw_reason } : null;
+}
+
+async function notifySeller(ctx: AdminContext, sellerId: string, auctionId: string, type: string, data: Record<string, unknown> = {}) {
+  const { error } = await ctx.db.from("notifications").insert({ user_id: sellerId, type, auction_id: auctionId, data });
+  if (error) console.error(`${type} notification failed`, error);
+}
+
+export async function approveWithdrawalRequest(input: unknown): Promise<AdminResult> {
+  const g = await guard(auctionIdSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  const request = await pendingWithdrawal(ctx, v.auctionId);
+  if (!request) return { ok: false, error: "There's no pending withdrawal request. Reload the page." };
+  if (a.status !== "live") return { ok: false, error: "The auction isn't live any more. Decline the request instead." };
+
+  // Same as Withdraw: guarded on the status we just read, so it can't race the close job.
+  const changed = await changeStatus(ctx, v.auctionId, ["live"], "withdrawn");
+  if (changed === "stale") return STALE;
+  if (changed !== "ok") return { ok: false, error: changed.error };
+
+  const { error } = await ctx.db
+    .from("auction_private")
+    .update({ withdraw_request_status: "approved" })
+    .eq("auction_id", v.auctionId);
+  if (error) console.error("withdraw request status update failed", error);
+
+  const holds = await releaseAuctionHolds(ctx.db, v.auctionId);
+  await notifySeller(ctx, a.seller_id, v.auctionId, "withdrawal_approved");
+  await logAdminAction(ctx, v.auctionId, "withdraw_request.approve", { reason: request.reason, bid_count: a.bid_count, holds });
+  refresh(v.auctionId);
+
+  const holdNote =
+    holds.failed !== 0
+      ? " Some card holds couldn't be released right now. The hold release job retries them; check Stripe if they stay."
+      : holds.released > 0
+        ? ` ${holds.released} card ${holds.released === 1 ? "hold was" : "holds were"} released.`
+        : "";
+  return { ok: true, message: `Request approved and auction withdrawn. No one wins the car.${holdNote}` };
+}
+
+export async function declineWithdrawalRequest(input: unknown): Promise<AdminResult> {
+  const g = await guard(declineWithdrawalSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  const request = await pendingWithdrawal(ctx, v.auctionId);
+  if (!request) return { ok: false, error: "There's no pending withdrawal request. Reload the page." };
+
+  const { error } = await ctx.db
+    .from("auction_private")
+    .update({ withdraw_request_status: "declined" })
+    .eq("auction_id", v.auctionId)
+    .eq("withdraw_request_status", "pending");
+  if (error) return { ok: false, error: dbMessage(error) };
+
+  await notifySeller(ctx, a.seller_id, v.auctionId, "withdrawal_declined", v.note ? { note: v.note } : {});
+  await logAdminAction(ctx, v.auctionId, "withdraw_request.decline", { reason: request.reason, note: v.note || null });
+  refresh(v.auctionId);
+  return { ok: true, message: "Request declined. The seller has been told; the auction keeps running." };
 }
 
 export async function withdrawAuction(input: unknown): Promise<AdminResult> {
