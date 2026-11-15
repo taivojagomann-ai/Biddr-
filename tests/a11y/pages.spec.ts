@@ -2,7 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 // Must match tests/a11y/mock-supabase.mjs
-const ACCESS_TOKEN = "a11y-test-access-token";
+const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const ACCESS_TOKEN = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({
+  sub: "00000000-0000-4000-8000-0000000000aa", aud: "authenticated", role: "authenticated",
+  aal: "aal2", amr: [{ method: "totp", timestamp: 1700000000 }], exp: 4102444800,
+})}.a11y-signature`;
 const ME = "00000000-0000-4000-8000-0000000000aa";
 const LIVE = "10000000-0000-4000-8000-000000000001";
 const RESTORED = "10000000-0000-4000-8000-000000000002";

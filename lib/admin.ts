@@ -25,7 +25,8 @@ export async function getAdminAccess(): Promise<AdminAccess> {
   if (!user) return { status: "none" };
   const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>();
   if (data?.role !== "admin") return { status: "none" };
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  // A token that can't be read counts as "not verified" (fail closed).
+  const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel().then((r) => r.data, () => null);
   return aal?.currentLevel === "aal2" ? { status: "ok", adminId: user.id } : { status: "needs_2fa", userId: user.id };
 }
 
