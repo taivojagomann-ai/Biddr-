@@ -15,7 +15,7 @@ export const SellPreview = forwardRef<
   PreviewBannerHandle,
   {
     auction: Auction | null;
-    /** The seller chose "Yes, book an inspection". */
+    /** The seller uploaded a dealer inspection report (not checked yet). */
     inspectionPending: boolean;
     userId: string;
     initialNow: number;

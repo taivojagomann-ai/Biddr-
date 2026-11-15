@@ -80,7 +80,7 @@ export function AuctionFilters({ status }: { status: FeedStatus }) {
               <option value="">Any history</option>
               <option value="clean">Clean history</option>
               <option value="restored_any">Restored</option>
-              <option value="restored">Restored, partner verified</option>
+              <option value="restored">Restored, dealer inspected</option>
             </select>
           </div>
         </div>

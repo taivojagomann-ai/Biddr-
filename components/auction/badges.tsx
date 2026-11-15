@@ -1,4 +1,5 @@
 import { ShieldCheck, Wrench } from "lucide-react";
+import { DEALER_INSPECTED } from "@/lib/inspection";
 import { cn } from "@/lib/utils";
 
 export function ReserveBadge({ hasReserve, reserveMet, className }: { hasReserve: boolean; reserveMet: boolean; className?: string }) {
@@ -16,15 +17,16 @@ export function ReserveBadge({ hasReserve, reserveMet, className }: { hasReserve
   );
 }
 
-export function InspectionBadge({ partner, compact = false, className }: { partner: string | null; compact?: boolean; className?: string }) {
-  if (!partner) return null;
+/** "Dealer inspected": only pass `dealer` for cars with an accepted authorised dealer report. */
+export function InspectionBadge({ dealer, className }: { dealer: string | null; className?: string }) {
+  if (!dealer) return null;
   return (
     <span
       className={cn("inline-flex items-center gap-1 rounded-sm bg-verified/10 px-1.5 py-0.5 text-xs font-semibold text-verified", className)}
-      title={`Inspected by ${partner}`}
+      title={`Inspected by ${dealer}`}
     >
       <ShieldCheck className="size-3.5" aria-hidden />
-      {compact ? "Partner verified" : `Verified by ${partner}`}
+      {DEALER_INSPECTED}
     </span>
   );
 }

@@ -6,12 +6,13 @@ import { requireAdmin } from "@/lib/admin";
 import { ADMIN_STATUS_LABELS, MAX_AUCTION_MS } from "@/lib/admin-schemas";
 import { formatBaltic } from "@/lib/baltic-time";
 import { COUNTRY_NAMES, formatEur, formatExactTime, formatKm } from "@/lib/format";
+import { REPORT_MAX_AGE_DAYS, daysSince, euCountryName } from "@/lib/sell";
 import { COMMENT_COLUMNS, type Auction, type AuctionPrivate, type CommentRow, type Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { asServiceHistory, asTextList, toServiceRows } from "@/lib/listing-details";
 import { CommentsPanel } from "./comments-panel";
 import { DetailsForm } from "./details-form";
-import { InspectionPanel } from "./inspection-panel";
+import { InspectionPanel, type DealerReportView } from "./inspection-panel";
 import { ListingForm } from "./listing-form";
 import { PhotosPanel } from "./photos-panel";
 import { PricingForm } from "./pricing-form";
@@ -40,6 +41,51 @@ const NAV = [
   ["bids", "Bids"],
   ["comments", "Comments"],
 ] as const;
+
+/** What the inspection panel shows, with plain-language warnings for the admin. */
+function dealerReportView(priv: AuctionPrivate | null, listingKm: number, startsAt: string | null): DealerReportView {
+  const provided = priv?.dealer_inspection_provided ?? null;
+  const paths = Array.isArray(priv?.dealer_report_paths) ? priv.dealer_report_paths : [];
+  const dealer =
+    provided && priv?.dealer_name && priv.dealer_inspection_date
+      ? {
+          name: priv.dealer_name,
+          city: priv.dealer_city ?? "",
+          country: euCountryName(priv.dealer_country) ?? priv.dealer_country ?? "",
+          date: priv.dealer_inspection_date,
+          mileageKm: priv.dealer_inspection_mileage_km,
+        }
+      : null;
+  const warnings: string[] = [];
+  if (dealer?.mileageKm != null && dealer.mileageKm > listingKm) {
+    warnings.push(
+      `The report shows ${dealer.mileageKm.toLocaleString("en-IE")} km, more than the ${listingKm.toLocaleString("en-IE")} km in the listing.`,
+    );
+  }
+  if (dealer) {
+    const start = startsAt ? new Date(startsAt) : new Date();
+    const age = daysSince(dealer.date, start);
+    if (age > REPORT_MAX_AGE_DAYS) {
+      warnings.push(
+        `The report is ${age} days old ${startsAt ? "at the scheduled start" : "today"}, more than ${REPORT_MAX_AGE_DAYS} days.`,
+      );
+    }
+  }
+  return {
+    provided,
+    dealer,
+    files: paths.map((path, index) => ({
+      index,
+      label: `File ${index + 1} (${path.endsWith(".pdf") ? "PDF" : "image"})`,
+    })),
+    review: {
+      status: priv?.inspection_review_status ?? null,
+      note: priv?.inspection_review_note ?? null,
+      reviewedAt: priv?.inspection_reviewed_at ?? null,
+    },
+    warnings,
+  };
+}
 
 export default async function AdminAuctionPage({ params }: { params: { id: string } }) {
   const ctx = await requireAdmin();
@@ -71,8 +117,13 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
 
   const priv = privRes.data;
   // null: submitted before sellers could choose (0013).
+  const report = dealerReportView(priv, a.mileage_km, a.starts_at);
   const inspectionLabel =
-    priv?.inspection_requested === true ? "Yes" : priv?.inspection_requested === false ? "No" : "Not answered (submitted before sellers could choose)";
+    report.provided === true
+      ? `Report provided · ${report.review.status === "accepted" ? "accepted" : report.review.status === "rejected" ? "rejected" : "waiting for review"}`
+      : report.provided === false
+        ? "No report: listed without an inspection"
+        : "No report (submitted before dealer inspections)";
   const seller = sellerRes.data;
   const email = authRes.data.user?.email ?? null;
   const bids = bidsRes.data ?? [];
@@ -128,13 +179,20 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
       <p
         className={cn(
           "mt-4 inline-flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm",
-          priv?.inspection_requested === true ? "border-verified/60" : "border-field",
+          report.review.status === "pending" ? "border-signal/60" : report.review.status === "accepted" ? "border-verified/60" : "border-field",
         )}
       >
-        <ClipboardCheck aria-hidden className={cn("size-4 shrink-0", priv?.inspection_requested === true ? "text-verified" : "text-mute")} />
-        <span className="font-semibold">Inspection requested:</span>
+        <ClipboardCheck
+          aria-hidden
+          className={cn("size-4 shrink-0", report.review.status === "accepted" ? "text-verified" : report.review.status === "pending" ? "text-signal" : "text-mute")}
+        />
+        <span className="font-semibold">Dealer inspection:</span>
         <span>{inspectionLabel}</span>
-        {a.inspection_report_url ? <span className="text-mute">· report attached</span> : null}
+        {report.provided ? (
+          <a href="#inspection" className="underline underline-offset-4 hover:text-signal">
+            Review it
+          </a>
+        ) : null}
       </p>
 
       <nav aria-label="Sections" className="mt-6">
@@ -192,13 +250,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             />
             <Item label="Country" value={seller?.country ? COUNTRY_NAMES[seller.country] : null} />
             <Item label="Requested reserve" value={priv?.requested_reserve ? formatEur(priv.requested_reserve) : "No reserve"} />
-            <Item label="Inspection requested" value={inspectionLabel} />
-            {priv?.inspection_requested !== false ? (
-              <>
-                <Item label="Inspection city" value={priv?.inspection_city} />
-                <Item label="Preferred inspection dates" value={priv?.inspection_preferred_dates} />
-              </>
-            ) : null}
+            <Item label="Dealer inspection" value={inspectionLabel} />
           </dl>
         </Section>
 
@@ -267,20 +319,15 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         <Section
           id="inspection"
           title="Inspection"
-          intro={
-            priv?.inspection_requested === false
-              ? "The seller chose to list without an inspection. If the car is inspected after all, add the partner and report here."
-              : "Add the partner and the report PDF once the car has been inspected. The public page then shows the Partner verified badge and the report."
-          }
+          intro="Only reports from an authorised dealer of the car's brand, in an EU country, are accepted. Accepting adds the Dealer inspected badge."
         >
           <InspectionPanel
             auctionId={a.id}
+            reviewable={a.status === "draft" || a.status === "upcoming"}
+            report={report}
+            listingMileage={formatKm(a.mileage_km)}
+            initialHighlights={a.inspection_type === "authorised_dealer" ? (a.inspection_highlights ?? []) : []}
             reportUrl={a.inspection_report_url}
-            initial={{
-              partnerName: a.inspection_partner_name ?? "",
-              inspectionDate: a.inspection_date ?? "",
-              highlights: a.inspection_highlights ?? [],
-            }}
           />
         </Section>
 

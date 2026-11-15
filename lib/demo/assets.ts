@@ -55,14 +55,14 @@ function pdfEscape(s: string): string {
   return s.replace(/[^\x20-\x7E]/g, "?").replace(/([()\\])/g, "\\$1");
 }
 
-export function renderDemoReportPdf(title: string, lines: string[]): Buffer {
+export function renderDemoReportPdf(title: string, lines: string[], dealer: string): Buffer {
   const content = [
     "BT",
-    "/F1 22 Tf 72 760 Td (Demo inspection report) Tj",
+    "/F1 22 Tf 72 760 Td (Demo pre-sale inspection report) Tj",
     "/F1 13 Tf 0 -34 Td (" + pdfEscape(title) + ") Tj",
     "/F1 11 Tf 0 -22 Td (Placeholder for testing. This is not a real inspection.) Tj",
     ...lines.map((l) => "0 -20 Td (" + pdfEscape(`- ${l}`) + ") Tj"),
-    "0 -36 Td (Inspection partner: Demo inspection partner) Tj",
+    "0 -36 Td (" + pdfEscape(`Authorised dealer (fictional): ${dealer}`) + ") Tj",
     "ET",
   ].join("\n");
 

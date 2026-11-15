@@ -61,14 +61,38 @@ export function uploadToStorage(opts: {
   onProgress: (fraction: number) => void;
   signal?: AbortSignal;
 }): Promise<void> {
+  return uploadBlob({
+    bucket: PHOTO_BUCKET,
+    path: opts.path,
+    blob: opts.photo.blob,
+    contentType: opts.photo.contentType,
+    accessToken: opts.accessToken,
+    onProgress: opts.onProgress,
+    signal: opts.signal,
+    tooLarge: "This photo is still too large after resizing.",
+  });
+}
+
+/** Same as uploadToStorage, for any file and bucket (e.g. dealer inspection reports). */
+export function uploadBlob(opts: {
+  bucket: string;
+  path: string;
+  blob: Blob;
+  contentType: string;
+  accessToken: string;
+  onProgress: (fraction: number) => void;
+  signal?: AbortSignal;
+  /** Message when Storage refuses the size. */
+  tooLarge?: string;
+}): Promise<void> {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/+$/, "");
-  const url = `${base}/storage/v1/object/${PHOTO_BUCKET}/${opts.path.split("/").map(encodeURIComponent).join("/")}`;
+  const url = `${base}/storage/v1/object/${opts.bucket}/${opts.path.split("/").map(encodeURIComponent).join("/")}`;
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", url);
     xhr.setRequestHeader("Authorization", `Bearer ${opts.accessToken}`);
     xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    xhr.setRequestHeader("Content-Type", opts.photo.contentType);
+    xhr.setRequestHeader("Content-Type", opts.contentType);
     xhr.setRequestHeader("cache-control", "max-age=31536000");
     xhr.setRequestHeader("x-upsert", "false");
     xhr.upload.onprogress = (e) => {
@@ -76,14 +100,14 @@ export function uploadToStorage(opts: {
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else if (xhr.status === 413) reject(new PhotoError("This photo is still too large after resizing."));
+      else if (xhr.status === 413) reject(new PhotoError(opts.tooLarge ?? "This file is too large."));
       else if (xhr.status === 401 || xhr.status === 403) reject(new PhotoError("Your session has expired. Reload the page."));
       else reject(new PhotoError("Upload failed. Check your connection and retry."));
     };
     xhr.onerror = () => reject(new PhotoError("Upload failed. Check your connection and retry."));
     xhr.onabort = () => reject(new PhotoError("Upload cancelled."));
     opts.signal?.addEventListener("abort", () => xhr.abort());
-    xhr.send(opts.photo.blob);
+    xhr.send(opts.blob);
   });
 }
 

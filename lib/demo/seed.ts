@@ -3,15 +3,14 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { INSPECTION_BUCKET } from "@/lib/admin-schemas";
 import { addDays, fromBalticInputs, toBalticInputs } from "@/lib/baltic-time";
-import { PHOTO_BUCKET, listingTitle } from "@/lib/sell";
-import type { AuctionStatus, BodyStyle, ConditionType, Country, InspectionCity, RegistrationCountry } from "@/lib/types";
+import { PHOTO_BUCKET, REPORT_BUCKET, listingTitle, type EuCountry } from "@/lib/sell";
+import type { AuctionStatus, BodyStyle, ConditionType, Country, RegistrationCountry } from "@/lib/types";
 import { renderDemoPhoto, renderDemoReportPdf } from "./assets";
 import { generateBids } from "./bids";
 
-// Everything demo lives under this folder in both buckets.
+// Everything demo lives under this folder in every bucket.
 const DEMO_FOLDER = "demo";
 const DEMO_EMAIL_RE = /^demo-[a-z0-9-]+@biddr\.invalid$/;
-const PARTNER = "Demo inspection partner";
 const MIN_INCREMENT = 250;
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -63,10 +62,9 @@ interface CarSpec {
   color: string;
   city: string;
   country: Country;
-  inspectionCity: InspectionCity;
   condition: ConditionType;
-  /** false: listed without an independent inspection (the seller's choice). Default true. */
-  inspected?: boolean;
+  /** The authorised dealer whose pre-sale report an admin accepted; null = listed without an inspection. */
+  dealer: DemoDealer | null;
   damageSummary: string | null;
   startingBid: number;
   bids: number;
@@ -91,13 +89,25 @@ interface ListingDetails {
   notes: string;
 }
 
+/** Clearly fictional dealers, marked "Demo" so nobody mistakes them for real ones. */
+interface DemoDealer {
+  name: string;
+  city: string;
+  country: EuCountry;
+}
+const DEMO_BMW_TALLINN: DemoDealer = { name: "Demo BMW Centre", city: "Tallinn", country: "EE" };
+const DEMO_BMW_VILNIUS: DemoDealer = { name: "Demo BMW Centre", city: "Vilnius", country: "LT" };
+const DEMO_AUDI_RIGA: DemoDealer = { name: "Demo Audi Centre", city: "Riga", country: "LV" };
+const DEMO_AUDI_HELSINKI: DemoDealer = { name: "Demo Audi Centre", city: "Helsinki", country: "FI" };
+const DEMO_MERCEDES_HELSINKI: DemoDealer = { name: "Demo Mercedes-Benz Centre", city: "Helsinki", country: "FI" };
+
 const DEMO_DEALER = { name: "Tallinn M Garage OÜ (demo)", code: "00000000" };
 
 const CARS: CarSpec[] = [
   {
     scenario: "closing_soon", make: "BMW", model: "M2", variant: "Competition", year: 2020, wmi: "WBS",
     mileageKm: 42_800, engine: "3.0 inline-6 twin-turbo, 410 hp", transmission: "6-speed manual", drivetrain: "RWD",
-    color: "Hockenheim Silver", city: "Tallinn", country: "EE", inspectionCity: "Tallinn", condition: "clean",
+    color: "Hockenheim Silver", city: "Tallinn", country: "EE", dealer: DEMO_BMW_TALLINN, condition: "clean",
     damageSummary: null, startingBid: 38_000, bids: 21,
     highlights: ["Paint thickness measured on all panels", "Clutch and flywheel within spec", "No fault codes stored", "Tyres 6 mm all round"],
     listing: {
@@ -132,7 +142,7 @@ const CARS: CarSpec[] = [
   {
     scenario: "reserve_not_met_yet", make: "Audi", model: "RS6", variant: "Avant", year: 2021, wmi: "WUA",
     mileageKm: 31_500, engine: "4.0 V8 twin-turbo, 600 hp", transmission: "8-speed automatic", drivetrain: "AWD",
-    color: "Nardo Grey", city: "Riga", country: "LV", inspectionCity: "Riga", condition: "clean",
+    color: "Nardo Grey", city: "Riga", country: "LV", dealer: DEMO_AUDI_RIGA, condition: "clean",
     damageSummary: null, startingBid: 88_000, bids: 6,
     highlights: ["Full Audi service history", "Brake discs and pads at 70%", "Air suspension holds height overnight"],
     listing: {
@@ -155,9 +165,8 @@ const CARS: CarSpec[] = [
   {
     scenario: "no_reserve_no_bids", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
     mileageKm: 24_900, engine: "3.0 flat-6 twin-turbo, 450 hp", transmission: "8-speed PDK", drivetrain: "RWD",
-    color: "Gentian Blue", city: "Vilnius", country: "LT", inspectionCity: "Vilnius", condition: "restored_accident",
-    // Shows a restored car listed without an independent inspection.
-    inspected: false,
+    color: "Gentian Blue", city: "Vilnius", country: "LT", dealer: null, condition: "restored_accident",
+    // Shows a restored car listed without an inspection.
     damageSummary:
       "Rear-right impact while parked in 2022. Rear bumper and right rear quarter panel repaired and repainted at an independent body shop in Vilnius. No structural damage according to the shop. Airbags did not deploy.",
     startingBid: 105_000, bids: 0,
@@ -182,7 +191,7 @@ const CARS: CarSpec[] = [
   {
     scenario: "upcoming", make: "Mercedes-AMG", model: "C63 S", variant: "Coupe", year: 2018, wmi: "WDD",
     mileageKm: 58_700, engine: "4.0 V8 twin-turbo, 510 hp", transmission: "9-speed automatic", drivetrain: "RWD",
-    color: "Selenite Grey", city: "Tartu", country: "EE", inspectionCity: "Tallinn", condition: "clean",
+    color: "Selenite Grey", city: "Tartu", country: "EE", dealer: DEMO_MERCEDES_HELSINKI, condition: "clean",
     damageSummary: null, startingBid: 52_000, bids: 0,
     highlights: ["Spark plugs and coils replaced at 55,000 km", "Rear tyres new in 2026", "No oil leaks found"],
     listing: {
@@ -206,7 +215,7 @@ const CARS: CarSpec[] = [
   {
     scenario: "sold", make: "BMW", model: "M3", variant: "Competition", year: 2022, wmi: "WBS",
     mileageKm: 19_800, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "RWD",
-    color: "Isle of Man Green", city: "Kaunas", country: "LT", inspectionCity: "Vilnius", condition: "restored_accident",
+    color: "Isle of Man Green", city: "Kaunas", country: "LT", dealer: DEMO_BMW_VILNIUS, condition: "restored_accident",
     damageSummary:
       "Front-left impact at low speed in 2024. Bonnet, left wing, headlight and radiator replaced with new BMW parts at a main-dealer body shop. Airbags did not deploy. Wheel alignment checked after the repair.",
     startingBid: 62_000, bids: 17,
@@ -231,7 +240,7 @@ const CARS: CarSpec[] = [
   {
     scenario: "ended_below_reserve", make: "Audi", model: "RS3", variant: "Sportback", year: 2017, wmi: "WUA",
     mileageKm: 67_400, engine: "2.5 inline-5 turbo, 400 hp", transmission: "7-speed S tronic", drivetrain: "AWD",
-    color: "Catalunya Red", city: "Pärnu", country: "EE", inspectionCity: "Tallinn", condition: "clean",
+    color: "Catalunya Red", city: "Pärnu", country: "EE", dealer: DEMO_AUDI_HELSINKI, condition: "clean",
     damageSummary: null, startingBid: 29_000, bids: 9,
     highlights: ["S tronic oil changed at 60,000 km", "Haldex serviced", "Small stone chips on the bonnet"],
     listing: {
@@ -430,7 +439,7 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       const id = randomUUID();
       const schedule = scheduleFor(car.scenario, now);
       const restored = car.condition === "restored_accident";
-      const inspected = car.inspected !== false;
+      const dealer = car.dealer;
 
       // Photos
       const set = PHOTO_SET.filter((p) => p.section !== "before" || restored);
@@ -445,17 +454,27 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       for (const u of uploads) urls[u.section]!.push(db.storage.from(PHOTO_BUCKET).getPublicUrl(u.path).data.publicUrl);
       files += uploads.length;
 
-      // Inspection report for inspected restored cars (clean demo cars show the partner without a PDF)
+      // Dealer inspection: the seller's (placeholder) report in the private bucket for
+      // every inspected car, and a public "redacted" copy for the restored one.
       let reportUrl: string | null = null;
-      if (restored && inspected) {
-        const path = `${DEMO_FOLDER}/${id}/report.pdf`;
+      const privateReportPaths: string[] = [];
+      if (dealer) {
         const title = listingTitle({ year: car.year, make: car.make, model: car.model, variant: car.variant });
-        const { error } = await db.storage
-          .from(INSPECTION_BUCKET)
-          .upload(path, renderDemoReportPdf(title, car.highlights), { contentType: "application/pdf", upsert: true });
-        if (error) fail("Uploading the demo inspection report", error);
-        reportUrl = db.storage.from(INSPECTION_BUCKET).getPublicUrl(path).data.publicUrl;
+        const pdf = renderDemoReportPdf(title, car.highlights, `${dealer.name}, ${dealer.city}`);
+        const privatePath = `${DEMO_FOLDER}/${id}/${randomUUID()}.pdf`;
+        const { error: privateUploadError } = await db.storage
+          .from(REPORT_BUCKET)
+          .upload(privatePath, pdf, { contentType: "application/pdf", upsert: true });
+        if (privateUploadError) fail("Uploading the demo dealer report", privateUploadError);
+        privateReportPaths.push(privatePath);
         files += 1;
+        if (restored) {
+          const path = `${DEMO_FOLDER}/${id}/report.pdf`;
+          const { error } = await db.storage.from(INSPECTION_BUCKET).upload(path, pdf, { contentType: "application/pdf", upsert: true });
+          if (error) fail("Uploading the demo inspection report", error);
+          reportUrl = db.storage.from(INSPECTION_BUCKET).getPublicUrl(path).data.publicUrl;
+          files += 1;
+        }
       }
 
       // Bids: after the start, before now (live) or a few minutes before the end (closed,
@@ -494,10 +513,11 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         location_country: car.country,
         condition_type: car.condition,
         damage_history_summary: car.damageSummary,
-        inspection_partner_name: inspected ? PARTNER : null,
+        inspection_type: dealer ? "authorised_dealer" : null,
+        inspection_partner_name: dealer ? `${dealer.name}, ${dealer.city}` : null,
         inspection_report_url: reportUrl,
-        inspection_date: inspected ? inspectionDate : null,
-        inspection_highlights: inspected ? car.highlights : [],
+        inspection_date: dealer ? inspectionDate : null,
+        inspection_highlights: dealer ? car.highlights : [],
         body_style: car.listing.bodyStyle,
         interior_color: car.listing.interior,
         owner_count: car.listing.owners,
@@ -538,8 +558,16 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         auction_id: id,
         reserve_price: reserve,
         requested_reserve: reserve,
-        inspection_requested: inspected,
-        inspection_city: inspected ? car.inspectionCity : null,
+        dealer_inspection_provided: dealer !== null,
+        dealer_name: dealer?.name ?? null,
+        dealer_city: dealer?.city ?? null,
+        dealer_country: dealer?.country ?? null,
+        dealer_inspection_date: dealer ? inspectionDate : null,
+        // A little below the listing mileage, as on a real pre-sale report.
+        dealer_inspection_mileage_km: dealer ? Math.max(0, car.mileageKm - 120) : null,
+        dealer_report_paths: privateReportPaths,
+        inspection_review_status: dealer ? "accepted" : null,
+        inspection_reviewed_at: dealer ? new Date(now).toISOString() : null,
       });
       if (privateError) fail("Saving the reserve", privateError);
 
@@ -608,7 +636,7 @@ export async function removeDemoData(db: SupabaseClient): Promise<DemoSummary> {
 
   // 2. Files under demo/ in both buckets.
   let files = 0;
-  for (const bucket of [PHOTO_BUCKET, INSPECTION_BUCKET]) {
+  for (const bucket of [PHOTO_BUCKET, INSPECTION_BUCKET, REPORT_BUCKET]) {
     const paths = await listFiles(db, bucket, DEMO_FOLDER);
     for (let i = 0; i < paths.length; i += 100) {
       const { error } = await db.storage.from(bucket).remove(paths.slice(i, i + 100));

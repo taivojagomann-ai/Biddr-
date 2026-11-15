@@ -1,4 +1,5 @@
 import { COUNTRY_NAMES, formatKm } from "@/lib/format";
+import { DEALER_INSPECTED, NOT_INSPECTED, isDealerInspected } from "@/lib/inspection";
 import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
 import type { Auction } from "@/lib/types";
 
@@ -24,7 +25,7 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Owners", auction.owner_count ? String(auction.owner_count) : null],
     ["Seller", auction.seller_type === "dealer" ? (auction.dealer_name ? `Dealer: ${auction.dealer_name}` : "Dealer") : "Private seller"],
     ["Registration", registration(auction)],
-    ["Inspection", auction.inspection_partner_name ? "Partner verified" : "Not inspected"],
+    ["Inspection", isDealerInspected(auction) ? DEALER_INSPECTED : NOT_INSPECTED],
   ];
 
   const visible = rows.filter((r): r is [string, string] => Boolean(r[1]));

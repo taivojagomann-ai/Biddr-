@@ -4,6 +4,7 @@ import {
   AlarmClock,
   CheckCircle2,
   Eye,
+  FileX,
   Gavel,
   MessageCircleQuestion,
   MessageSquareReply,
@@ -32,6 +33,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   listing_submitted: Send,
   watch_ending_soon: AlarmClock,
   watch_live: Eye,
+  inspection_rejected: FileX,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

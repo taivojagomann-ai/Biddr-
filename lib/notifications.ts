@@ -14,7 +14,7 @@ export const PAGE_SIZE = 50;
 const TYPES: readonly NotificationType[] = [
   "question", "answer", "outbid", "listing_approved", "listing_rejected",
   "auction_live", "auction_ended", "auction_won", "listing_submitted",
-  "watch_ending_soon", "watch_live",
+  "watch_ending_soon", "watch_live", "inspection_rejected",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -73,6 +73,12 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
       return titled(`${car} ends in less than an hour`);
     case "watch_live":
       return titled(`${car} is now live`);
+    case "inspection_rejected": {
+      const reason = str(n.data.reason);
+      return withTitle(
+        `Your dealer inspection report wasn't accepted${reason ? `: ${reason}` : ""}. The listing can still go live without the Dealer inspected badge.`,
+      );
+    }
   }
 }
 
@@ -92,6 +98,7 @@ export function notificationHref(n: NotificationRow): string {
       return a ? `/auctions/${a}` : "/account/notifications";
     case "listing_approved":
     case "listing_rejected":
+    case "inspection_rejected":
       return "/account/listings";
     case "listing_submitted":
       return a ? `/admin/auctions/${a}` : "/admin";

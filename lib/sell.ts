@@ -11,7 +11,7 @@ import {
   type DetailsInput,
   type OwnershipInput,
 } from "@/lib/listing-details";
-import type { AuctionStatus, Country, InspectionCity } from "@/lib/types";
+import type { AuctionStatus, Country } from "@/lib/types";
 
 export const PHOTO_BUCKET = "auction-photos";
 
@@ -22,7 +22,53 @@ export const DRIVETRAINS = ["RWD", "AWD", "FWD"] as const;
 export type Drivetrain = (typeof DRIVETRAINS)[number];
 
 export const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
-export const INSPECTION_CITIES: readonly InspectionCity[] = ["Tallinn", "Riga", "Vilnius"];
+
+// -----------------------------------------------------------------------------
+// Dealer inspection reports (0014): only a pre-sale inspection by an authorised
+// dealer of the car's brand, in any EU country. Files go to a private bucket.
+// -----------------------------------------------------------------------------
+export const REPORT_BUCKET = "inspection-uploads";
+export const MAX_REPORT_FILES = 10;
+export const MAX_REPORT_BYTES = 20 * 1024 * 1024;
+export const REPORT_TYPES = { "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
+export type ReportContentType = keyof typeof REPORT_TYPES;
+/** A report must be at most this many days old. */
+export const REPORT_MAX_AGE_DAYS = 90;
+
+export const EU_COUNTRIES = [
+  { code: "AT", name: "Austria" }, { code: "BE", name: "Belgium" }, { code: "BG", name: "Bulgaria" },
+  { code: "HR", name: "Croatia" }, { code: "CY", name: "Cyprus" }, { code: "CZ", name: "Czechia" },
+  { code: "DK", name: "Denmark" }, { code: "EE", name: "Estonia" }, { code: "FI", name: "Finland" },
+  { code: "FR", name: "France" }, { code: "DE", name: "Germany" }, { code: "GR", name: "Greece" },
+  { code: "HU", name: "Hungary" }, { code: "IE", name: "Ireland" }, { code: "IT", name: "Italy" },
+  { code: "LV", name: "Latvia" }, { code: "LT", name: "Lithuania" }, { code: "LU", name: "Luxembourg" },
+  { code: "MT", name: "Malta" }, { code: "NL", name: "Netherlands" }, { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" }, { code: "RO", name: "Romania" }, { code: "SK", name: "Slovakia" },
+  { code: "SI", name: "Slovenia" }, { code: "ES", name: "Spain" }, { code: "SE", name: "Sweden" },
+] as const;
+export type EuCountry = (typeof EU_COUNTRIES)[number]["code"];
+const EU_CODES = EU_COUNTRIES.map((c) => c.code) as [EuCountry, ...EuCountry[]];
+
+export function euCountryName(code: string | null | undefined): string | null {
+  return EU_COUNTRIES.find((c) => c.code === code)?.name ?? null;
+}
+
+/** An uploaded report file: its path in REPORT_BUCKET and the name the seller saw. */
+export interface ReportFile {
+  path: string;
+  name: string;
+}
+
+/** Report path inside the bucket: <user id>/<draft id>/<uuid>.<ext> */
+export const REPORT_PATH_RE = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/;
+
+/** Whole days between an ISO date (YYYY-MM-DD) and today; negative if it's in the future. */
+export function daysSince(isoDate: string, now: Date = new Date()): number {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const then = Date.UTC(y!, (m ?? 1) - 1, d ?? 1);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((today - then) / 86_400_000);
+}
 
 export const STEPS = [
   { id: 1, label: "Car" },
@@ -98,10 +144,15 @@ export interface SellInput extends OwnershipInput, DetailsInput {
   videoUrl: string;
   startingBid: string;
   reserve: string;
-  /** Required, no default: the seller decides whether to book an independent inspection. */
-  inspectionRequested: "yes" | "no" | "";
-  inspectionCity: InspectionCity | "";
-  inspectionDates: string;
+  /** Required, no default: does the seller have an authorised dealer's pre-sale inspection report? */
+  dealerInspection: "yes" | "no" | "";
+  reportDealerName: string;
+  reportDealerCity: string;
+  reportDealerCountry: EuCountry | "";
+  /** YYYY-MM-DD */
+  reportDate: string;
+  reportMileage: string;
+  reportFiles: ReportFile[];
   confirmed: boolean;
 }
 
@@ -117,7 +168,8 @@ export const FIELD_STEP: Record<SellField, StepId> = {
   highlights: 3, equipment: 3, modifications: 3, noModifications: 3, knownFlaws: 3, noKnownFlaws: 3,
   serviceHistory: 3, itemsIncluded: 3, sellerNotes: 3,
   "photos.exterior": 4, "photos.interior": 4, "photos.mechanical": 4, "photos.before": 4, videoUrl: 4,
-  startingBid: 5, reserve: 5, inspectionRequested: 5, inspectionCity: 5, inspectionDates: 5,
+  startingBid: 5, reserve: 5, dealerInspection: 5, reportDealerName: 5, reportDealerCity: 5, reportDealerCountry: 5,
+  reportDate: 5, reportMileage: 5, reportFiles: 5,
   confirmed: 6,
 };
 
@@ -133,7 +185,8 @@ export function emptySellInput(draftId: string, country: Country | ""): SellInpu
     noKnownFlaws: false, serviceHistory: [emptyServiceRow()], itemsIncluded: [""], sellerNotes: "",
     photos: { exterior: [], interior: [], mechanical: [], before: [] },
     videoUrl: "",
-    startingBid: "", reserve: "", inspectionRequested: "", inspectionCity: "", inspectionDates: "",
+    startingBid: "", reserve: "", dealerInspection: "", reportDealerName: "", reportDealerCity: "", reportDealerCountry: "",
+    reportDate: "", reportMileage: "", reportFiles: [],
     confirmed: false,
   };
 }
@@ -311,15 +364,37 @@ export const priceSchema = z
           .transform((v) => (v === "" ? null : Number(v)))
           .pipe(z.number().int().max(MAX_PRICE, "Check the reserve price.").nullable()),
       ),
-    inspectionRequested: z.enum(["yes", "no"], {
-      errorMap: () => ({ message: "Choose whether you'd like an independent inspection." }),
+    dealerInspection: z.enum(["yes", "no"], {
+      errorMap: () => ({ message: "Choose whether you have a dealer inspection report." }),
     }),
-    inspectionCity: z.enum(["Tallinn", "Riga", "Vilnius", ""]).catch(""),
-    inspectionDates: optionalText("preferred dates", 500),
+    reportDealerName: z.string().trim().max(120, "Keep the dealer's name under 120 characters."),
+    reportDealerCity: z.string().trim().max(80, "Keep the city under 80 characters."),
+    reportDealerCountry: z.enum([...EU_CODES, ""]).catch(""),
+    reportDate: z.string().trim(),
+    reportMileage: z.string().transform((v) => v.replace(/[\s.,]/g, "")),
+    reportFiles: z
+      .array(z.object({ path: z.string().regex(REPORT_PATH_RE), name: z.string().max(255) }))
+      .max(MAX_REPORT_FILES, `Add at most ${MAX_REPORT_FILES} files.`)
+      .catch([]),
   })
   .superRefine((v, ctx) => {
-    if (v.inspectionRequested === "yes" && v.inspectionCity === "") {
-      ctx.addIssue({ code: "custom", path: ["inspectionCity"], message: "Choose where the car can be inspected." });
+    if (v.dealerInspection === "yes") {
+      const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+      if (v.reportDealerName.length < 2) issue("reportDealerName", "Enter the dealer's name.");
+      if (v.reportDealerCity.length < 2) issue("reportDealerCity", "Enter the dealer's city.");
+      if (v.reportDealerCountry === "") issue("reportDealerCountry", "Choose the country (EU only).");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.reportDate)) issue("reportDate", "Enter the inspection date.");
+      else {
+        const age = daysSince(v.reportDate);
+        if (age < 0) issue("reportDate", "The inspection date can't be in the future.");
+        else if (age > REPORT_MAX_AGE_DAYS) {
+          issue("reportDate", `The report must be from the last ${REPORT_MAX_AGE_DAYS} days.`);
+        }
+      }
+      if (!/^\d{1,7}$/.test(v.reportMileage)) {
+        issue("reportMileage", "Enter the mileage on the report, in whole kilometres.");
+      }
+      if (v.reportFiles.length === 0) issue("reportFiles", "Upload the inspection report (PDF or photos).");
     }
     if (v.reserve !== null && v.reserve < v.startingBid) {
       ctx.addIssue({
@@ -329,16 +404,25 @@ export const priceSchema = z
       });
     }
   })
-  // City and dates only matter when an inspection is wanted.
-  .transform(({ inspectionRequested, inspectionCity, inspectionDates, ...rest }) => {
-    const requested = inspectionRequested === "yes";
-    return {
-      ...rest,
-      inspectionRequested: requested,
-      inspectionCity: requested && inspectionCity !== "" ? (inspectionCity as InspectionCity) : null,
-      inspectionDates: requested ? inspectionDates : null,
-    };
-  });
+  // The dealer details only matter when the seller has a report.
+  .transform(
+    ({ dealerInspection, reportDealerName, reportDealerCity, reportDealerCountry, reportDate, reportMileage, reportFiles, ...rest }) => {
+      const provided = dealerInspection === "yes";
+      return {
+        ...rest,
+        dealer: provided
+          ? {
+              name: reportDealerName,
+              city: reportDealerCity,
+              country: reportDealerCountry as EuCountry,
+              date: reportDate,
+              mileageKm: Number(reportMileage),
+              reportPaths: reportFiles.map((r) => r.path),
+            }
+          : null,
+      };
+    },
+  );
 
 /** Sellers must give 3 to 10 highlights. */
 export const sellerDetailsSchema = detailsSchema({ highlightsMin: HIGHLIGHTS_MIN });

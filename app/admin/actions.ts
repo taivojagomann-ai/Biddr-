@@ -10,7 +10,8 @@ import {
   commentDeleteSchema,
   extendSchema,
   fieldErrorsOf,
-  inspectionSchema,
+  acceptReportSchema,
+  rejectReportSchema,
   listingSchema,
   photoActionSchema,
   pricingSchema,
@@ -246,22 +247,109 @@ export async function makeCover(input: unknown): Promise<AdminResult> {
 // -----------------------------------------------------------------------------
 // Inspection
 // -----------------------------------------------------------------------------
-export async function saveInspection(input: unknown): Promise<AdminResult> {
-  const g = await guard(inspectionSchema, input);
+// Only before an auction goes live: the badge must not change under bidders.
+const REVIEWABLE: readonly AuctionStatus[] = ["draft", "upcoming"];
+
+type DealerReportRow = {
+  dealer_inspection_provided: boolean | null;
+  dealer_name: string | null;
+  dealer_city: string | null;
+  dealer_inspection_date: string | null;
+  dealer_report_paths: string[] | null;
+};
+
+async function loadDealerReport(ctx: AdminContext, auctionId: string): Promise<DealerReportRow | null> {
+  const { data } = await ctx.db
+    .from("auction_private")
+    .select("dealer_inspection_provided, dealer_name, dealer_city, dealer_inspection_date, dealer_report_paths")
+    .eq("auction_id", auctionId)
+    .maybeSingle<DealerReportRow>();
+  return data;
+}
+
+export async function acceptInspectionReport(input: unknown): Promise<AdminResult> {
+  const g = await guard(acceptReportSchema, input);
   if ("result" in g) return g.result;
   const { ctx, data: v } = g;
-  const changes = {
-    inspection_partner_name: v.partnerName,
-    inspection_date: v.inspectionDate,
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  if (!REVIEWABLE.includes(a.status)) return { ok: false, error: "Reports can only be reviewed before the auction goes live." };
+  const report = await loadDealerReport(ctx, v.auctionId);
+  if (!report?.dealer_inspection_provided || !report.dealer_name || !report.dealer_inspection_date) {
+    return { ok: false, error: "The seller didn't provide a dealer inspection report." };
+  }
+
+  const { error: privError } = await ctx.db
+    .from("auction_private")
+    .update({
+      inspection_review_status: "accepted",
+      inspection_review_note: null,
+      inspection_reviewed_by: ctx.adminId,
+      inspection_reviewed_at: new Date().toISOString(),
+    })
+    .eq("auction_id", v.auctionId);
+  if (privError) return { ok: false, error: dbMessage(privError) };
+
+  const publicFields = {
+    inspection_type: "authorised_dealer",
+    inspection_partner_name: [report.dealer_name, report.dealer_city].filter(Boolean).join(", "),
+    inspection_date: report.dealer_inspection_date,
     inspection_highlights: v.highlights,
   };
-  const { data, error } = await ctx.db.from("auctions").update(changes).eq("id", v.auctionId).select("id");
+  const { data, error } = await ctx.db.from("auctions").update(publicFields).eq("id", v.auctionId).select("id");
   if (error) return { ok: false, error: dbMessage(error) };
   if (!data?.length) return NOT_FOUND;
 
-  await logAdminAction(ctx, v.auctionId, "inspection.update", changes);
+  // The checklist is saved with the decision, in the audit log.
+  await logAdminAction(ctx, v.auctionId, "inspection.accept", { checks: v.checks, ...publicFields });
   refresh(v.auctionId);
-  return { ok: true, message: "Inspection details saved." };
+  return { ok: true, message: "Report accepted. The listing shows the Dealer inspected badge." };
+}
+
+export async function rejectInspectionReport(input: unknown): Promise<AdminResult> {
+  const g = await guard(rejectReportSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  if (!REVIEWABLE.includes(a.status)) return { ok: false, error: "Reports can only be reviewed before the auction goes live." };
+  const report = await loadDealerReport(ctx, v.auctionId);
+  if (!report?.dealer_inspection_provided) return { ok: false, error: "The seller didn't provide a dealer inspection report." };
+
+  const { error: privError } = await ctx.db
+    .from("auction_private")
+    .update({
+      inspection_review_status: "rejected",
+      inspection_review_note: v.reason,
+      inspection_reviewed_by: ctx.adminId,
+      inspection_reviewed_at: new Date().toISOString(),
+    })
+    .eq("auction_id", v.auctionId);
+  if (privError) return { ok: false, error: dbMessage(privError) };
+
+  // Nothing about the report stays public.
+  const { data, error } = await ctx.db
+    .from("auctions")
+    .update({
+      inspection_type: null,
+      inspection_partner_name: null,
+      inspection_date: null,
+      inspection_highlights: [],
+      inspection_report_url: null,
+    })
+    .eq("id", v.auctionId)
+    .select("id");
+  if (error) return { ok: false, error: dbMessage(error) };
+  if (!data?.length) return NOT_FOUND;
+
+  const { error: notifyError } = await ctx.db
+    .from("notifications")
+    .insert({ user_id: a.seller_id, type: "inspection_rejected", auction_id: v.auctionId, data: { reason: v.reason } });
+  if (notifyError) console.error("inspection_rejected notification failed", notifyError);
+
+  await logAdminAction(ctx, v.auctionId, "inspection.reject", { reason: v.reason });
+  refresh(v.auctionId);
+  return { ok: true, message: "Report rejected. The seller has been told why; the listing can still be approved without a badge." };
 }
 
 export async function saveInspectionReport(input: unknown): Promise<AdminResult> {
@@ -277,6 +365,15 @@ export async function saveInspectionReport(input: unknown): Promise<AdminResult>
     return { ok: false, error: "We couldn't find the uploaded PDF. Upload it again." };
   }
 
+  const { data: review } = await ctx.db
+    .from("auction_private")
+    .select("inspection_review_status")
+    .eq("auction_id", v.auctionId)
+    .maybeSingle<{ inspection_review_status: string | null }>();
+  if (review?.inspection_review_status !== "accepted") {
+    return { ok: false, error: "Accept the dealer report before publishing a copy." };
+  }
+
   const url = ctx.db.storage.from(INSPECTION_BUCKET).getPublicUrl(v.path).data.publicUrl;
   const { data, error } = await ctx.db
     .from("auctions")
@@ -286,9 +383,9 @@ export async function saveInspectionReport(input: unknown): Promise<AdminResult>
   if (error) return { ok: false, error: dbMessage(error) };
   if (!data?.length) return NOT_FOUND;
 
-  await logAdminAction(ctx, v.auctionId, "inspection.report", { url });
+  await logAdminAction(ctx, v.auctionId, "inspection.public_copy", { url });
   refresh(v.auctionId);
-  return { ok: true, message: "Inspection report attached." };
+  return { ok: true, message: "Redacted copy published. Buyers can download it from the listing." };
 }
 
 // -----------------------------------------------------------------------------

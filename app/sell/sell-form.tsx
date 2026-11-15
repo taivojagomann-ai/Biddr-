@@ -7,6 +7,9 @@ import { PhotoError, precheckFile, randomId, resizePhoto, uploadToStorage } from
 import {
   FIELD_STEP,
   MAX_PHOTOS_PER_SECTION,
+  MAX_REPORT_FILES,
+  REPORT_BUCKET,
+  REPORT_PATH_RE,
   PHOTO_BUCKET,
   PHOTO_SECTION_KEYS,
   STEP,
@@ -20,6 +23,7 @@ import {
   validateAll,
   validateStep,
   type PhotoSection,
+  type ReportFile,
   type SellErrors,
   type SellField,
   type SellInput,
@@ -78,6 +82,10 @@ function asStep(v: unknown): StepId {
   return typeof v === "number" && STEPS.some((s) => s.id === v) ? (v as StepId) : 1;
 }
 
+function isReportFile(v: unknown): v is ReportFile {
+  return isRecord(v) && typeof v.path === "string" && REPORT_PATH_RE.test(v.path) && typeof v.name === "string";
+}
+
 function isServiceRow(v: unknown): v is ServiceRowInput {
   return (
     isRecord(v) &&
@@ -98,7 +106,12 @@ function readPersisted(raw: unknown, country: Country | ""): Persisted | null {
     const fallback = values[key];
     if (Array.isArray(fallback)) {
       if (!Array.isArray(saved)) continue;
-      const list = key === "serviceHistory" ? saved.filter(isServiceRow) : saved.filter((x): x is string => typeof x === "string");
+      const list =
+        key === "serviceHistory"
+          ? saved.filter(isServiceRow)
+          : key === "reportFiles"
+            ? saved.filter(isReportFile).slice(0, MAX_REPORT_FILES)
+            : saved.filter((x): x is string => typeof x === "string");
       if (list.length) Object.assign(values, { [key]: list.slice(0, LIST_MAX_ITEMS) });
     } else if (typeof saved === typeof fallback) {
       Object.assign(values, { [key]: saved });
@@ -394,8 +407,15 @@ export function SellForm({
     });
   };
 
+  // Dealer report files still uploading (the upload component reports this).
+  const reportBusy = useRef(false);
+  const onReportBusy = useCallback((busy: boolean) => {
+    reportBusy.current = busy;
+  }, []);
+
   const hasPendingUploads = () =>
-    photoSectionsFor(restored).some((s) => uploadsRef.current[s.key].some((i) => i.status !== "done"));
+    photoSectionsFor(restored).some((s) => uploadsRef.current[s.key].some((i) => i.status !== "done")) ||
+    (values.dealerInspection === "yes" && reportBusy.current);
 
   // ---------------------------------------------------------------------------
   // Navigation
@@ -583,6 +603,8 @@ export function SellForm({
       }
     }
     if (paths.length) void getBrowserSupabase().storage.from(PHOTO_BUCKET).remove(paths);
+    const reportPaths = values.reportFiles.map((r) => r.path);
+    if (reportPaths.length) void getBrowserSupabase().storage.from(REPORT_BUCKET).remove(reportPaths);
     try {
       window.localStorage.removeItem(key);
     } catch {
@@ -621,7 +643,7 @@ export function SellForm({
       <SellPreview
         ref={bannerRef}
         auction={preview}
-        inspectionPending={values.inspectionRequested === "yes"}
+        inspectionPending={values.dealerInspection === "yes"}
         userId={userId}
         initialNow={previewNow}
         submitting={submitting}
@@ -681,7 +703,9 @@ export function SellForm({
               onMove={movePhoto}
             />
           ) : null}
-          {step === STEP.price ? <PriceStep values={values} errors={errors} set={set} /> : null}
+          {step === STEP.price ? (
+          <PriceStep values={values} errors={errors} set={set} userId={userId} draftId={draftId} onReportBusy={onReportBusy} />
+        ) : null}
           {step === STEP.review ? (
             <ReviewStep
               values={values}

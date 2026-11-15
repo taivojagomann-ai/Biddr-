@@ -16,7 +16,8 @@ export function Gallery({ auction }: { auction: Auction }) {
     { key: "before", label: "Before restoration", photos: auction.before_photos_urls },
   ].filter((s) => s.photos.length > 0);
 
-  const hasDocs = Boolean(auction.inspection_report_url);
+  // A public, redacted copy of an accepted dealer report.
+  const hasDocs = Boolean(auction.inspection_report_url) && auction.inspection_type === "authorised_dealer";
   const first = sections[0]?.key ?? (hasDocs ? "docs" : "exterior");
 
   return (
@@ -34,9 +35,7 @@ export function Gallery({ auction }: { auction: Auction }) {
         <TabsContent key={s.key} value={s.key}>
           {s.key === "before" && (
             <p className="mb-3 rounded-md border border-line bg-panel px-3 py-2 text-sm text-mute">
-              {auction.inspection_partner_name
-                ? "Photos of the damage before repair, supplied by the seller and checked by the inspection partner."
-                : "Photos of the damage before repair, supplied by the seller."}
+              Photos of the damage before repair, supplied by the seller.
             </p>
           )}
           <PhotoStrip photos={s.photos} alt={`${auction.title}, ${s.label.toLowerCase()}`} />
@@ -53,9 +52,9 @@ export function Gallery({ auction }: { auction: Auction }) {
           >
             <FileText className="size-8 text-verified" aria-hidden />
             <span>
-              <span className="block font-semibold">Inspection report (PDF)</span>
+              <span className="block font-semibold">Dealer inspection report (PDF)</span>
               <span className="text-sm text-mute">
-                {auction.inspection_partner_name ?? "Partner workshop"}
+                {auction.inspection_partner_name ?? "Authorised dealer"}
                 {auction.inspection_date && `, ${new Date(auction.inspection_date).toLocaleDateString("en-GB")}`}
               </span>
             </span>

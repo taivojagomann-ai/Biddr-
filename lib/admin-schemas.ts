@@ -124,19 +124,42 @@ export type AdminDetailsInput = DetailsInput & { auctionId: string };
 export const photoSectionSchema = z.enum(["exterior", "interior", "mechanical", "before"]);
 export const photoActionSchema = z.object({ auctionId: id, section: photoSectionSchema, url: z.string().url().max(500) });
 
-export const inspectionSchema = z.object({
+// -----------------------------------------------------------------------------
+// Dealer inspection report review (0014)
+// -----------------------------------------------------------------------------
+export const INSPECTION_HIGHLIGHTS_MIN = 3;
+export const INSPECTION_HIGHLIGHTS_MAX = 6;
+
+/** What the admin confirms before accepting a dealer report. All four are required. */
+export const REPORT_CHECKS = [
+  { key: "authorisedDealer", label: "Dealer is an authorised dealer of this brand" },
+  { key: "vinMatches", label: "VIN on the report matches the listing" },
+  { key: "mileageConsistent", label: "Mileage is consistent" },
+  { key: "dateWithin90Days", label: "Report date is within 90 days" },
+] as const;
+export type ReportCheckKey = (typeof REPORT_CHECKS)[number]["key"];
+
+const tick = z.literal(true, { errorMap: () => ({ message: "Confirm this before accepting the report." }) });
+
+export const acceptReportSchema = z.object({
   auctionId: id,
-  partnerName: optionalText(80, "partner name"),
-  inspectionDate: z
-    .string()
-    .refine((v) => v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), "Enter a valid date.")
-    .transform((v) => (v === "" ? null : v)),
+  checks: z.object({ authorisedDealer: tick, vinMatches: tick, mileageConsistent: tick, dateWithin90Days: tick }),
   highlights: z
     .array(z.string().trim().max(140, "Keep each highlight under 140 characters."))
-    .max(MAX_HIGHLIGHTS, `Add at most ${MAX_HIGHLIGHTS} highlights.`)
-    .transform((list) => list.filter((h) => h.length > 0)),
+    .transform((list) => list.filter((h) => h.length > 0))
+    .pipe(
+      z
+        .array(z.string())
+        .min(INSPECTION_HIGHLIGHTS_MIN, `Add at least ${INSPECTION_HIGHLIGHTS_MIN} highlights from the report.`)
+        .max(INSPECTION_HIGHLIGHTS_MAX, `Add at most ${INSPECTION_HIGHLIGHTS_MAX} highlights.`),
+    ),
 });
-export type InspectionInput = z.input<typeof inspectionSchema>;
+export type AcceptReportInput = z.input<typeof acceptReportSchema>;
+
+export const rejectReportSchema = z.object({
+  auctionId: id,
+  reason: text("reason", 3, 500),
+});
 
 export const reportSchema = z.object({
   auctionId: id,
@@ -249,7 +272,8 @@ export const DB_ERROR_MESSAGES: Record<string, string> = {
 export function fieldErrorsOf(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const issue of error.issues) {
-    const key = String(issue.path[0] ?? "form");
+    // Report checklist errors are per box ("checks.vinMatches"); everything else per field.
+    const key = issue.path[0] === "checks" && issue.path[1] ? `checks.${String(issue.path[1])}` : String(issue.path[0] ?? "form");
     out[key] ??= issue.message;
   }
   return out;
