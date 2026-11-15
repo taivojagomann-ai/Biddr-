@@ -53,30 +53,40 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
   // Live: new notifications arrive, and reads from other tabs update the count.
   useEffect(() => {
     const supabase = getBrowserSupabase();
-    const channel = supabase
-      .channel(`notifications:${userId}:${channelKey}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
-        async (payload: { new: { id?: string } }) => {
-          const id = payload.new.id;
-          if (!id) return;
-          const { data } = await supabase.from("notifications").select(NOTIFICATION_COLUMNS).eq("id", id).maybeSingle();
-          const [row] = asNotificationRows(data ? [data] : []);
-          if (!row) return;
-          setItems((list) => (list.some((x) => x.id === row.id) ? list : [row, ...list].slice(0, BELL_LIMIT)));
-          setUnread((n) => n + 1);
-          setAnnouncement(`New notification: ${notificationCopy(row, Intl.DateTimeFormat().resolvedOptions().timeZone).text}`);
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
-        () => void load(),
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+    // Notifications are private (RLS), so the channel must join with the user's
+    // token. Load the session first: joining before it's loaded joins as an
+    // anonymous visitor, and the server then filters out every event.
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+      channel = supabase
+        .channel(`notifications:${userId}:${channelKey}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+          async (payload: { new: { id?: string } }) => {
+            const id = payload.new.id;
+            if (!id) return;
+            const { data } = await supabase.from("notifications").select(NOTIFICATION_COLUMNS).eq("id", id).maybeSingle();
+            const [row] = asNotificationRows(data ? [data] : []);
+            if (!row) return;
+            setItems((list) => (list.some((x) => x.id === row.id) ? list : [row, ...list].slice(0, BELL_LIMIT)));
+            setUnread((n) => n + 1);
+            setAnnouncement(`New notification: ${notificationCopy(row, Intl.DateTimeFormat().resolvedOptions().timeZone).text}`);
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+          () => void load(),
+        )
+        .subscribe();
+    });
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) void supabase.removeChannel(channel);
     };
   }, [userId, load, channelKey]);
 
