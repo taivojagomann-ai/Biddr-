@@ -70,8 +70,4 @@ test.describe("My listings", () => {
   test.fixme("My listings has tabs (Waiting for review, Live, Finished)", async () => {
     // Not built: My listings is a single list. Needs a decision on the tab groups.
   });
-
-  test.fixme("a questions inbox shows unanswered questions across the seller's listings", async () => {
-    // Not built: sellers see questions only on each auction page and as notifications.
-  });
 });
