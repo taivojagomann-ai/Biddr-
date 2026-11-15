@@ -64,7 +64,8 @@ app/
   sell/*-step.tsx, field.tsx    one component per step, shared field wrapper
   sell/actions.ts               submitListing(): re-validates, inserts the draft
   sell/submitted/page.tsx       confirmation and next steps
-  admin/layout.tsx              admins only; everyone else gets a 404
+  admin/layout.tsx              admins only (after two-step verification); everyone else gets a 404
+  two-factor/                   the admin's second step: authenticator code, or QR setup the first time
   admin/page.tsx                tabs: to review, scheduled, live, finished, rejected or withdrawn
   admin/auctions/[id]/          one page per auction: seller, listing, photos, inspection,
                                 pricing, schedule, status actions, bids, comments
@@ -113,7 +114,7 @@ lib/
   notifications.ts              notification wording, links and select columns (client + server)
   listing-preview.ts            preview texts and the preview auction built from the sell form
   search.ts                     ?q= cleanup, debounce and wording for the home page search
-middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
+middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login, admins without two-step verification to /two-factor
 supabase/migrations/0001_init.sql
 supabase/migrations/0002_service_role_grants.sql
 supabase/migrations/0003_sell.sql
@@ -137,7 +138,7 @@ playwright.e2e.config.ts        end-to-end test projects (desktop Berlin, phone 
 supabase/config.toml            local, test-only Supabase stack (never used in production)
 scripts/check-migrations.sh     applies every migration a second time and compares the schema
 .github/workflows/e2e.yml       runs the tests on every pull request and push to main
-vercel.json                     cron for hold release
+vercel.json                     daily cron for hold release (/api/stripe/release, 00:00 UTC)
 ```
 
 ## Testing
@@ -191,6 +192,15 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
 | `0017_inspected_by_seller.sql` | `inspected_by_seller` on `auction_private` and `auctions`: the admin confirms a dealer seller inspected its own car, and the listing says "Inspected by the selling dealer" | Run before deploying this version (the admin review and auction page read it) |
 | `0018_eu_countries.sql` | All 27 EU countries: adds them to the country type used by profiles and car locations, and widens the registration-country check (old `other_eu` values stay valid) | Run before deploying this version (profile, sell form and filters offer every EU country) |
+| `0019_admin_two_factor.sql` | `is_admin()` is true only after two-step verification (`aal2`), so admin rights in the database need the authenticator code too | Run when deploying this version (admins then sign in with Google and a code) |
+
+## Admin sign-in (two-step verification)
+
+Admins sign in from the normal sign-in page: the small **Sign in as an admin** link at the bottom opens a dialog with **Continue with Google** only. After Google, `/two-factor` asks for the 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…). The first time, it shows a QR code (and the key, to type in by hand) to add Biddr to the app.
+
+- Until the code is entered, the admin is treated like any member: `/admin` sends them to `/two-factor` and back, admin actions and `/api/admin/*` answer 404, and `is_admin()` in the database is false.
+- Supabase: Authentication → Multi-Factor → TOTP must be enabled (it is by default), and Google must be set up as a sign-in provider.
+- An admin who loses their phone: in Supabase, Authentication → Users → the admin → remove their MFA factor. Next sign-in shows a new QR code.
 
 ## Selling a car (`/sell`)
 
