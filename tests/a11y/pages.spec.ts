@@ -1193,3 +1193,11 @@ test.describe("consistency with DECISIONS.md", () => {
     });
   });
 });
+
+test("the featured box explains itself: Ending next, and what the countdown means", async ({ page }) => {
+  await page.goto("/");
+  const featured = page.locator("article", { hasText: "Ending next" }).first();
+  await expect(featured).toContainText("Ending next: the next live auction to close");
+  await expect(featured.getByText("Ends in", { exact: true })).toBeVisible();
+  await expectNoSeriousViolations(page, "Featured box");
+});
