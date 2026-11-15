@@ -3,8 +3,10 @@
 import { z } from "zod";
 import {
   HIGHLIGHTS_MIN,
+  detailsColumns,
   detailsSchema,
   emptyServiceRow,
+  ownershipColumns,
   ownershipSchema,
   type DetailsInput,
   type OwnershipInput,
@@ -409,6 +411,37 @@ export type SellSubmission = Extract<ReturnType<typeof parseSubmission>, { succe
 
 export function listingTitle(v: { year: number; make: string; model: string; variant: string | null }): string {
   return [String(v.year), v.make, v.model, v.variant].filter(Boolean).join(" ");
+}
+
+/**
+ * The auctions columns a seller's submission writes. Used by the submit action and by
+ * the listing preview, so the preview shows exactly what will be saved.
+ */
+export function listingColumns(parsed: Extract<ReturnType<typeof parseSubmission>, { success: true }>) {
+  const v = parsed.data;
+  return {
+    title: listingTitle(v),
+    make: v.make,
+    model: v.model,
+    variant: v.variant,
+    year: v.year,
+    vin: v.vin,
+    mileage_km: v.mileageKm,
+    engine: v.engine,
+    transmission: v.transmission,
+    drivetrain: v.drivetrain,
+    exterior_color: v.exteriorColor,
+    location_city: v.city,
+    location_country: v.country,
+    condition_type: v.condition,
+    damage_history_summary: v.damageSummary,
+    gallery_urls: { exterior: v.photos.exterior, interior: v.photos.interior, mechanical: v.photos.mechanical },
+    before_photos_urls: v.photos.before,
+    video_url: v.videoUrl,
+    starting_bid: v.startingBid,
+    ...ownershipColumns(parsed.ownership),
+    ...detailsColumns(parsed.details),
+  };
 }
 
 export type SubmitResult = { ok: true; id: string } | { ok: false; error?: string; errors?: SellErrors };

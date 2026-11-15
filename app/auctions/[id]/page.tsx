@@ -1,27 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
-import { AuctionLive } from "@/components/auction/auction-live";
-import { Gallery } from "@/components/auction/gallery";
-import { InspectionCard } from "@/components/auction/inspection-card";
-import {
-  Equipment,
-  Highlights,
-  ItemsIncluded,
-  KnownFlaws,
-  Modifications,
-  SellerNotes,
-  ServiceHistory,
-} from "@/components/auction/listing-sections";
-import { SpecSheet } from "@/components/auction/spec-sheet";
-import { VideoPlayer } from "@/components/auction/video-player";
-import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
-import { InfoTip } from "@/components/info-tip";
-import { HELP } from "@/lib/help";
-import { getServerSupabase } from "@/lib/supabase/server";
+import Link from "next/link";
+import { AuctionView } from "@/components/auction/auction-view";
+import { PreviewBanner } from "@/components/auction/preview-banner";
+import { Button } from "@/components/ui/button";
+import { getCurrentAdminId } from "@/lib/admin";
+import { PREVIEW_TEXT, isPreviewStatus } from "@/lib/listing-preview";
+import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { formatEur, formatKm } from "@/lib/format";
-import { WatchButton, WatchCount } from "@/components/auction/watch-button";
-import { ShareButton } from "@/components/share-button";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +47,8 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const description = shareDescription(a);
   const url = `/auctions/${a.id}`;
   // og:image comes from ./opengraph-image.tsx (absolute via metadataBase in the root layout).
+  // Drafts and rejected listings are previews for the seller and admins: keep them out of search engines.
+  if (isPreviewStatus(a.status)) return { title: `Preview: ${a.title}`, robots: { index: false, follow: false } };
   return {
     title: a.title,
     description,
@@ -109,70 +97,69 @@ export default async function AuctionPage({ params }: { params: { id: string } }
     hasHold = Boolean(hold);
   }
 
+  // RLS only returns drafts and rejected listings to their seller and to admins;
+  // everyone else got null above and a 404.
+  const preview = isPreviewStatus(auction.status);
+  let isAdmin = false;
+  let rejectionReason: string | null = null;
+  if (preview && user) {
+    isAdmin = (await getCurrentAdminId()) === user.id;
+    if (auction.status === "rejected" && (isAdmin || auction.seller_id === user.id)) {
+      // auction_private is admin-only: read just this listing's reason with the service role.
+      const { data: row } = await getAdminSupabase()
+        .from("auction_private")
+        .select("rejection_reason")
+        .eq("auction_id", auction.id)
+        .maybeSingle<{ rejection_reason: string | null }>();
+      rejectionReason = row?.rejection_reason ?? null;
+    }
+  }
+
   return (
     <main className="container py-6">
-      {auction.is_demo && (
-        <p className="mb-4 flex items-center gap-2 rounded-md border border-field bg-panel px-3 py-2 text-sm">
-          <DemoBadge />
-          This is a demo listing for testing. Bidding is turned off.
-        </p>
-      )}
-      <div className="mb-5 flex flex-col gap-2">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <h1 className="min-w-0 font-wide text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">{auction.title}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <WatchCount auctionId={auction.id} initialCount={auction.watch_count} />
-            <WatchButton
-              auctionId={auction.id}
-              userId={user?.id ?? null}
-              initialWatching={watching}
-              initialCount={auction.watch_count}
-            />
-            <ShareButton path={`/auctions/${auction.id}`} title={auction.title} />
-          </div>
+      {preview ? (
+        <div className="mb-5">
+          <PreviewBanner
+            heading={PREVIEW_TEXT.privateBanner}
+            tone={auction.status === "rejected" ? "warning" : "info"}
+            actions={
+              <>
+                {isAdmin ? (
+                  <Button asChild size="sm">
+                    <Link href={`/admin/auctions/${auction.id}`}>Open in admin</Link>
+                  </Button>
+                ) : null}
+                {auction.seller_id === user?.id ? (
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/account/listings">My listings</Link>
+                  </Button>
+                ) : null}
+              </>
+            }
+          >
+            {auction.status === "rejected" ? (
+              <p>
+                <span className="font-semibold text-chalk">Not accepted:</span>{" "}
+                {rejectionReason ?? "We couldn't accept this listing. Contact us for details."}
+              </p>
+            ) : (
+              <p>{PREVIEW_TEXT.waiting}</p>
+            )}
+          </PreviewBanner>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm text-mute">
-          <span>{formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}</span>
-          {auction.inspection_partner_name ? (
-            <span className="inline-flex items-center gap-0.5">
-              <InspectionBadge partner={auction.inspection_partner_name} />
-              <InfoTip topic={HELP.partnerVerified} />
-            </span>
-          ) : null}
-          {/* Phones and tablets have no bid box, so the reserve shows here (lg+ shows it in the bid box). */}
-          <span className="inline-flex items-center gap-0.5 lg:hidden">
-            <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
-            <InfoTip topic={auction.has_reserve ? HELP.reserve : HELP.noReserve} />
-          </span>
-          {auction.condition_type === "restored_accident" && <RestoredBadge />}
-        </div>
-      </div>
-
-      <Suspense>
-        <AuctionLive
-          initialAuction={auction}
-          initialBids={bidsRes.data ?? []}
-          initialComments={commentsRes.data ?? []}
-          userId={user?.id ?? null}
-          initialHasHold={hasHold}
-          canComment={canComment}
-          initialWatching={watching}
-          initialNow={Date.now()}
-          holdEur={HOLD_EUR}
-        >
-          <Gallery auction={auction} />
-          <Highlights auction={auction} />
-          <InspectionCard auction={auction} />
-          <SpecSheet auction={auction} />
-          <Equipment auction={auction} />
-          <Modifications auction={auction} />
-          <KnownFlaws auction={auction} />
-          <ServiceHistory auction={auction} />
-          <ItemsIncluded auction={auction} />
-          <SellerNotes auction={auction} />
-          {auction.video_url && <VideoPlayer url={auction.video_url} title={auction.title} />}
-        </AuctionLive>
-      </Suspense>
+      ) : null}
+      <AuctionView
+        auction={auction}
+        bids={bidsRes.data ?? []}
+        comments={commentsRes.data ?? []}
+        userId={user?.id ?? null}
+        hasHold={hasHold}
+        canComment={canComment}
+        watching={watching}
+        initialNow={Date.now()}
+        holdEur={HOLD_EUR}
+        preview={preview}
+      />
     </main>
   );
 }

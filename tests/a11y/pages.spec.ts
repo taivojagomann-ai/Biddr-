@@ -9,6 +9,7 @@ const RESTORED = "10000000-0000-4000-8000-000000000002";
 const UPCOMING = "10000000-0000-4000-8000-000000000003";
 const SOLD = "10000000-0000-4000-8000-000000000004";
 const MY_DRAFT = "10000000-0000-4000-8000-000000000005";
+const MY_REJECTED = "10000000-0000-4000-8000-000000000006";
 const MOCK = "http://127.0.0.1:54329";
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
@@ -545,7 +546,9 @@ test.describe("keyboard on a phone", () => {
         if (el.closest("footer")) return "end"; // reached the footer: page done
         const r = el.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) return null; // visually hidden helpers
-        const top = header ? header.getBoundingClientRect().bottom : 0;
+        const stickyTop = document.querySelector<HTMLElement>("[data-sticky-top]");
+        if (stickyTop?.contains(el)) return null;
+        const top = Math.max(header ? header.getBoundingClientRect().bottom : 0, stickyTop ? stickyTop.getBoundingClientRect().bottom : 0);
         const barVisible = bar && getComputedStyle(bar).position === "fixed";
         const bottom = barVisible ? bar.getBoundingClientRect().top : window.innerHeight;
         // WCAG 2.4.11 (AA): never entirely hidden. We hold ordinary controls (up to 100px tall)
@@ -576,6 +579,120 @@ test.describe("keyboard on a phone", () => {
       );
       await page.goto("/sell");
       await expectFocusNeverObscured(page, "Sell form");
+    });
+
+    test("focus is never hidden behind the header or the preview banner in the sell preview", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(6)] as const,
+      );
+      await page.goto("/sell?preview=1");
+      await expect(page.getByRole("heading", { level: 1, name: "2023 BMW M3 Touring" })).toBeVisible();
+      await expectFocusNeverObscured(page, "Sell preview");
+    });
+  });
+});
+
+test.describe("listing preview", () => {
+  test("signed out, a draft or rejected listing is not found", async ({ page }) => {
+    for (const id of [MY_DRAFT, MY_REJECTED]) {
+      const res = await page.goto(`/auctions/${id}`);
+      expect(res?.status()).toBe(404);
+      await expect(page.getByRole("heading", { name: "This auction isn't listed" })).toBeVisible();
+    }
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    /** Visible copy of a text that the bid box (desktop) and the bid bar (phones) both carry. */
+    const visibleText = (page: Page, text: string) => page.getByText(text, { exact: true }).locator("visible=true");
+
+    test("My listings links drafts and rejected listings to their preview", async ({ page }) => {
+      await page.goto("/account/listings");
+      await expect(page.getByRole("link", { name: "Preview 2020 BMW M2 Competition" })).toHaveAttribute("href", `/auctions/${MY_DRAFT}`);
+      await expect(page.getByRole("link", { name: "Preview 2016 Audi RS 3 Sportback" })).toHaveAttribute("href", `/auctions/${MY_REJECTED}`);
+    });
+
+    test("a draft shows the preview banner, disabled bidding and questions, and is not indexed", async ({ page }) => {
+      await page.goto(`/auctions/${MY_DRAFT}`);
+      const banner = page.getByRole("region", { name: "Preview: only you can see this." });
+      await expect(banner).toContainText("Waiting for review.");
+      await expect(banner.getByRole("link", { name: "Open in admin" })).toHaveAttribute("href", `/admin/auctions/${MY_DRAFT}`);
+      await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+      await expect(page.getByRole("heading", { level: 1, name: "2020 BMW M2 Competition" })).toBeVisible();
+
+      await expect(visibleText(page, "Bidding opens after review.")).toHaveCount(1);
+      const bid = page.getByRole("button", { name: "Place bid" }).locator("visible=true");
+      await expect(bid).toBeDisabled();
+      await expect(bid).toHaveAccessibleDescription("Bidding opens after review.");
+      await expect(page.getByText("Questions open when the auction starts.")).toBeVisible();
+      await expect(page.getByLabel("Ask the seller a question")).toHaveCount(0);
+      await expect(page.getByText("Inspection will be added after your car is inspected.")).toBeVisible();
+      await expect(page.getByRole("button", { name: /^Watch/ })).toHaveCount(0);
+      await expectNoSeriousViolations(page, "Draft preview");
+    });
+
+    test("a rejected listing says why", async ({ page }) => {
+      await page.goto(`/auctions/${MY_REJECTED}`);
+      const banner = page.getByRole("region", { name: "Preview: only you can see this." });
+      await expect(banner).toContainText("Not accepted: The photos don't show the underside. Add them and submit again.");
+      await expect(banner.getByRole("link", { name: "My listings" })).toBeVisible();
+      await expectNoSeriousViolations(page, "Rejected preview");
+    });
+
+    test("the sell form previews the listing and Back to edit keeps everything", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => { if (!window.sessionStorage.getItem("seeded")) { window.localStorage.setItem(key, value); window.sessionStorage.setItem("seeded", "1"); } },
+        [`biddr:sell:v1:${ME}`, sellDraft(6)] as const,
+      );
+      await page.goto("/sell");
+      await page.getByRole("button", { name: "Preview listing" }).click();
+      await expect(page).toHaveURL(/\/sell\?preview=1$/);
+
+      const banner = page.getByRole("region", { name: "Preview: this is how buyers will see your listing." });
+      await expect(banner.getByRole("heading")).toBeFocused();
+      await expect(page.getByRole("heading", { level: 1, name: "2023 BMW M3 Touring" })).toBeVisible();
+      await expect(visibleText(page, "Bidding opens after review.")).toHaveCount(1);
+      await expect(page.getByText("Questions open when the auction starts.")).toBeVisible();
+      await expect(page.getByText("Inspection will be added after your car is inspected.")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Sell your car" })).toHaveCount(0);
+      await expectNoSeriousViolations(page, "Sell preview");
+
+      await banner.getByRole("button", { name: "Back to edit" }).click();
+      await expect(page).toHaveURL(/\/sell$/);
+      await expect(page.getByRole("button", { name: "Preview listing" })).toBeFocused();
+      await expect(page.getByText("WBS8M9C50G5K12345")).toBeVisible();
+
+      // The browser's Back button closes the preview too.
+      await page.getByRole("button", { name: "Preview listing" }).click();
+      await expect(page).toHaveURL(/preview=1/);
+      await page.goBack();
+      await expect(page.getByRole("button", { name: "Preview listing" })).toBeVisible();
+    });
+
+    test("Submit for review in the preview asks for the confirmation first", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(6)] as const,
+      );
+      await page.goto("/sell?preview=1");
+      await page.getByRole("button", { name: "Submit for review" }).click();
+      await expect(page).toHaveURL(/\/sell$/);
+      await expect(page.getByText("Tick the box to confirm before you submit.")).toBeVisible();
+    });
+
+    test("previews fit 320px", async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(6)] as const,
+      );
+      await page.goto("/sell?preview=1");
+      await expect(page.getByRole("heading", { level: 1, name: "2023 BMW M3 Touring" })).toBeVisible();
+      await noHorizontalScroll(page, "Sell preview at 320px");
+      await page.goto(`/auctions/${MY_DRAFT}`);
+      await noHorizontalScroll(page, "Draft preview at 320px");
     });
   });
 });

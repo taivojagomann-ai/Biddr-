@@ -74,6 +74,8 @@ components/
   auction/
     auction-feed.tsx            client grid + Realtime
     auction-card.tsx, featured-lot.tsx, auction-filters.tsx
+    auction-view.tsx            the auction page layout, shared by /auctions/[id] and the sell preview
+    preview-banner.tsx          banner above listing previews
     auction-search.tsx          home page search box with suggestions (ARIA combobox)
     auction-live.tsx            detail page state owner + Realtime channel
     bid-box.tsx, sticky-bid-bar.tsx, bid-modal.tsx, bid-history.tsx
@@ -103,6 +105,7 @@ lib/
   site.ts                       footer links, support email and company placeholders
   bidder.ts                     server-only: bidder_status() check used by the hold route
   notifications.ts              notification wording, links and select columns (client + server)
+  listing-preview.ts            preview texts and the preview auction built from the sell form
   search.ts                     ?q= cleanup, debounce and wording for the home page search
 middleware.ts                   session refresh, sends signed-out users on /sell, /admin, /account to /login
 supabase/migrations/0001_init.sql
@@ -178,6 +181,12 @@ Signed-in members with a complete profile (username and country) submit a car in
 - `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
 
 Photos from a draft that is never submitted stay in the bucket. Clean them up later with a scheduled job that removes folders with no matching auction.
+
+### Previewing a listing
+
+- **Before submitting:** on the Review step, **Preview listing** opens the auction page exactly as buyers will see it (`/sell?preview=1`), built from the form's answers and the photos already uploaded. Nothing is saved. A banner at the top has **Back to edit** (the browser's Back button works too) and **Submit for review**.
+- **After submitting:** in **My listings**, drafts and rejected listings have a **Preview** link to their auction page. Only the seller and admins can open it; everyone else gets "This auction isn't listed" (the database already hides these rows). A banner says "Waiting for review." or "Not accepted:" with the reason, and admins also get **Open in admin**. These pages are marked `noindex`.
+- In a preview, bidding ("Bidding opens after review"), questions ("Questions open when the auction starts"), Watch and Share are turned off, and the inspection section says "Inspection will be added after your car is inspected". The preview uses the same components as the live auction page (`components/auction/auction-view.tsx`), so the two can't drift apart.
 
 ## Admin panel (`/admin`)
 

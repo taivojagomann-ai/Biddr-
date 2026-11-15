@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PhotoError, precheckFile, randomId, resizePhoto, uploadToStorage } from "@/lib/photo-upload";
@@ -27,7 +27,9 @@ import {
   type StepId,
 } from "@/lib/sell";
 import { LIST_MAX_ITEMS, type ServiceRowInput } from "@/lib/listing-details";
+import { previewAuction } from "@/lib/listing-preview";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import type { PreviewBannerHandle } from "@/components/auction/preview-banner";
 import type { Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { submitListing } from "./actions";
@@ -38,6 +40,7 @@ import { HistoryStep } from "./history-step";
 import { PhotosStep } from "./photos-step";
 import { PriceStep } from "./price-step";
 import { ReviewStep } from "./review-step";
+import { SellPreview } from "./sell-preview";
 import type { SellValues, UploadItem, Uploads } from "./types";
 
 const MAX_PARALLEL_UPLOADS = 3;
@@ -142,8 +145,20 @@ function describeRejected(messages: string[], tooMany: number): string | undefin
   return parts.length ? parts.join(" ") : undefined;
 }
 
-export function SellForm({ userId, defaultCountry }: { userId: string; defaultCountry: Country | "" }) {
+export function SellForm({
+  userId,
+  defaultCountry,
+  intro,
+}: {
+  userId: string;
+  defaultCountry: Country | "";
+  /** Page heading and intro, hidden while the preview is open. */
+  intro: React.ReactNode;
+}) {
   const router = useRouter();
+  // The preview is /sell?preview=1: the browser's Back button returns to the form,
+  // and the answers stay in this component (and in localStorage).
+  const previewing = useSearchParams().get("preview") === "1";
   const key = storageKey(userId);
 
   const [loaded, setLoaded] = useState(false);
@@ -484,6 +499,77 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Preview
+  // ---------------------------------------------------------------------------
+  const bannerRef = useRef<PreviewBannerHandle>(null);
+  const openedPreview = useRef(false);
+  const afterPreview = useRef<(() => void) | null>(null);
+  const wasPreviewing = useRef(previewing);
+  const [previewNow, setPreviewNow] = useState(() => Date.now());
+  const preview = useMemo(() => (previewing && loaded ? previewAuction(input, userId) : null), [previewing, loaded, input, userId]);
+
+  const openPreview = () => {
+    const errs = validateAll(input);
+    delete errs.confirmed; // only needed to submit
+    if (Object.keys(errs).length) {
+      showErrors(errs);
+      return;
+    }
+    if (hasPendingUploads()) {
+      setPendingError(PENDING_PHOTOS);
+      setStep(STEP.photos);
+      scrollTop();
+      return;
+    }
+    setFormError(undefined);
+    setPreviewNow(Date.now());
+    openedPreview.current = true;
+    router.push("/sell?preview=1", { scroll: false });
+  };
+
+  const closePreview = (then?: () => void) => {
+    afterPreview.current = then ?? null;
+    if (openedPreview.current) router.back();
+    else router.replace("/sell", { scroll: false });
+    openedPreview.current = false;
+  };
+
+  const submitFromPreview = () => {
+    const errs = validateAll(input);
+    if (Object.keys(errs).length || hasPendingUploads()) {
+      // e.g. the confirmation box isn't ticked yet: go back and show what's missing.
+      closePreview(() => (Object.keys(errs).length ? showErrors(errs) : setPendingError(PENDING_PHOTOS)));
+      return;
+    }
+    void onSubmit();
+  };
+
+  // Entering the preview: start at the top with focus on the banner. Leaving it: back to
+  // the Preview button (or to the first problem when submitting found one).
+  useEffect(() => {
+    if (!loaded) return;
+    if (previewing) {
+      window.scrollTo(0, 0);
+      bannerRef.current?.focusHeading();
+      document.title = `Preview: ${preview?.title ?? "your listing"} | Biddr`;
+    } else if (wasPreviewing.current) {
+      document.title = "Sell your car | Biddr";
+      const then = afterPreview.current;
+      afterPreview.current = null;
+      window.setTimeout(() => {
+        if (then) then();
+        else {
+          const button = document.getElementById("sell-preview-button") ?? document.getElementById(STEP_HEADING_ID);
+          button?.scrollIntoView({ block: "center" });
+          button?.focus({ preventScroll: true });
+        }
+      }, 0);
+    }
+    wasPreviewing.current = previewing;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the preview opens or closes
+  }, [previewing, loaded]);
+
   const startOver = () => {
     if (!window.confirm("Start over? This clears your answers and deletes the photos you uploaded.")) return;
     controllers.current.forEach((c) => c.abort());
@@ -520,10 +606,28 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
 
   if (!loaded) {
     return (
-      <div className="mt-10 flex items-center gap-2 text-sm text-mute" role="status">
-        <Loader2 aria-hidden className="size-4 animate-spin" />
-        Loading your draft…
+      <div className="container max-w-3xl pt-8 sm:pt-12">
+        {intro}
+        <div className="mt-10 flex items-center gap-2 text-sm text-mute" role="status">
+          <Loader2 aria-hidden className="size-4 animate-spin" />
+          Loading your draft…
+        </div>
       </div>
+    );
+  }
+
+  if (previewing) {
+    return (
+      <SellPreview
+        ref={bannerRef}
+        auction={preview}
+        userId={userId}
+        initialNow={previewNow}
+        submitting={submitting}
+        formError={formError}
+        onBack={() => closePreview()}
+        onSubmit={submitFromPreview}
+      />
     );
   }
 
@@ -531,96 +635,100 @@ export function SellForm({ userId, defaultCountry }: { userId: string; defaultCo
   const current = STEPS[step - 1];
 
   return (
-    <div ref={topRef} className="scroll-mt-20">
-      <div className="mt-8 flex items-center justify-between gap-3">
-        <p className="text-sm text-mute md:hidden">
-          Step {step} of {STEPS.length}: <span className="font-semibold text-chalk">{current?.label}</span>
-        </p>
-        <p className="sr-only hidden md:block">
-          Step {step} of {STEPS.length}: {current?.label}
-        </p>
-        <span className="hidden md:block" />
-        <Button type="button" variant="ghost" size="sm" onClick={startOver} disabled={submitting}>
-          <RotateCcw aria-hidden />
-          Start over
-        </Button>
-      </div>
-      <Progress step={step} furthest={furthest} onGo={goTo} />
-
-      <form
-        noValidate
-        className="mt-8"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (step === STEP.review) void onSubmit();
-          else onContinue();
-        }}
-      >
-        {step === STEP.car ? <CarStep values={values} errors={errors} set={set} /> : null}
-        {step === STEP.history ? <HistoryStep values={values} errors={errors} set={set} /> : null}
-        {step === STEP.details ? <DetailsStep values={values} errors={errors} set={set} /> : null}
-        {step === STEP.photos ? (
-          <PhotosStep
-            uploads={uploads}
-            restored={restored}
-            errors={errors}
-            notices={notices}
-            pendingError={pendingError}
-            videoUrl={values.videoUrl}
-            onVideoUrl={(v) => set("videoUrl", v)}
-            onAdd={addPhotos}
-            onRemove={removePhoto}
-            onRetry={retryPhoto}
-            onMove={movePhoto}
-          />
-        ) : null}
-        {step === STEP.price ? <PriceStep values={values} errors={errors} set={set} /> : null}
-        {step === STEP.review ? (
-          <ReviewStep
-            values={values}
-            photos={photos}
-            errors={errors}
-            stepsWithErrors={stepsWithErrors}
-            onEdit={goTo}
-            onConfirm={(v) => set("confirmed", v)}
-          />
-        ) : null}
-
-        {formError ? (
-          <p role="alert" className="mt-6 rounded-md border border-signal/40 bg-signal/10 px-3 py-2 text-sm">
-            {formError}
+    <div className="container max-w-3xl pt-8 sm:pt-12">
+      {intro}
+      <div ref={topRef} className="scroll-mt-20">
+        <div className="mt-8 flex items-center justify-between gap-3">
+          <p className="text-sm text-mute md:hidden">
+            Step {step} of {STEPS.length}: <span className="font-semibold text-chalk">{current?.label}</span>
           </p>
-        ) : null}
-
-        <div data-sticky-bottom="sell" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-asphalt/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:static md:mt-10 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-          <div className="mx-auto flex max-w-3xl gap-3 md:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={onBack}
-              disabled={step === 1 || submitting}
-              className="flex-1 md:flex-none"
-            >
-              Back
-            </Button>
-            <Button type="submit" size="lg" disabled={submitting} className="flex-[2] md:flex-none">
-              {step === STEP.review ? (
-                submitting ? (
-                  <>
-                    <Loader2 aria-hidden className="animate-spin" />
-                    Submitting…
-                  </>
-                ) : (
-                  "Submit for review"
-                )
-              ) : (
-                "Continue"
-              )}
-            </Button>
-          </div>
+          <p className="sr-only hidden md:block">
+            Step {step} of {STEPS.length}: {current?.label}
+          </p>
+          <span className="hidden md:block" />
+          <Button type="button" variant="ghost" size="sm" onClick={startOver} disabled={submitting}>
+            <RotateCcw aria-hidden />
+            Start over
+          </Button>
         </div>
-      </form>
+        <Progress step={step} furthest={furthest} onGo={goTo} />
+
+        <form
+          noValidate
+          className="mt-8"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (step === STEP.review) void onSubmit();
+            else onContinue();
+          }}
+        >
+          {step === STEP.car ? <CarStep values={values} errors={errors} set={set} /> : null}
+          {step === STEP.history ? <HistoryStep values={values} errors={errors} set={set} /> : null}
+          {step === STEP.details ? <DetailsStep values={values} errors={errors} set={set} /> : null}
+          {step === STEP.photos ? (
+            <PhotosStep
+              uploads={uploads}
+              restored={restored}
+              errors={errors}
+              notices={notices}
+              pendingError={pendingError}
+              videoUrl={values.videoUrl}
+              onVideoUrl={(v) => set("videoUrl", v)}
+              onAdd={addPhotos}
+              onRemove={removePhoto}
+              onRetry={retryPhoto}
+              onMove={movePhoto}
+            />
+          ) : null}
+          {step === STEP.price ? <PriceStep values={values} errors={errors} set={set} /> : null}
+          {step === STEP.review ? (
+            <ReviewStep
+              values={values}
+              photos={photos}
+              errors={errors}
+              stepsWithErrors={stepsWithErrors}
+              onEdit={goTo}
+              onConfirm={(v) => set("confirmed", v)}
+              onPreview={openPreview}
+            />
+          ) : null}
+
+          {formError ? (
+            <p role="alert" className="mt-6 rounded-md border border-signal/40 bg-signal/10 px-3 py-2 text-sm">
+              {formError}
+            </p>
+          ) : null}
+
+          <div data-sticky-bottom="sell" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-asphalt/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:static md:mt-10 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+            <div className="mx-auto flex max-w-3xl gap-3 md:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={onBack}
+                disabled={step === 1 || submitting}
+                className="flex-1 md:flex-none"
+              >
+                Back
+              </Button>
+              <Button type="submit" size="lg" disabled={submitting} className="flex-[2] md:flex-none">
+                {step === STEP.review ? (
+                  submitting ? (
+                    <>
+                      <Loader2 aria-hidden className="animate-spin" />
+                      Submitting…
+                    </>
+                  ) : (
+                    "Submit for review"
+                  )
+                ) : (
+                  "Continue"
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

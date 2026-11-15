@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Car, ChevronRight } from "lucide-react";
+import { Car, ChevronRight, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
@@ -106,6 +106,15 @@ export default async function MyListingsPage() {
                   <p className="mt-1 text-xs text-mute">
                     Submitted {new Date(l.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
+                  {isPublic ? null : (
+                    <Link
+                      href={`/auctions/${l.id}`}
+                      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-chalk underline underline-offset-4 hover:text-signal"
+                    >
+                      <Eye aria-hidden className="size-4" />
+                      Preview<span className="sr-only"> {l.title}</span>
+                    </Link>
+                  )}
                 </div>
                 {isPublic ? <ChevronRight aria-hidden className="size-5 shrink-0 text-mute" /> : null}
               </>

@@ -11,6 +11,7 @@ import { getBrowserSupabase } from "@/lib/supabase/client";
 import { formatEur } from "@/lib/format";
 import { minNextBid } from "@/lib/pricing";
 import { setWatchCount } from "@/lib/client/watch-store";
+import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow, type PlaceBidResult } from "@/lib/types";
 
 interface AuctionLiveProps {
@@ -24,6 +25,11 @@ interface AuctionLiveProps {
   initialWatching: boolean;
   initialNow: number;
   holdEur: number;
+  /**
+   * Seller's preview of an unpublished listing: no bidding, no questions, no Realtime,
+   * and nothing is read or written after the first render.
+   */
+  preview?: boolean;
   /** Server-rendered, non-interactive sections (gallery, specs, video) */
   children: React.ReactNode;
 }
@@ -35,7 +41,7 @@ interface AuctionLiveProps {
  * On every (re)subscribe we refetch, so updates missed while offline aren't lost.
  */
 export function AuctionLive({
-  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialWatching, initialNow, holdEur, children,
+  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialWatching, initialNow, holdEur, preview = false, children,
 }: AuctionLiveProps) {
   const supabase = getBrowserSupabase();
   const router = useRouter();
@@ -99,6 +105,7 @@ export function AuctionLive({
   }, [supabase, initialAuction.id, applyAuction, refreshBids]);
 
   useEffect(() => {
+    if (preview) return;
     const channel = supabase
       .channel(`auction:${initialAuction.id}`)
       .on("postgres_changes",
@@ -116,12 +123,12 @@ export function AuctionLive({
       });
 
     return () => { void supabase.removeChannel(channel); };
-  }, [supabase, initialAuction.id, applyAuction, refetchAll]);
+  }, [supabase, initialAuction.id, applyAuction, refetchAll, preview]);
 
   // Returning from a 3-D Secure redirect: record the hold, then reopen the modal.
   useEffect(() => {
     const piId = searchParams.get("payment_intent");
-    if (searchParams.get("hold") !== "return" || !piId) return;
+    if (preview || searchParams.get("hold") !== "return" || !piId) return;
     void (async () => {
       const res = await fetch("/api/stripe/hold/confirm", {
         method: "POST",
@@ -134,7 +141,7 @@ export function AuctionLive({
         setModalOpen(true);
       }
     })();
-  }, [searchParams, router, initialAuction.id]);
+  }, [searchParams, router, initialAuction.id, preview]);
 
   const onBidPlaced = useCallback((r: PlaceBidResult) => {
     setWasOutbid(false);
@@ -148,7 +155,7 @@ export function AuctionLive({
   const ui: BidUiState = {
     auction, amount, setAmount, onPlaceBid: () => setModalOpen(true),
     isLeading, wasOutbid, justExtended, flash, initialNow, holdEur,
-    userId, watching: initialWatching,
+    userId, watching: initialWatching, preview,
   };
 
   return (
@@ -158,7 +165,7 @@ export function AuctionLive({
           {children}
           <div className="lg:hidden"><BidHistory bids={bids} currentUserId={userId} initialNow={initialNow} /></div>
           <Comments auctionId={auction.id} sellerId={auction.seller_id} comments={comments} currentUserId={userId} canComment={canComment}
-            initialNow={initialNow}
+            initialNow={initialNow} closedReason={preview ? PREVIEW_TEXT.comments : undefined}
             onPosted={(c) => setComments((list) => (list.some((x) => x.id === c.id) ? list : [...list, c]))} />
         </div>
 
@@ -176,18 +183,20 @@ export function AuctionLive({
 
       <StickyBidBar {...ui} />
 
-      <BidModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        auction={auction}
-        amount={amount}
-        setAmount={setAmount}
-        userId={userId}
-        hasHold={hasHold}
-        onHoldAuthorized={() => setHasHold(true)}
-        onBidPlaced={onBidPlaced}
-        holdEur={holdEur}
-      />
+      {preview ? null : (
+        <BidModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          auction={auction}
+          amount={amount}
+          setAmount={setAmount}
+          userId={userId}
+          hasHold={hasHold}
+          onHoldAuthorized={() => setHasHold(true)}
+          onBidPlaced={onBidPlaced}
+          holdEur={holdEur}
+        />
+      )}
     </>
   );
 }

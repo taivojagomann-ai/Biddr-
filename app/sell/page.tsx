@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { loginPath } from "@/lib/login";
 import { isProfileComplete } from "@/lib/profile";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -21,14 +22,25 @@ export default async function SellPage() {
     .maybeSingle<{ username: string | null; country: Country | null }>();
   if (!isProfileComplete(profile)) redirect("/account/setup?next=/sell");
 
+  // The form also shows the full-width listing preview (?preview=1), so the page
+  // width is set inside it.
   return (
-    <main className="container max-w-3xl pt-8 sm:pt-12">
-      <h1 className="font-wide text-3xl font-extrabold tracking-tight">Sell your car</h1>
-      <p className="mt-2 max-w-xl text-sm text-mute">
-        Tell us about the car and add photos. We review every listing, inspect the car and then schedule the auction.
-        Your answers are saved on this device as you go.
-      </p>
-      <SellForm userId={user.id} defaultCountry={profile?.country ?? ""} />
+    <main>
+      <Suspense>
+        <SellForm
+          userId={user.id}
+          defaultCountry={profile?.country ?? ""}
+          intro={
+            <>
+              <h1 className="font-wide text-3xl font-extrabold tracking-tight">Sell your car</h1>
+              <p className="mt-2 max-w-xl text-sm text-mute">
+                Tell us about the car and add photos. We review every listing, inspect the car and then schedule the auction.
+                Your answers are saved on this device as you go.
+              </p>
+            </>
+          }
+        />
+      </Suspense>
     </main>
   );
 }

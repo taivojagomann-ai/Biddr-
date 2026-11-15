@@ -17,9 +17,12 @@ interface CommentsProps {
   currentUserId: string | null;
   canComment: boolean;
   initialNow: number;
+  /** Shown instead of the form when questions can't be asked yet (listing preview). */
+  closedReason?: string;
 }
 
-export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, canComment, initialNow }: CommentsProps) {
+export function Comments({ auctionId, sellerId, comments, onPosted, currentUserId, canComment: canCommentProp, initialNow, closedReason }: CommentsProps) {
+  const canComment = canCommentProp && !closedReason;
   const now = useMinuteNow(initialNow);
   const [replyTo, setReplyTo] = useState<CommentRow | null>(null);
 
@@ -65,7 +68,9 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
         <span className="text-sm text-mute tabular">{comments.length}</span>
       </div>
 
-      {currentUserId && canComment ? (
+      {closedReason ? (
+        <p className="rounded-lg border border-line bg-panel p-4 text-sm font-semibold">{closedReason}.</p>
+      ) : currentUserId && canComment ? (
         <CommentForm auctionId={auctionId} replyTo={null} onPosted={onPosted} />
       ) : currentUserId ? (
         <p className="rounded-lg border border-line bg-panel p-4 text-sm text-mute">
@@ -84,7 +89,7 @@ export function Comments({ auctionId, sellerId, comments, onPosted, currentUserI
         </p>
       )}
 
-      {roots.length === 0 ? (
+      {roots.length === 0 && closedReason ? null : roots.length === 0 ? (
         <p className="text-sm text-mute">No questions yet. Ask about service history, tyres or anything the photos don&apos;t show.</p>
       ) : (
         <ul className="flex flex-col gap-3">
