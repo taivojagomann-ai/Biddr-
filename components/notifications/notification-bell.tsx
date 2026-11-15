@@ -27,6 +27,9 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
   const headingRef = useRef<HTMLHeadingElement>(null);
   const panelId = useId();
   const headingId = useId();
+  // The header renders two bells (phone and desktop). Each needs its own channel
+  // name: a second channel with the same topic makes Realtime close the first.
+  const channelKey = useId();
 
   const load = useCallback(async () => {
     const supabase = getBrowserSupabase();
@@ -51,7 +54,7 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
   useEffect(() => {
     const supabase = getBrowserSupabase();
     const channel = supabase
-      .channel(`notifications:${userId}`)
+      .channel(`notifications:${userId}:${channelKey}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
@@ -75,7 +78,7 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, load]);
+  }, [userId, load, channelKey]);
 
   // Focus moves into the panel when it opens.
   useEffect(() => {
