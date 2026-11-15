@@ -245,6 +245,8 @@ test.describe("admin", () => {
     await expect.poll(async () => (await getPrivate<{ withdraw_request_status: string }>(declineMe.id)).withdraw_request_status).toBe("declined");
     expect((await getAuction<{ status: string }>(declineMe.id)).status).toBe("live");
     expect(await adminActions(declineMe.id)).toContain("withdraw_request.decline");
+    expect((await notificationsFor(seller, "withdrawal_approved")).map((n) => n.auction_id)).toEqual([approveMe.id]);
+    expect((await notificationsFor(seller, "withdrawal_declined")).map((n) => n.auction_id)).toEqual([declineMe.id]);
   });
 
   test("demo data loads and is removed again, without touching real listings", async ({ page, context, seed }) => {
