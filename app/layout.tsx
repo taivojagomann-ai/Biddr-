@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { siteUrl } from "@/lib/site";
+import { siteUrl, SITE_INTRO } from "@/lib/site";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -15,8 +15,8 @@ const archivo = Archivo({
 export const metadata: Metadata = {
   // Makes Open Graph and Twitter image URLs absolute. Set NEXT_PUBLIC_SITE_URL in Vercel.
   metadataBase: new URL(siteUrl()),
-  title: { default: "Biddr: performance car auctions", template: "%s | Biddr" },
-  description: "Buy and sell exceptional performance cars with transparent bidding, documented service histories and optional independent inspections.",
+  title: { default: "Biddr: Cars worth chasing", template: "%s | Biddr" },
+  description: SITE_INTRO,
 };
 
 export const viewport: Viewport = {

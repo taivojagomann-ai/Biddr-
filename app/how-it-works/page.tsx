@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { buyersPremium, PREMIUM_MAX, PREMIUM_MIN, PREMIUM_RATE } from "@/lib/pricing";
+import { SITE_INTRO } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -39,8 +40,7 @@ export default function HowItWorksPage() {
     <main className="container max-w-3xl py-10 sm:py-14">
       <h1 className="font-wide text-3xl font-extrabold tracking-tight md:text-4xl">How it works</h1>
       <p className="mt-3 text-mute">
-        Biddr runs week-long online auctions for performance cars. Here is what happens when you bid, and when you
-        sell.
+        {SITE_INTRO} Biddr runs week-long online auctions. Here is what happens when you bid, and when you sell.
       </p>
 
       <nav aria-labelledby="toc-heading" className="mt-8 rounded-lg border border-line bg-panel p-4">

@@ -1,12 +1,20 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { AuctionFeed } from "@/components/auction/auction-feed";
 import { AuctionFilters } from "@/components/auction/auction-filters";
 import { parseFeedStatus, type FeedStatus } from "@/lib/feed";
 import { parseSearchQuery } from "@/lib/search";
+import { SITE_INTRO } from "@/lib/site";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AUCTION_CARD_COLUMNS, type AuctionCard, type AuctionSearchRow, type Country } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+// Link previews for the home page (the default description comes from the root layout).
+export const metadata: Metadata = {
+  openGraph: { type: "website", siteName: "Biddr", title: "Biddr: Cars worth chasing", description: SITE_INTRO, url: "/" },
+  twitter: { card: "summary", title: "Biddr: Cars worth chasing", description: SITE_INTRO },
+};
 
 type SearchParams = { status?: string; q?: string; country?: string; condition?: string };
 
@@ -117,8 +125,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           Cars worth chasing
         </h1>
         <p className="mt-2 text-mute">
-          Buy and sell exceptional performance cars with transparent bidding, documented service histories and
-          optional independent inspections.
+          {SITE_INTRO}
         </p>
       </div>
 

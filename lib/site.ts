@@ -1,6 +1,9 @@
 // Site-wide copy and links. Placeholders in [brackets] must be filled in before launch.
 
 /** TODO before launch: the real support address. */
+/** The site's positioning line: home intro, default meta description, link previews. */
+export const SITE_INTRO = "Rare finds. Brought back to life. Ready for a new story.";
+
 export const SUPPORT_EMAIL = "[support email]";
 
 /** TODO before launch: legal entity details shown in the footer. */

@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import sharp from "sharp";
 import { formatEur, formatKm } from "@/lib/format";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { SITE_INTRO } from "@/lib/site";
 import type { Auction } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -78,7 +79,7 @@ export default async function OpengraphImage({ params }: { params: { id: string 
         <div style={{ position: "absolute", left: 56, right: 56, bottom: 48, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", fontSize: 64, fontWeight: 800, lineHeight: 1.05 }}>{a?.title ?? "Biddr"}</div>
           <div style={{ display: "flex", fontSize: 30, color: "#D4D4D8" }}>
-            {a ? `${formatKm(a.mileage_km)} · ${a.location_city} · ${resultLine(a)}` : "Performance car auctions"}
+            {a ? `${formatKm(a.mileage_km)} · ${a.location_city} · ${resultLine(a)}` : SITE_INTRO}
           </div>
         </div>
       </div>
