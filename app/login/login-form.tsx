@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { AuthError } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 
@@ -69,12 +70,12 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
 
   const redirectTo = () => `${window.location.origin}${callbackPath(next)}`;
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle(target: string = redirectTo()) {
     setError(undefined);
     setPending("google");
     const { error: err } = await getBrowserSupabase().auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: redirectTo() },
+      options: { redirectTo: target },
     });
     // On success the browser navigates away; only failures land here.
     if (err) {
@@ -213,7 +214,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
         variant="outline"
         size="lg"
         className="w-full"
-        onClick={signInWithGoogle}
+        onClick={() => void signInWithGoogle()}
         disabled={pending !== null}
       >
         <GoogleIcon />
@@ -250,6 +251,40 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
           {pending === "email" ? "Sending…" : "Email me a sign-in link"}
         </Button>
       </form>
+
+      <AdminSignIn
+        pending={pending === "google"}
+        onGoogle={() =>
+          void signInWithGoogle(`${window.location.origin}${callbackPath(`/two-factor?next=${encodeURIComponent("/admin")}`)}`)
+        }
+      />
     </div>
+  );
+}
+
+/** Small link at the bottom: admins sign in with Google only, then two-step verification. */
+function AdminSignIn({ pending, onGoogle }: { pending: boolean; onGoogle: () => void }) {
+  return (
+    <Dialog>
+      <div className="border-t border-line pt-4 text-center">
+        <DialogTrigger asChild>
+          <button type="button" className="inline-flex min-h-6 items-center text-xs text-mute underline underline-offset-4 hover:text-chalk">
+            Sign in as an admin
+          </button>
+        </DialogTrigger>
+      </div>
+      <DialogContent>
+        <div className="flex flex-col gap-4">
+          <DialogTitle>Sign in as an admin</DialogTitle>
+          <DialogDescription>
+            Admins sign in with Google, then enter a code from their authenticator app.
+          </DialogDescription>
+          <Button type="button" size="lg" variant="outline" className="w-full" onClick={onGoogle} disabled={pending}>
+            <GoogleIcon />
+            {pending ? "Opening Google…" : "Continue with Google"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,5 @@
 // Area 1: database security. Talks to the local database directly with the
 // anon key and with signed-in users' clients, exactly as a browser could.
-import { authenticator } from "otplib";
 import { test, expect, signIn } from "../support/fixtures";
 import { APP_URL, CRON_SECRET } from "../support/env";
 import { anonDb, userDb } from "../support/supabase";
@@ -94,7 +93,8 @@ test.describe("database security", () => {
     expect(await visible(anonDb())).toBe(0);
     expect(await visible(await userDb((await createUser()).email))).toBe(0);
     expect(await visible(await userDb(seller.email))).toBe(2);
-    expect(await visible(await userDb(seed.admin.email))).toBe(2);
+    // Admins see them once they've passed two-step verification (see the aal1 test below).
+    expect(await visible(await userDb(seed.admin.email, { totpSecret: seed.admin.totpSecret }))).toBe(2);
   });
 
   test("storage: no one can upload into another user's folder or read private inspection uploads", async () => {
@@ -141,9 +141,27 @@ test.describe("database security", () => {
     await context.close();
   });
 
-  test.fixme("admin server actions and routes refuse an admin session without two-step verification (aal2)", async ({ seed }) => {
-    // Needs a decision: the admin panel doesn't ask for a second factor today, so an
-    // admin signed in with only email (aal1) can use it. See the PR's "Needs a decision".
-    void authenticator.generate(seed.admin.totpSecret);
+  test("admins without two-step verification (aal1) can't use the admin panel, admin routes or admin rights in the database", async ({ browser, seed }) => {
+    const draft = await createAuction({ seller: await createUser({ role: "seller" }), status: "draft" });
+
+    // Database: is_admin() needs aal2. Signed in with only the first step, the admin
+    // sees no other seller's drafts; after the authenticator code, they do.
+    const firstStep = await userDb(seed.admin.email);
+    expect((await firstStep.from("auctions").select("id").eq("id", draft.id)).data ?? []).toHaveLength(0);
+    expect((await firstStep.rpc("is_admin")).data).toBe(false);
+    const bothSteps = await userDb(seed.admin.email, { totpSecret: seed.admin.totpSecret });
+    expect((await bothSteps.from("auctions").select("id").eq("id", draft.id)).data ?? []).toHaveLength(1);
+    expect((await bothSteps.rpc("is_admin")).data).toBe(true);
+
+    // App: the panel sends them to the second step; admin routes answer 404.
+    const context = await browser.newContext();
+    await signIn(context, seed.admin, { twoFactor: false });
+    const page = await context.newPage();
+    await page.goto(`/admin/auctions/${draft.id}`);
+    await expect(page).toHaveURL(new RegExp(`/two-factor\\?next=${encodeURIComponent(`/admin/auctions/${draft.id}`)}$`));
+    const api = await context.request.get(`${APP_URL}/api/admin/inspection-file?auction=${draft.id}&file=0`, { maxRedirects: 0 });
+    expect(api.status()).toBe(404);
+    await context.close();
   });
+
 });
