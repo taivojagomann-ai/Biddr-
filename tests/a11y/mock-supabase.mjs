@@ -8,7 +8,13 @@ import zlib from "node:zlib";
 
 const PORT = Number(process.env.MOCK_SUPABASE_PORT ?? 54329);
 const BASE = `http://127.0.0.1:${PORT}`;
-export const ACCESS_TOKEN = "a11y-test-access-token";
+// JWT-shaped (the app reads the claims, e.g. "aal" for admin two-step verification).
+// The mock compares it as a string; it's never verified.
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+export const ACCESS_TOKEN = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({
+  sub: "00000000-0000-4000-8000-0000000000aa", aud: "authenticated", role: "authenticated",
+  aal: "aal2", amr: [{ method: "totp", timestamp: 1700000000 }], exp: 4102444800,
+})}.a11y-signature`;
 
 const ME = "00000000-0000-4000-8000-0000000000aa";
 const SELLER = "00000000-0000-4000-8000-0000000000bb";

@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
   // it goes to /two-factor and comes back to the same page. Non-admins fall
   // through to the admin layout, which answers 404.
   if (user && (pathname === "/admin" || pathname.startsWith("/admin/"))) {
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel().then((r) => r.data, () => null);
     if (aal?.currentLevel !== "aal2") {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>();
       if (profile?.role === "admin") {
