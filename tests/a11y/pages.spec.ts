@@ -1110,6 +1110,12 @@ test.describe("Dealer inspected and Accident repaired badges", () => {
     await expectNoSeriousViolations(page, "Selling dealer inspection");
   });
 
+  test("the accident damage photo section is called Before repair", async ({ page }) => {
+    await page.goto(`/auctions/${RESTORED}`);
+    await expect(page.getByRole("tab", { name: /^Before repair/ })).toBeVisible();
+    await expect(page.getByText(/Before restoration/i)).toHaveCount(0);
+  });
+
   test("an independent dealer's inspection doesn't mention the seller", async ({ page }) => {
     await page.goto(`/auctions/${RESTORED}`);
     await expect(page.getByRole("region", { name: "Dealer inspected" })).not.toContainText("selling dealer");
