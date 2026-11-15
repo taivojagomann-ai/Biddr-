@@ -1,9 +1,24 @@
-import { Check, Download, ShieldCheck } from "lucide-react";
+import { Check, ClipboardCheck, Download, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import type { Auction } from "@/lib/types";
 
-export function InspectionCard({ auction }: { auction: Auction }) {
-  if (!auction.inspection_partner_name) return null;
+export function InspectionCard({ auction, preview = false }: { auction: Auction; preview?: boolean }) {
+  if (!auction.inspection_partner_name) {
+    if (!preview) return null;
+    // Listing preview: the inspection comes later, show where it will go.
+    return (
+      <section aria-labelledby="inspection-heading" className="rounded-lg border border-dashed border-field bg-panel">
+        <div className="flex items-start gap-3 p-4">
+          <ClipboardCheck className="mt-0.5 size-6 shrink-0 text-mute" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <h2 id="inspection-heading" className="font-bold">Inspection</h2>
+            <p className="text-sm text-mute">{PREVIEW_TEXT.inspection}.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
   const restored = auction.condition_type === "restored_accident";
 
   return (

@@ -163,7 +163,7 @@ const TABLES = {
   bid_holds: [],
   auction_private: [{ auction_id: AUCTIONS[4].id, reserve_price: null, requested_reserve: 48000, inspection_city: "Tallinn",
     inspection_preferred_dates: "Weekday mornings", admin_notes: null, contact_notes: null, rejection_reason: null },
-    { auction_id: AUCTIONS[5].id, rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
+    { auction_id: "10000000-0000-4000-8000-000000000006", rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
   admin_actions: [],
 };
 
@@ -284,7 +284,11 @@ const server = http.createServer(async (req, res) => {
   if (!rows) return send(res, 404, { message: `mock: unknown table ${table}` });
   if (req.method !== "GET" && req.method !== "HEAD") return send(res, 201, []);
 
-  const result = applyFilters(rows, url.searchParams);
+  // Like RLS: drafts and rejected listings only for their (signed-in) seller and admins.
+  const auth = req.headers.authorization ?? "";
+  const signedIn = auth === `Bearer ${ACCESS_TOKEN}` || auth === "Bearer a11y-service-role-key";
+  const visible = table === "auctions" && !signedIn ? rows.filter((r) => !["draft", "rejected"].includes(r.status)) : rows;
+  const result = applyFilters(visible, url.searchParams);
   const range = { "Content-Range": `0-${Math.max(0, result.length - 1)}/${result.length}` };
   if (req.method === "HEAD") return send(res, 200, undefined, range);
   if ((req.headers.accept ?? "").includes("vnd.pgrst.object")) {

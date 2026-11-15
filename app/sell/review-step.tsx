@@ -1,3 +1,4 @@
+import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COUNTRY_NAMES, formatEur, formatKm } from "@/lib/format";
 import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
@@ -76,6 +77,7 @@ export function ReviewStep({
   stepsWithErrors,
   onEdit,
   onConfirm,
+  onPreview,
 }: {
   values: SellValues;
   photos: SellPhotos;
@@ -83,6 +85,8 @@ export function ReviewStep({
   stepsWithErrors: ReadonlySet<StepId>;
   onEdit: (step: StepId) => void;
   onConfirm: (v: boolean) => void;
+  /** Opens the full-page preview of the listing. */
+  onPreview: () => void;
 }) {
   const restored = values.hadDamage === "yes";
   const make = values.make === "Other" ? values.makeOther : values.make;
@@ -96,6 +100,15 @@ export function ReviewStep({
   return (
     <section>
       <StepHeading title="Review" intro="Check everything once more. You can't edit the listing after you submit it." />
+      <div className="mt-6 flex flex-col gap-3 rounded-lg border border-field bg-panel p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p id="sell-preview-intro" className="text-sm text-mute">
+          See the auction page exactly as buyers will. Nothing is saved or published.
+        </p>
+        <Button id="sell-preview-button" type="button" variant="outline" onClick={onPreview} aria-describedby="sell-preview-intro" className="shrink-0">
+          <Eye aria-hidden />
+          Preview listing
+        </Button>
+      </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-panel">
         <div className="aspect-[16/9] bg-asphalt">

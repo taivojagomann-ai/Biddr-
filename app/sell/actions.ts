@@ -3,14 +3,13 @@ import { revalidatePath } from "next/cache";
 import {
   PHOTO_SECTION_KEYS,
   draftFolder,
-  listingTitle,
+  listingColumns,
   parseSubmission,
   publicBucketPrefix,
   type PhotoSection,
   type SellErrors,
   type SubmitResult,
 } from "@/lib/sell";
-import { detailsColumns, ownershipColumns } from "@/lib/listing-details";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
 const FILE_RE = /^[A-Za-z0-9-]{8,64}\.(webp|jpg)$/;
@@ -46,8 +45,6 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
       : { ok: false, error: "Something in the form is out of date. Reload the page and check each step." };
   }
   const v = parsed.data;
-  const ownership = ownershipColumns(parsed.ownership);
-  const details = detailsColumns(parsed.details);
 
   const photoErrors = checkPhotoUrls(v.photos, user.id, v.draftId);
   if (Object.keys(photoErrors).length) return { ok: false, errors: photoErrors };
@@ -56,30 +53,7 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
   // status is not in the insert grant; it defaults to 'draft', which the policy requires.
   const { data: auction, error } = await supabase
     .from("auctions")
-    .insert({
-      seller_id: user.id,
-      title: listingTitle(v),
-      make: v.make,
-      model: v.model,
-      variant: v.variant,
-      year: v.year,
-      vin: v.vin,
-      mileage_km: v.mileageKm,
-      engine: v.engine,
-      transmission: v.transmission,
-      drivetrain: v.drivetrain,
-      exterior_color: v.exteriorColor,
-      location_city: v.city,
-      location_country: v.country,
-      condition_type: v.condition,
-      damage_history_summary: v.damageSummary,
-      gallery_urls: { exterior: v.photos.exterior, interior: v.photos.interior, mechanical: v.photos.mechanical },
-      before_photos_urls: v.photos.before,
-      video_url: v.videoUrl,
-      starting_bid: v.startingBid,
-      ...ownership,
-      ...details,
-    })
+    .insert({ seller_id: user.id, ...listingColumns(parsed) })
     .select("id, seller_id, status")
     .single<{ id: string; seller_id: string; status: string }>();
 

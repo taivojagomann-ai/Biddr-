@@ -10,6 +10,7 @@ import { ReserveBadge } from "./badges";
 import { WatchButton, WatchCount } from "./watch-button";
 import { formatEur } from "@/lib/format";
 import { buyersPremium, minNextBid, QUICK_INCREMENTS } from "@/lib/pricing";
+import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import { cn } from "@/lib/utils";
 import type { Auction } from "@/lib/types";
 
@@ -26,27 +27,31 @@ export interface BidUiState {
   holdEur: number;
   userId: string | null;
   watching: boolean;
+  /** Seller's preview of an unpublished listing: nothing can be done yet. */
+  preview?: boolean;
 }
 
-export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur, userId, watching }: BidUiState) {
+export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur, userId, watching, preview = false }: BidUiState) {
   // Demo listings look live but never take bids (place_bid refuses them too).
-  const live = auction.status === "live" && !auction.is_demo;
+  const live = auction.status === "live" && !auction.is_demo && !preview;
   const minNext = minNextBid(auction);
   const tooLow = amount < minNext;
 
   return (
     <section aria-labelledby="bid-heading" className="rounded-xl border border-line bg-panel">
       <h2 id="bid-heading" className="sr-only">Bidding</h2>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-        <WatchCount auctionId={auction.id} initialCount={auction.watch_count} className="text-xs" />
-        <WatchButton
-          auctionId={auction.id}
-          userId={userId}
-          initialWatching={watching}
-          initialCount={auction.watch_count}
-          className="ml-auto"
-        />
-      </div>
+      {preview ? null : (
+        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
+          <WatchCount auctionId={auction.id} initialCount={auction.watch_count} className="text-xs" />
+          <WatchButton
+            auctionId={auction.id}
+            userId={userId}
+            initialWatching={watching}
+            initialCount={auction.watch_count}
+            className="ml-auto"
+          />
+        </div>
+      )}
 
       <div className="grid grid-cols-2 border-b border-line">
         <div className={cn("p-4", flash && "animate-bid-flash")}>
@@ -85,7 +90,15 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
         )}
       </div>
 
-      {live ? (
+      {preview ? (
+        <div className="flex flex-col gap-3 px-4 pb-4">
+          <p id="bid-preview-note" className="text-sm font-semibold">{PREVIEW_TEXT.bidding}.</p>
+          <Button size="lg" disabled aria-describedby="bid-preview-note">
+            <Gavel aria-hidden />
+            Place bid
+          </Button>
+        </div>
+      ) : live ? (
         <div className="flex flex-col gap-3 px-4 pb-4">
           <div className="grid grid-cols-3 gap-2">
             {QUICK_INCREMENTS.map((inc) => {
