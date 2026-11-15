@@ -15,6 +15,8 @@ export const SellPreview = forwardRef<
   PreviewBannerHandle,
   {
     auction: Auction | null;
+    /** The seller chose "Yes, book an inspection". */
+    inspectionPending: boolean;
     userId: string;
     initialNow: number;
     submitting: boolean;
@@ -22,7 +24,7 @@ export const SellPreview = forwardRef<
     onBack: () => void;
     onSubmit: () => void;
   }
->(function SellPreview({ auction, userId, initialNow, submitting, formError, onBack, onSubmit }, ref) {
+>(function SellPreview({ auction, inspectionPending, userId, initialNow, submitting, formError, onBack, onSubmit }, ref) {
   return (
     <div className="pb-6">
       <PreviewBanner
@@ -69,6 +71,7 @@ export const SellPreview = forwardRef<
             initialNow={initialNow}
             holdEur={0} // the hold text isn't shown in a preview
             preview
+            inspectionPending={inspectionPending}
           />
         ) : (
           <div className="rounded-lg border border-dashed border-line p-8 text-center">

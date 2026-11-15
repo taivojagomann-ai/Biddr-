@@ -36,6 +36,8 @@ export interface AuctionViewProps {
    * listing): the same page, with bidding, questions, watching and sharing turned off.
    */
   preview?: boolean;
+  /** Preview only: the seller asked for an inspection that hasn't been added yet. */
+  inspectionPending?: boolean;
 }
 
 /**
@@ -44,7 +46,7 @@ export interface AuctionViewProps {
  * No "use client": it renders on the server for /auctions/[id] and in the browser for /sell.
  */
 export function AuctionView({
-  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false,
+  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false, inspectionPending = false,
 }: AuctionViewProps) {
   return (
     <>
@@ -102,7 +104,7 @@ export function AuctionView({
         >
           <Gallery auction={auction} />
           <Highlights auction={auction} />
-          <InspectionCard auction={auction} preview={preview} />
+          <InspectionCard auction={auction} preview={preview} inspectionPending={inspectionPending} />
           <SpecSheet auction={auction} />
           <Equipment auction={auction} />
           <Modifications auction={auction} />

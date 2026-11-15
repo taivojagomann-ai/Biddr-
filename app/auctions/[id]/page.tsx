@@ -102,16 +102,20 @@ export default async function AuctionPage({ params }: { params: { id: string } }
   const preview = isPreviewStatus(auction.status);
   let isAdmin = false;
   let rejectionReason: string | null = null;
+  let inspectionPending = false;
   if (preview && user) {
     isAdmin = (await getCurrentAdminId()) === user.id;
-    if (auction.status === "rejected" && (isAdmin || auction.seller_id === user.id)) {
-      // auction_private is admin-only: read just this listing's reason with the service role.
+    if (isAdmin || auction.seller_id === user.id) {
+      // auction_private is admin-only: read just this listing's reason and inspection
+      // choice with the service role.
       const { data: row } = await getAdminSupabase()
         .from("auction_private")
-        .select("rejection_reason")
+        .select("rejection_reason, inspection_requested")
         .eq("auction_id", auction.id)
-        .maybeSingle<{ rejection_reason: string | null }>();
-      rejectionReason = row?.rejection_reason ?? null;
+        .maybeSingle<{ rejection_reason: string | null; inspection_requested: boolean | null }>();
+      rejectionReason = auction.status === "rejected" ? row?.rejection_reason ?? null : null;
+      // Older listings (null) were all submitted expecting an inspection.
+      inspectionPending = row?.inspection_requested !== false;
     }
   }
 
@@ -159,6 +163,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
         initialNow={Date.now()}
         holdEur={HOLD_EUR}
         preview={preview}
+        inspectionPending={inspectionPending}
       />
     </main>
   );

@@ -621,6 +621,7 @@ export function SellForm({
       <SellPreview
         ref={bannerRef}
         auction={preview}
+        inspectionPending={values.inspectionRequested === "yes"}
         userId={userId}
         initialNow={previewNow}
         submitting={submitting}

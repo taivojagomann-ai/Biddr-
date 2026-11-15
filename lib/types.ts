@@ -92,6 +92,8 @@ export interface AuctionPrivate {
   auction_id: string;
   reserve_price: number | null;
   admin_notes: string | null;
+  /** Seller's choice (0013): true = book an inspection, false = list without one, null = not answered (older listings). */
+  inspection_requested: boolean | null;
   inspection_city: InspectionCity | null;
   requested_reserve: number | null;
   inspection_preferred_dates: string | null;

@@ -73,7 +73,10 @@ const AUCTIONS = [
   {
     ...base, id: "10000000-0000-4000-8000-000000000003", seller_id: SELLER, title: "2021 Porsche 911 Carrera S",
     make: "Porsche", model: "911", year: 2021, vin: "WP0ZZZ99ZMS212345", mileage_km: 22100, location_city: "Vilnius",
-    location_country: "LT", condition_type: "clean", gallery_urls: gallery("911"), starting_bid: 95000,
+    // Restored, listed without an independent inspection (0013).
+    location_country: "LT", condition_type: "restored_accident", gallery_urls: gallery("911"), starting_bid: 95000,
+    damage_history_summary: "Rear-right quarter panel repaired and repainted in 2022. Airbags did not deploy.",
+    before_photos_urls: [photo("911-before-1")],
     starts_at: iso(20 * H), ends_at: iso(7 * 24 * H), status: "upcoming",
   },
   {
@@ -161,7 +164,7 @@ const TABLES = {
   comments: COMMENTS,
   bids: BIDS,
   bid_holds: [],
-  auction_private: [{ auction_id: AUCTIONS[4].id, reserve_price: null, requested_reserve: 48000, inspection_city: "Tallinn",
+  auction_private: [{ auction_id: "10000000-0000-4000-8000-000000000005", reserve_price: null, requested_reserve: 48000, inspection_city: "Tallinn", inspection_requested: true,
     inspection_preferred_dates: "Weekday mornings", admin_notes: null, contact_notes: null, rejection_reason: null },
     { auction_id: "10000000-0000-4000-8000-000000000006", rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
   admin_actions: [],
@@ -259,6 +262,7 @@ function applyFilters(rows, params) {
     if (op === "eq") out = out.filter((r) => String(r[key]) === value);
     else if (op === "is" && value === "null") out = out.filter((r) => r[key] === null || r[key] === undefined);
     else if (op === "neq") out = out.filter((r) => String(r[key]) !== value);
+    else if (op === "not" && value === "is.null") out = out.filter((r) => r[key] !== null && r[key] !== undefined);
     else if (op === "in") {
       const set = new Set(value.replace(/^\(|\)$/g, "").split(",").map((v) => v.replace(/^"|"$/g, "")));
       out = out.filter((r) => set.has(String(r[key])));
