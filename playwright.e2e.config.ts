@@ -34,7 +34,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npx next build && npx next start -p ${APP_PORT} -H 127.0.0.1`,
+    command: `npx next build && npx next start -p ${APP_PORT}`,
     url: `${APP_URL}/login`,
     timeout: 600_000,
     reuseExistingServer: !process.env.CI,

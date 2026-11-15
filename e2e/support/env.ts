@@ -11,7 +11,8 @@ export const SERVICE_ROLE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 export const MAIL_URL = process.env.E2E_MAIL_URL ?? "http://127.0.0.1:54324";
 export const APP_PORT = Number(process.env.E2E_APP_PORT ?? 3100);
-export const APP_URL = `http://127.0.0.1:${APP_PORT}`;
+// "localhost" (not 127.0.0.1): the app builds redirects with it, and cookies must match.
+export const APP_URL = `http://localhost:${APP_PORT}`;
 export const STRIPE_MOCK_PORT = Number(process.env.E2E_STRIPE_MOCK_PORT ?? 12111);
 
 /** Shared with the app build (playwright.e2e.config.ts). Test-only values. */
