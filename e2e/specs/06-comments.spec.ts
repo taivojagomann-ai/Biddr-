@@ -1,6 +1,6 @@
 // Area 6: questions and comments: who can post, replies, the Seller and Biddr
 // team labels, live updates, links to a comment, and the database rules behind them.
-import { test, expect, signIn } from "../support/fixtures";
+import { test, expect, signIn, realtimeReady } from "../support/fixtures";
 import { createAuction, createUser, notificationsFor, service } from "../support/factory";
 import { userDb } from "../support/supabase";
 
@@ -30,8 +30,9 @@ test.describe("questions and comments", () => {
     const sellerCtx = await browser.newContext();
     await signIn(sellerCtx, seller);
     const sellerPage = await sellerCtx.newPage();
+    const sellerLive = realtimeReady(sellerPage, `auction:${a.id}`);
     await sellerPage.goto(`/auctions/${a.id}`);
-    await sellerPage.waitForTimeout(1500);
+    await sellerLive;
 
     await signIn(context, asker);
     await page.goto(`/auctions/${a.id}`);

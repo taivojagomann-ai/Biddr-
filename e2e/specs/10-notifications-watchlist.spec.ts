@@ -1,6 +1,6 @@
 // Area 10: notifications (every type, never about your own action, never for
 // demo listings, never twice) and the watchlist.
-import { test, expect, signIn, expectAccessible } from "../support/fixtures";
+import { test, expect, signIn, expectAccessible, realtimeReady } from "../support/fixtures";
 import { bid, createAuction, createUser, iso, DAY, HOUR, notificationsFor, readyBidder, runJob, service, setAuction } from "../support/factory";
 import { userDb } from "../support/supabase";
 
@@ -72,10 +72,11 @@ test.describe("notifications", () => {
     const seller = await createUser({ role: "seller" });
     const a = await createAuction({ seller });
     await signIn(context, seller);
+    const live = realtimeReady(page, `notifications:${seller.id}`, { count: 2 });
     await page.goto("/");
     const bell = page.getByRole("button", { name: /^Notifications, / });
     await expect(bell).toHaveAccessibleName("Notifications, none unread");
-    await page.waitForTimeout(1500);
+    await live;
     const asker = await createUser();
     await (await userDb(asker.email)).from("comments").insert({ auction_id: a.id, content: "Is the price negotiable?" });
     await expect(bell).toHaveAccessibleName("Notifications, 1 unread", { timeout: 15_000 });
@@ -89,6 +90,19 @@ test.describe("notifications", () => {
     await expect(page.getByRole("button", { name: "Notifications, none unread" })).toBeVisible();
     const { count } = await service().from("notifications").select("id", { count: "exact", head: true }).eq("user_id", seller.id).is("read_at", null);
     expect(count).toBe(0);
+  });
+
+  test("more than 9 unread: the badge shows 9+ and the button's name says the same", async ({ page, context }) => {
+    const seller = await createUser({ role: "seller" });
+    const a = await createAuction({ seller });
+    const rows = Array.from({ length: 12 }, () => ({ user_id: seller.id, type: "question", auction_id: a.id }));
+    expect((await service().from("notifications").insert(rows)).error).toBeNull();
+    await signIn(context, seller);
+    await page.goto("/");
+    const bell = page.getByRole("button", { name: "Notifications, 9+ unread" });
+    await expect(bell).toBeVisible();
+    await expect(bell).toContainText("9+");
+    await expectAccessible(page, "Bell with 9+ unread", "header");
   });
 
   test("you can only read and update your own notifications", async () => {

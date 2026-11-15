@@ -47,7 +47,8 @@ test.describe("sign in and profile", () => {
     const mail = await requestEmail(page, user.email);
     await page.goto(linkFrom(mail.text, mail.html));
     await expect(page).toHaveURL(/\/how-it-works$/);
-    await expect(page.getByRole("button", { name: new RegExp(`${user.username}`) })).toBeVisible();
+    // Signed in: the notification bell shows in the header (desktop and phone).
+    await expect(page.getByRole("button", { name: /^Notifications, / })).toBeVisible();
   });
 
   test("a wrong code is refused with a clear message", async ({ page }) => {
@@ -96,13 +97,14 @@ test.describe("sign in and profile", () => {
     expect(options).toBe(27);
   });
 
-  test("signing out ends the session, and protected pages send you to sign in", async ({ page, context }) => {
+  test("signing out ends the session, and protected pages send you to sign in", async ({ page, context, isMobile }) => {
     const user = await createUser();
     await signIn(context, user);
     await page.goto("/account/listings");
     await expect(page.getByRole("heading", { name: "My listings" })).toBeVisible();
-    await page.getByRole("button", { name: new RegExp(`${user.username}`) }).first().click();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    // Desktop: the account menu under the username. Phones: the Menu button.
+    await page.getByRole("button", { name: isMobile ? "Menu" : new RegExp(`${user.username}`) }).first().click();
+    await page.getByRole("button", { name: "Sign out" }).locator("visible=true").click();
     await expect(page).toHaveURL("http://localhost:3100/");
     for (const path of ["/account/listings", "/account/watchlist", "/account/notifications", "/sell", "/admin"]) {
       await page.goto(path);

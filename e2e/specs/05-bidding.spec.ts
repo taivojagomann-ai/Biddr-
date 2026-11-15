@@ -2,7 +2,7 @@
 // anti-sniping, concurrency, the buyer's premium and live updates.
 import Stripe from "stripe";
 import type { Page } from "@playwright/test";
-import { test, expect, signIn, expectAccessible } from "../support/fixtures";
+import { test, expect, signIn, expectAccessible, realtimeReady } from "../support/fixtures";
 import { APP_URL, STRIPE_MOCK_PORT, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } from "../support/env";
 import { authorizeHold, bid, createAuction, createUser, getAuction, iso, DAY, HOUR, readyBidder, service, notificationsFor } from "../support/factory";
 import { userDb } from "../support/supabase";
@@ -156,14 +156,15 @@ test.describe("bidding rules (database)", () => {
     const endsAt = iso(90_000);
     const a = await createAuction({ seller: await createUser({ role: "seller" }), endsAt });
     const b = await readyBidder(a.id);
+    const live = realtimeReady(page, `auction:${a.id}`);
     await page.goto(`/auctions/${a.id}`);
-    await page.waitForTimeout(1500);
+    await live;
     const res = await bid(b, a.id, 10_000);
     expect(res.error).toBeNull();
     expect((res.data as { extended: boolean }).extended).toBe(true);
     const after = await getAuction<{ ends_at: string }>(a.id);
     expect(Date.parse(after.ends_at) - Date.parse(endsAt)).toBe(120_000);
-    await expect(page.getByText("A late bid added 2 minutes to the clock.").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("A late bid added 2 minutes to the clock.").locator("visible=true").first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("two equal bids at the same moment: exactly one wins", async () => {
@@ -209,6 +210,7 @@ test.describe("live bidding across browsers", () => {
     const ctx1 = await browser.newContext();
     await signIn(ctx1, first);
     const p1 = await ctx1.newPage();
+    const p1Live = realtimeReady(p1, `auction:${a.id}`);
     await p1.goto(`/auctions/${a.id}`);
     await openBidDialog(p1);
     await p1.getByRole("dialog", { name: "Confirm your bid" }).getByRole("button", { name: "Place bid of €40,000" }).click();
@@ -218,12 +220,13 @@ test.describe("live bidding across browsers", () => {
     const ctx2 = await browser.newContext();
     await signIn(ctx2, second);
     const p2 = await ctx2.newPage();
+    const p2Live = realtimeReady(p2, `auction:${a.id}`);
     await p2.goto(`/auctions/${a.id}`);
-    await p1.waitForTimeout(1500);
+    await Promise.all([p1Live, p2Live]);
     expect((await bid(second, a.id, 41_000)).error).toBeNull();
 
     // The first bidder's page updates without reloading.
-    await expect(p1.getByText("You've been outbid.").first()).toBeVisible({ timeout: 15_000 });
+    await expect(p1.getByText(/You've been outbid/).locator("visible=true").first()).toBeVisible({ timeout: 15_000 });
     await expect(p1.getByText("€41,000").locator("visible=true").first()).toBeVisible();
     await expect(p2.getByText("€41,000").locator("visible=true").first()).toBeVisible({ timeout: 15_000 });
     await expect.poll(async () => (await notificationsFor(first, "outbid")).length).toBe(1);

@@ -128,8 +128,8 @@ test.describe("auction page", () => {
     await page.goto(`/auctions/${draft.id}`);
     const banner = page.getByRole("region", { name: "Preview: only you can see this." });
     await expect(banner).toContainText("Waiting for review.");
-    await expect(page.getByText("Bidding opens after review.").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Place bid" }).first()).toBeDisabled();
+    await expect(page.getByText("Bidding opens after review.").locator("visible=true").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Place bid" }).locator("visible=true").first()).toBeDisabled();
     await expect(page.getByText("Questions open when the auction starts.")).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
     await page.goto(`/auctions/${rejected.id}`);

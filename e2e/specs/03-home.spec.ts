@@ -1,5 +1,5 @@
 // Area 3: home page tabs, search, filters, badges, layout and live updates.
-import { test, expect, expectAccessible, expectNoHorizontalScroll } from "../support/fixtures";
+import { test, expect, expectAccessible, expectNoHorizontalScroll, realtimeReady } from "../support/fixtures";
 import { bid, createAuction, createUser, iso, DAY, HOUR, readyBidder } from "../support/factory";
 
 const tag = () => `Q${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
@@ -153,10 +153,11 @@ test.describe("home page", () => {
     const model = tag();
     const auction = await createAuction({ seller, model, startingBid: 20_000 });
     const bidder = await readyBidder(auction.id);
+    const live = realtimeReady(page, "feed:auctions");
     await page.goto(`/?q=${model}`);
     const c = card(page, auction.id);
     await expect(c).toContainText("€20,000");
-    await page.waitForTimeout(1500); // let the Realtime channel subscribe
+    await live;
     const { error } = await bid(bidder, auction.id, 21_000);
     expect(error).toBeNull();
     await expect(c).toContainText("€21,000", { timeout: 15_000 });

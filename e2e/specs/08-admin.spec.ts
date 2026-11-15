@@ -230,7 +230,8 @@ test.describe("admin", () => {
       await expect(dialog.getByRole("alert")).toBeVisible();
       await dialog.getByLabel("Why do you want to withdraw it?").fill("The car was damaged in a hailstorm yesterday.");
       await dialog.getByRole("button", { name: "Send request" }).click();
-      await expect(page.getByText("Withdrawal requested. The Biddr team will reply soon.")).toBeVisible();
+      const row = page.locator("li", { has: page.locator(`a[href="/auctions/${a.id}"]`) }).first();
+      await expect(row.getByText("Withdrawal requested. The Biddr team will reply soon.")).toBeVisible();
       await expect.poll(async () => (await getPrivate<{ withdraw_request_status: string }>(a.id)).withdraw_request_status).toBe("pending");
     }
 

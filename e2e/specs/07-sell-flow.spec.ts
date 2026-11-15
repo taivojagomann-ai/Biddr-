@@ -142,7 +142,7 @@ test.describe("sell flow", () => {
       inspection_review_status: "pending",
     });
     // The report is stored privately: no public URL works.
-    const path = (priv.dealer_report_paths as string[])[0];
+    const path = (priv.dealer_report_paths as string[])[0] ?? "";
     expect(path.startsWith(`${seller.id}/`)).toBe(true);
     const publicUrl = service().storage.from("inspection-uploads").getPublicUrl(path).data.publicUrl;
     expect((await page.request.get(publicUrl)).status()).toBeGreaterThanOrEqual(400);

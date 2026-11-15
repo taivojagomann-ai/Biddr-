@@ -26,6 +26,26 @@ export async function expectNoHorizontalScroll(page: Page, label: string): Promi
   expect(overflow, `${label}: page scrolls sideways`).toBeLessThanOrEqual(1);
 }
 
+/**
+ * Resolves once the page's Realtime channel whose name contains `channel` is
+ * subscribed on the server (`count` channels, e.g. 2 for the header's two bells).
+ * Call it BEFORE page.goto, then await it after.
+ */
+export function realtimeReady(page: Page, channel: string, { count = 1, timeout = 30_000 } = {}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Realtime channel "${channel}" didn't subscribe in ${timeout} ms`)), timeout);
+    page.on("websocket", (ws) => {
+      ws.on("framereceived", (frame) => {
+        const text = String(frame.payload);
+        if (text.includes("Subscribed to PostgreSQL") && text.includes(channel) && --count <= 0) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+  });
+}
+
 export const test = base.extend<{ seed: SeedState }>({
   // eslint-disable-next-line no-empty-pattern
   seed: async ({}, use) => {
