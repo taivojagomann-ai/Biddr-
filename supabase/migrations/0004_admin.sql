@@ -21,18 +21,34 @@ alter table public.auction_private add column if not exists rejection_reason tex
 -- -----------------------------------------------------------------------------
 -- Constraints: a rejected listing may lack a schedule and an inspection, like a draft.
 -- -----------------------------------------------------------------------------
+-- 0013 retired this rule (inspections became optional) and added
+-- auction_private.inspection_requested. When that column exists, 0013 has run:
+-- don't bring the rule back, or re-running this file fails on accident-repaired
+-- cars listed without an inspection.
 alter table public.auctions drop constraint if exists restored_needs_inspection;
-alter table public.auctions add constraint restored_needs_inspection check (
-  condition_type = 'clean'
-  or status::text in ('draft', 'rejected')
-  or (inspection_partner_name is not null and inspection_report_url is not null)
-);
+do $$ begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'auction_private'
+                    and column_name = 'inspection_requested') then
+    alter table public.auctions add constraint restored_needs_inspection check (
+      condition_type = 'clean'
+      or status::text in ('draft', 'rejected')
+      or (inspection_partner_name is not null and inspection_report_url is not null)
+    );
+  end if;
+end $$;
 
-alter table public.auctions drop constraint if exists schedule_valid;
-alter table public.auctions add constraint schedule_valid check (
-  status::text in ('draft', 'rejected')
-  or (starts_at is not null and ends_at is not null and ends_at > starts_at)
-);
+-- Added only when missing: 0015 widens it (withdrawn listings may lack a
+-- schedule), and re-running this file must not narrow it back.
+do $$ begin
+  if not exists (select 1 from pg_constraint
+                  where conrelid = 'public.auctions'::regclass and conname = 'schedule_valid') then
+    alter table public.auctions add constraint schedule_valid check (
+      status::text in ('draft', 'rejected')
+      or (starts_at is not null and ends_at is not null and ends_at > starts_at)
+    );
+  end if;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- Visibility: drafts and rejected listings only for the seller and admins.

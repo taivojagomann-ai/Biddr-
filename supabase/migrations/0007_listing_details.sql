@@ -89,9 +89,16 @@ alter table public.auctions add constraint auctions_dealer_details_check
     and (dealer_registry_code is null or char_length(dealer_registry_code) <= 40)
   );
 
-alter table public.auctions drop constraint if exists auctions_registration_country_check;
-alter table public.auctions add constraint auctions_registration_country_check
-  check (registration_country is null or registration_country in ('EE', 'LV', 'LT', 'other_eu', 'non_eu'));
+-- Added only when missing: 0018 replaces it with a check for every EU country,
+-- and re-running this file must not narrow it back to the Baltics.
+do $$ begin
+  if not exists (select 1 from pg_constraint
+                  where conrelid = 'public.auctions'::regclass
+                    and conname = 'auctions_registration_country_check') then
+    alter table public.auctions add constraint auctions_registration_country_check
+      check (registration_country is null or registration_country in ('EE', 'LV', 'LT', 'other_eu', 'non_eu'));
+  end if;
+end $$;
 
 alter table public.auctions drop constraint if exists auctions_owner_count_check;
 alter table public.auctions add constraint auctions_owner_count_check

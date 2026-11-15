@@ -91,12 +91,28 @@ create trigger watchlist_on_bid
 -- -----------------------------------------------------------------------------
 -- Notifications: two new types, each at most once per user and auction.
 -- -----------------------------------------------------------------------------
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check check (type in (
-  'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+-- Replaced only when the current check is missing or doesn't allow every type
+-- below, so re-running this file never narrows a list a later migration widened.
+do $$
+declare
+  v_def text;
+begin
+  select pg_get_constraintdef(oid) into v_def from pg_constraint
+   where conrelid = 'public.notifications'::regclass and conname = 'notifications_type_check';
+  if v_def is null or exists (
+    select 1 from unnest(array['question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
   'auction_live', 'auction_ended', 'auction_won', 'listing_submitted',
-  'watch_ending_soon', 'watch_live'
-));
+  'watch_ending_soon', 'watch_live']) as t(v)
+     where position(quote_literal(t.v) in v_def) = 0
+  ) then
+    alter table public.notifications drop constraint if exists notifications_type_check;
+    alter table public.notifications add constraint notifications_type_check check (type in (
+      'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+      'auction_live', 'auction_ended', 'auction_won', 'listing_submitted',
+      'watch_ending_soon', 'watch_live'
+    ));
+  end if;
+end $$;
 
 create unique index if not exists notifications_watch_once_idx
   on public.notifications (user_id, auction_id, type)
