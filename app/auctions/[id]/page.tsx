@@ -6,6 +6,7 @@ import { PreviewBanner } from "@/components/auction/preview-banner";
 import { Button } from "@/components/ui/button";
 import { getCurrentAdminId } from "@/lib/admin";
 import { PREVIEW_TEXT, isPreviewStatus } from "@/lib/listing-preview";
+import { loadSellerInfo } from "@/lib/seller-info";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { formatEur, formatKm } from "@/lib/format";
 import { DecisionPanel } from "@/app/account/listings/decision-panel";
@@ -201,6 +202,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
         holdEur={HOLD_EUR}
         preview={preview}
         inspectionPending={inspectionPending}
+        seller={await loadSellerInfo(auction)}
       />
     </main>
   );

@@ -11,6 +11,7 @@ import {
   extendSchema,
   fieldErrorsOf,
   acceptReportSchema,
+  approveSchema,
   declineWithdrawalSchema,
   rejectReportSchema,
   listingSchema,
@@ -22,7 +23,7 @@ import {
   auctionIdSchema,
   type AdminResult,
 } from "@/lib/admin-schemas";
-import { formatBaltic, fromBalticInputs } from "@/lib/baltic-time";
+import { formatDateTime, fromZonedInputs } from "@/lib/zoned-time";
 import { releaseAuctionHolds } from "@/lib/holds";
 import { detailsColumns } from "@/lib/listing-details";
 import { PHOTO_BUCKET, publicBucketPrefix } from "@/lib/sell";
@@ -483,7 +484,7 @@ export async function saveSchedule(input: unknown): Promise<AdminResult> {
 
   await logAdminAction(ctx, v.auctionId, "schedule.update", { starts_at: v.startsAt, ends_at: v.endsAt });
   refresh(v.auctionId);
-  return { ok: true, message: `Schedule saved: ${formatBaltic(v.startsAt)} to ${formatBaltic(v.endsAt)}, Eastern European time.` };
+  return { ok: true, message: `Schedule saved: ${formatDateTime(v.startsAt, v.tz)} to ${formatDateTime(v.endsAt, v.tz)}.` };
 }
 
 export async function extendAuction(input: unknown): Promise<AdminResult> {
@@ -502,7 +503,7 @@ export async function extendAuction(input: unknown): Promise<AdminResult> {
       ? new Date(current + 60 * 60 * 1000).toISOString()
       : v.mode === "1d"
         ? new Date(current + 24 * 60 * 60 * 1000).toISOString()
-        : fromBalticInputs(v.date ?? "", v.time ?? "");
+        : fromZonedInputs(v.date ?? "", v.time ?? "", v.tz);
   if (!newEnd) return { ok: false, error: "Enter a valid new end date and time." };
 
   const { error } = await ctx.db.rpc("admin_set_schedule", {
@@ -517,7 +518,7 @@ export async function extendAuction(input: unknown): Promise<AdminResult> {
   const longRun = Date.parse(newEnd) - Date.parse(auction.starts_at) > MAX_AUCTION_MS;
   return {
     ok: true,
-    message: `The auction now ends ${formatBaltic(newEnd)}, Eastern European time.${
+    message: `The auction now ends ${formatDateTime(newEnd, v.tz)}.${
       longRun ? " It now runs longer than 7 days, so some card holds may expire before it closes." : ""
     }`,
   };
@@ -527,7 +528,7 @@ export async function extendAuction(input: unknown): Promise<AdminResult> {
 // Status changes
 // -----------------------------------------------------------------------------
 export async function approveAuction(input: unknown): Promise<AdminResult> {
-  const g = await guard(auctionIdSchema, input);
+  const g = await guard(approveSchema, input);
   if ("result" in g) return g.result;
   const { ctx, data: v } = g;
   const a = await loadAuction(ctx, v.auctionId);
@@ -558,7 +559,7 @@ export async function approveAuction(input: unknown): Promise<AdminResult> {
     ok: true,
     message: startsNow
       ? "Approved. Bidding opens within a minute."
-      : `Approved. Bidding opens ${formatBaltic(a.starts_at)}, Eastern European time.`,
+      : `Approved. Bidding opens ${formatDateTime(a.starts_at, v.tz ?? "UTC")}.`,
   };
 }
 

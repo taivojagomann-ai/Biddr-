@@ -206,7 +206,6 @@ export function PriceStep({
         </p>
       ) : null}
 
-      <p className="mt-8 rounded-lg border border-line px-4 py-3 text-sm">Seller fee: [to be confirmed]</p>
     </section>
   );
 }

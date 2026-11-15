@@ -90,7 +90,7 @@ components/
   mobile-menu.tsx               disclosure menu for small screens
   site-footer.tsx               the same help links on every page
   notifications/                header bell and the shared notification item
-  account-menu.tsx              Profile, Selling, Watchlist, Notifications, Sign out
+  account-menu.tsx              Profile, My listings, Watchlist, Notifications, Sign out
   share-button.tsx              native share sheet or Copy link / Facebook / WhatsApp / X / Email
   auction/watch-button.tsx      Watch / Watching toggle and "<n> watching"
   ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select
@@ -105,7 +105,8 @@ lib/
   photo-upload.ts               browser-only: resize to WebP, upload with progress
   admin.ts                      server-only: requireAdmin(), logAdminAction()
   admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
-  baltic-time.ts                Europe/Tallinn date + time inputs <-> UTC
+  zoned-time.ts                 date + time in a given time zone <-> UTC, and display with the zone abbreviation
+  countries.ts                  the 27 EU countries
   demo/                         demo data: seed/remove, placeholder photos and PDF, bid generator
   site.ts                       footer links, support email and company placeholders
   bidder.ts                     server-only: bidder_status() check used by the hold route
@@ -129,11 +130,14 @@ supabase/migrations/0014_dealer_inspections.sql
 supabase/migrations/0015_seller_withdraw.sql
 supabase/migrations/0016_seller_inspection_decision.sql
 supabase/migrations/0017_inspected_by_seller.sql
+supabase/migrations/0018_eu_countries.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
 
 ## Accessibility
+
+Product decisions live in [DECISIONS.md](DECISIONS.md); check changes against them. The last full review is in [CONSISTENCY_REVIEW.md](CONSISTENCY_REVIEW.md).
 
 The site targets WCAG 2.2 AA. See [ACCESSIBILITY.md](ACCESSIBILITY.md) for what was checked and what's still open. `npm run test:a11y` runs axe, reflow and keyboard checks on every page against a mock Supabase, with no keys needed.
 
@@ -177,6 +181,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0015_seller_withdraw.sql` | Seller withdrawals: `withdraw_reason`, `withdraw_requested_at` and `withdraw_request_status` on `auction_private`, the `seller_withdraw` and `seller_request_withdrawal` functions (signed-in users only), `auctions.withdrawn_before_review` so a draft withdrawn before review stays private, the schedule rule allowing a withdrawn listing without times, and the `withdrawal_approved` / `withdrawal_declined` notification types | Run before deploying this version (My listings and the admin pages use it) |
 | `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
 | `0017_inspected_by_seller.sql` | `inspected_by_seller` on `auction_private` and `auctions`: the admin confirms a dealer seller inspected its own car, and the listing says "Inspected by the selling dealer" | Run before deploying this version (the admin review and auction page read it) |
+| `0018_eu_countries.sql` | All 27 EU countries: adds them to the country type used by profiles and car locations, and widens the registration-country check (old `other_eu` values stay valid) | Run before deploying this version (profile, sell form and filters offer every EU country) |
 
 ## Selling a car (`/sell`)
 
@@ -199,7 +204,7 @@ Photos from a draft that is never submitted stay in the bucket. Clean them up la
 
 ### Dealer inspections
 
-The only inspection Biddr accepts is a **pre-sale inspection by an authorised dealer of the car's brand, in any EU country**. The seller arranges it and uploads the report; an admin checks it during listing review. Inspections are optional for every car. (Booking an inspection with a Biddr partner in Tallinn, Riga or Vilnius was removed; its old columns stay in the database unused.)
+The only inspection Biddr accepts is a **pre-sale inspection by an authorised dealer of the car's brand, in any EU country**. The seller arranges it and uploads the report; an admin checks it during listing review. Inspections are optional for every car. (An earlier inspection-booking feature was removed; its old columns stay in the database unused.)
 
 - **Sell form** (Price and inspection step): "Do you have a pre-sale inspection report from an authorised <make> dealer?" (required, no default).
   - **Yes** asks for the dealer's name, city and EU country, the inspection date (not in the future, at most 90 days old), the mileage on the report, and the report itself: a PDF or photos, up to 10 files of 20 MB. Files go to the **private** `inspection-uploads` bucket under `<user id>/<draft id>/`. The server checks every path is in the seller's own draft folder and that the file exists, then saves the details with review status `pending`.
@@ -211,7 +216,7 @@ The only inspection Biddr accepts is a **pre-sale inspection by an authorised de
 - **Buyers** see the **Dealer inspected** badge (cards, featured car, auction page) only when `inspection_type = 'authorised_dealer'`. The inspection card says "Inspected by <dealer, city> (authorised <make> dealer) on <date>. Report checked by Biddr.", lists the highlights, and offers "Download report (PDF)" only when a redacted copy exists. Specifications have an "Inspection" row: "Dealer inspected" or "Not inspected". An accident-repaired car without one shows its repair description and "This accident-repaired car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos." When the admin ticks **Inspected by the selling dealer** (dealer sellers only, `inspected_by_seller`, `0017`), the badge stays but the card says "Inspected by the selling dealer, <dealer, city> …" and the info tip says it isn't an independent check.
 - **Home page History filter**: "Accident repaired" (any accident-repaired car) and "Accident repaired, dealer inspected". The URL values (`restored_any`, `restored`) stay the same so old links keep working.
 - **Badge names**: "Dealer inspected" (accepted authorised-dealer report) and "Accident repaired" (the seller declared accident damage and its repair; Biddr doesn't check the repair itself). Both have info tips on the auction page; /how-it-works explains them in full.
-- Listings that showed "Partner verified" before `0014` have no `inspection_type`, so they show "Not inspected" until a dealer report is accepted for them.
+- Listings with an inspection from before `0014` have no `inspection_type`, so they show "Not inspected" until a dealer report is accepted for them.
 
 ### Previewing a listing
 
@@ -265,7 +270,7 @@ To remove admin access, set `role = 'user'` the same way. The header shows an "A
 ### What it does
 
 - **Lists** every auction in five tabs with counts: To review (`draft`), Scheduled (`upcoming`), Live (ending soonest first), Finished (`ended`, `sold`, `reserve_not_met`) and Rejected or withdrawn.
-- **Per auction** (`/admin/auctions/<id>`): every listing detail is editable. Admins aren't held to the seller-only rules (minimum highlights, declaring modifications and flaws), so older listings can be saved. Also on the page: seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve. The admin can edit the listing text, remove photos or change the cover, and review the seller's dealer inspection report (see [Dealer inspections](#dealer-inspections)). They also set the starting bid, increment and reserve, set the schedule in Baltic time, and see all bids and delete comments.
+- **Per auction** (`/admin/auctions/<id>`): every listing detail is editable. Admins aren't held to the seller-only rules (minimum highlights, declaring modifications and flaws), so older listings can be saved. Also on the page: seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve. The admin can edit the listing text, remove photos or change the cover, and review the seller's dealer inspection report (see [Dealer inspections](#dealer-inspections)). They also set the starting bid, increment and reserve, set the schedule in their own time zone (stored in UTC), and see all bids and delete comments.
 - **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
 - **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. Inspections are optional for every car since `0013`, so restored cars can be approved without one. Auctions run at most 7 days because card holds expire after about 7 days.
 - **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The redacted public report PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only; sellers' original reports stay in a private bucket that only signed one-minute links can open.
@@ -372,7 +377,7 @@ The admin panel can fill the site with six example auctions, with bids, comments
   - sold yesterday (a restored car with an accepted dealer inspection, before photos and a public demo report PDF);
   - ended 3 days ago below its reserve.
 
-  Every car except the restored Porsche has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre, Tallinn", "Demo Audi Centre, Riga" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
+  Every car except the restored Porsche has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre", "Demo Audi Centre" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
 
   The demo users have `@biddr.invalid` emails and no passwords, so nobody can sign in as them.
 - **Reset demo data** (shown once demo data exists) removes it and creates it again with times relative to now. Demo auctions close on their own like real ones (the 12-minute one closes first), so reset whenever you need the live states back.
@@ -415,7 +420,7 @@ The migration was run on PostgreSQL 16 with Supabase-style stubs and these cases
 ## Next phases
 
 1. ~~`/login` (Supabase Auth: magic link + Google), profile completion (username, country, phone).~~ Done.
-2. ~~`/sell` multi-step form: details and VIN, history, photo upload to Storage, inspection city (Tallinn, Riga, Vilnius) stored in `auction_private.inspection_city`.~~ Done (the partner booking was later replaced by dealer reports, `0014`).
+2. ~~`/sell` multi-step form: details and VIN, history, photo upload to Storage.~~ Done (inspections: dealer reports, `0014`).
 3. ~~`/admin`: approve or reject drafts, attach the inspection PDF, set reserve, schedule.~~ Done.
 4. Winner checkout: premium charge, invoices, seller payout flow.
 5. i18n: wrap copy with `next-intl`, locales `en`, `et`, `lv`, `lt`.

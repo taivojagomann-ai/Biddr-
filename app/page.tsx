@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { AuctionFeed } from "@/components/auction/auction-feed";
 import { AuctionFilters } from "@/components/auction/auction-filters";
 import { parseFeedStatus, type FeedStatus } from "@/lib/feed";
+import { COUNTRY_NAMES, isEuCountry } from "@/lib/countries";
 import { parseSearchQuery } from "@/lib/search";
 import { SITE_INTRO } from "@/lib/site";
 import { getServerSupabase } from "@/lib/supabase/server";
@@ -18,7 +19,6 @@ export const metadata: Metadata = {
 
 type SearchParams = { status?: string; q?: string; country?: string; condition?: string };
 
-const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
 const CONDITIONS = ["clean", "restored", "restored_any"] as const;
 
 /** Home page link keeping the given filters; empty values are left out. */
@@ -33,7 +33,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const supabase = getServerSupabase();
   const status = parseFeedStatus(searchParams.status);
   const q = parseSearchQuery(searchParams.q);
-  const country = searchParams.country && COUNTRIES.includes(searchParams.country as Country) ? searchParams.country : null;
+  const country = isEuCountry(searchParams.country) ? searchParams.country : null;
   // URL values kept for old links: restored = accident repaired and dealer inspected; restored_any = every accident-repaired car.
   const condition = CONDITIONS.find((c) => c === searchParams.condition) ?? null;
   const now = Date.now();
@@ -118,6 +118,17 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       }
     : null;
 
+  // The country filter offers only countries that have listings people can see
+  // (plus the one in the address, so it never disappears while selected).
+  const { data: countryRows } = await supabase
+    .from("auctions")
+    .select("location_country")
+    .in("status", ["upcoming", "live", "ended", "sold", "reserve_not_met"])
+    .returns<{ location_country: Country }[]>();
+  const present = new Set<Country>((countryRows ?? []).map((r) => r.location_country));
+  if (country) present.add(country);
+  const filterCountries = [...present].sort((a, b) => COUNTRY_NAMES[a].localeCompare(COUNTRY_NAMES[b]));
+
   return (
     <main className="container flex flex-col gap-6 py-6 pb-16 md:py-10">
       <div className="max-w-2xl">
@@ -130,7 +141,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
       </div>
 
       <Suspense>
-        <AuctionFilters status={status} />
+        <AuctionFilters status={status} countries={filterCountries} />
       </Suspense>
 
       {error ? (

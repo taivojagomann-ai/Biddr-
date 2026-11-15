@@ -1,6 +1,7 @@
 // Structured listing details (0007): shared by the sell form, the admin editor and
 // the public auction page. No "use client" here; server code imports this.
 import { z } from "zod";
+import { EU_CODES, EU_COUNTRIES } from "@/lib/countries";
 import type { BodyStyle, RegistrationCountry, SellerType, ServiceRecord } from "@/lib/types";
 
 // Limits mirror the database checks in 0007_listing_details.sql.
@@ -21,12 +22,16 @@ export const BODY_STYLES: readonly { value: BodyStyle; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
+/** What the forms offer: every EU country (by name), then outside the EU. */
 export const REGISTRATION_OPTIONS: readonly { value: RegistrationCountry; label: string }[] = [
-  { value: "EE", label: "Estonia" },
-  { value: "LV", label: "Latvia" },
-  { value: "LT", label: "Lithuania" },
-  { value: "other_eu", label: "Another EU country" },
+  ...[...EU_COUNTRIES].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ value: c.code, label: c.name })),
   { value: "non_eu", label: "Outside the EU" },
+];
+
+/** For showing saved values: also "other_eu", which only listings from before 0018 have. */
+export const REGISTRATION_LABELS: readonly { value: RegistrationCountry; label: string }[] = [
+  ...REGISTRATION_OPTIONS,
+  { value: "other_eu", label: "Another EU country" },
 ];
 
 export const SELLER_TYPES: readonly { value: SellerType; label: string }[] = [
@@ -201,7 +206,7 @@ export interface OwnershipInput {
 export const bodyStyleSchema = z.enum(["coupe", "sedan", "estate", "hatchback", "convertible", "suv", "other"], {
   errorMap: () => ({ message: "Choose the body style." }),
 });
-export const registrationSchema = z.enum(["EE", "LV", "LT", "other_eu", "non_eu"], {
+export const registrationSchema = z.enum([...EU_CODES, "other_eu", "non_eu"], {
   errorMap: () => ({ message: "Choose where the car is registered." }),
 });
 export const sellerTypeSchema = z.enum(["private", "dealer"], { errorMap: () => ({ message: "Choose who is selling." }) });

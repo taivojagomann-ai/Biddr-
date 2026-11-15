@@ -1,7 +1,7 @@
 // Wording and links for notifications (0009). The database stores only the type
 // and ids/data, so all text is built here and can be translated later.
 // Shared by the header bell and /account/notifications.
-import { formatBaltic } from "@/lib/baltic-time";
+import { formatDateTime } from "@/lib/zoned-time";
 import { formatEur } from "@/lib/format";
 import type { NotificationRow, NotificationType } from "@/lib/types";
 
@@ -33,7 +33,8 @@ export interface NotificationCopy {
   title: string | null;
 }
 
-export function notificationCopy(n: NotificationRow): NotificationCopy {
+/** `tz`: the viewer's time zone for dates in the text (useTimeZone() in components). */
+export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCopy {
   const title = n.auction?.title ?? null;
   const car = title ?? "a car";
   const withTitle = (text: string): NotificationCopy => ({ text, title });
@@ -50,7 +51,7 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
     }
     case "listing_approved": {
       const starts = str(n.data.starts_at);
-      return withTitle(starts ? `Your listing was approved. Bidding starts ${formatBaltic(starts)}.` : "Your listing was approved.");
+      return withTitle(starts ? `Your listing was approved. Bidding starts ${formatDateTime(starts, tz)}.` : "Your listing was approved.");
     }
     case "listing_rejected":
       return withTitle("Your listing wasn't accepted");
@@ -92,7 +93,7 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
     case "inspection_decision_reminder": {
       const deadline = str(n.data.deadline);
       return withTitle(
-        `Please choose how to continue${deadline ? ` by ${formatBaltic(deadline)}` : " soon"}: upload a new inspection report or list without an inspection. Otherwise the listing is withdrawn.`,
+        `Please choose how to continue${deadline ? ` by ${formatDateTime(deadline, tz)}` : " soon"}: upload a new inspection report or list without an inspection. Otherwise the listing is withdrawn.`,
       );
     }
     case "inspection_decision_expired":

@@ -39,7 +39,7 @@ export function FeaturedLot({
 
       <div className="flex flex-col justify-between gap-6 p-5 md:p-7">
         <div>
-          <p className="text-sm text-mute">Closing next</p>
+          <p className="text-sm text-mute">Ending next</p>
           <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">
             <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
               {auction.title}

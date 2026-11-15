@@ -8,7 +8,7 @@ import type { Country } from "@/lib/types";
 import { STATUS_TABS, type FeedStatus } from "@/lib/feed";
 import { AuctionSearch } from "./auction-search";
 
-export function AuctionFilters({ status }: { status: FeedStatus }) {
+export function AuctionFilters({ status, countries }: { status: FeedStatus; countries: Country[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -69,7 +69,7 @@ export function AuctionFilters({ status }: { status: FeedStatus }) {
             <label className="text-xs text-mute" htmlFor="f-country">Country</label>
             <select id="f-country" className={selectClass} value={params.get("country") ?? ""} onChange={(e) => setParam("country", e.target.value)}>
               <option value="">All countries</option>
-              {(Object.keys(COUNTRY_NAMES) as Country[]).map((c) => (
+              {countries.map((c) => (
                 <option key={c} value={c}>{COUNTRY_NAMES[c]}</option>
               ))}
             </select>

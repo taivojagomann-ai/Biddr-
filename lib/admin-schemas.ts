@@ -1,7 +1,8 @@
 // Admin panel: zod schemas, labels and limits shared by server actions and client forms.
 // No "use client" here; server code imports this.
 import { z } from "zod";
-import { fromBalticInputs } from "@/lib/baltic-time";
+import { EU_CODES } from "@/lib/countries";
+import { fromZonedInputs, isValidTimeZone } from "@/lib/zoned-time";
 import {
   bodyStyleSchema,
   detailsSchema,
@@ -49,6 +50,8 @@ export const REPORT_PATH_RE =
 // Field helpers
 // -----------------------------------------------------------------------------
 const id = z.string().uuid("This link is broken. Reload the page.");
+/** An IANA time zone sent by the admin's browser (Intl). */
+const timeZone = z.string().refine(isValidTimeZone, "Your browser's time zone wasn't recognised. Reload the page.");
 
 const text = (label: string, min: number, max: number) =>
   z.string().trim().min(min, `Enter the ${label}.`).max(max, `Keep the ${label} under ${max} characters.`);
@@ -77,6 +80,8 @@ const wholeEuros = (empty: string, min: number, max: number, range: string) =>
 // Schemas
 // -----------------------------------------------------------------------------
 export const auctionIdSchema = z.object({ auctionId: id });
+/** Approving: the admin's time zone only words the confirmation message. */
+export const approveSchema = z.object({ auctionId: id, tz: timeZone.optional() });
 
 export const listingSchema = z.object({
   auctionId: id,
@@ -88,7 +93,7 @@ export const listingSchema = z.object({
   exteriorColor: text("colour", 2, 40),
   mileageKm: wholeEuros("Enter the mileage.", 0, 1_000_000, "Enter the mileage in km, from 0 to 1,000,000."),
   city: text("city", 2, 60),
-  country: z.enum(["EE", "LV", "LT"], { errorMap: () => ({ message: "Choose the country." }) }),
+  country: z.enum(EU_CODES, { errorMap: () => ({ message: "Choose the country." }) }),
   damageSummary: optionalText(4000, "summary"),
   videoUrl: z
     .string()
@@ -205,10 +210,12 @@ export const scheduleSchema = z
     startTime: z.string(),
     endDate: z.string(),
     endTime: z.string(),
+    /** The admin's own time zone: the inputs are wall-clock times in it. */
+    tz: timeZone,
   })
   .transform((v, ctx) => {
-    const startsAt = fromBalticInputs(v.startDate, v.startTime);
-    const endsAt = fromBalticInputs(v.endDate, v.endTime);
+    const startsAt = fromZonedInputs(v.startDate, v.startTime, v.tz);
+    const endsAt = fromZonedInputs(v.endDate, v.endTime, v.tz);
     if (!startsAt) ctx.addIssue({ code: "custom", path: ["start"], message: "Enter a valid start date and time." });
     if (!endsAt) ctx.addIssue({ code: "custom", path: ["end"], message: "Enter a valid end date and time." });
     if (!startsAt || !endsAt) return z.NEVER;
@@ -229,7 +236,7 @@ export const scheduleSchema = z
       ctx.addIssue({ code: "custom", path: ["end"], message: "The end time has already passed." });
       return z.NEVER;
     }
-    return { auctionId: v.auctionId, startsAt, endsAt };
+    return { auctionId: v.auctionId, startsAt, endsAt, tz: v.tz };
   });
 export type ScheduleInput = z.input<typeof scheduleSchema>;
 
@@ -239,9 +246,11 @@ export const extendSchema = z
     mode: z.enum(["1h", "1d", "custom"]),
     date: z.string().optional(),
     time: z.string().optional(),
+    /** The admin's own time zone (custom date and time, and the message). */
+    tz: timeZone,
   })
   .superRefine((v, ctx) => {
-    if (v.mode === "custom" && !fromBalticInputs(v.date ?? "", v.time ?? "")) {
+    if (v.mode === "custom" && !fromZonedInputs(v.date ?? "", v.time ?? "", v.tz)) {
       ctx.addIssue({ code: "custom", path: ["custom"], message: "Enter a valid new end date and time." });
     }
   });

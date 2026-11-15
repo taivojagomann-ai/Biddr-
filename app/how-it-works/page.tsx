@@ -40,7 +40,7 @@ export default function HowItWorksPage() {
     <main className="container max-w-3xl py-10 sm:py-14">
       <h1 className="font-wide text-3xl font-extrabold tracking-tight md:text-4xl">How it works</h1>
       <p className="mt-3 text-mute">
-        {SITE_INTRO} Biddr runs week-long online auctions. Here is what happens when you bid, and when you sell.
+        {SITE_INTRO} Biddr runs online auctions of up to 7 days. Here is what happens when you bid, and when you sell.
       </p>
 
       <nav aria-labelledby="toc-heading" className="mt-8 rounded-lg border border-line bg-panel p-4">
@@ -178,9 +178,9 @@ export default function HowItWorksPage() {
         <section aria-labelledby="after-you-win">
           <H2 id="after-you-win">After you win</H2>
           <p>
-            When the clock runs out with your bid on top and the reserve met, the auction shows <strong>Sold</strong>. We
-            contact you and the seller to arrange payment of the car and the buyer&apos;s premium, and the handover. Your{" "}
-            {formatEur(HOLD_EUR)} hold goes toward the premium.
+            When the clock runs out with your bid on top and the reserve met, the auction shows <strong>Sold</strong>. We put
+            you in touch with the seller: you pay for the car directly to the seller and arrange the handover with them.
+            Biddr only charges the buyer&apos;s premium, and your {formatEur(HOLD_EUR)} hold goes toward it.
           </p>
           <p>If the reserve isn&apos;t met, the car doesn&apos;t sell and your hold is released.</p>
         </section>
@@ -207,7 +207,6 @@ export default function HowItWorksPage() {
               it.
             </li>
           </ol>
-          <p>Seller fee: [to be confirmed].</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild>
               <Link href="/sell">Sell your car</Link>

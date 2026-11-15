@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Clock, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_AUCTION_MS } from "@/lib/admin-schemas";
-import { formatBaltic, fromBalticInputs, toBalticInputs } from "@/lib/baltic-time";
+import { useTimeZone } from "@/hooks/use-time-zone";
+import { formatDateTime, fromZonedInputs, toZonedInputs, zoneAbbreviation } from "@/lib/zoned-time";
 import { formatEur } from "@/lib/format";
 import type { AuctionStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,8 +50,17 @@ export function StatusActions({
 }) {
   const { run, pending, result } = useAdminAction();
   const [reason, setReason] = useState("");
-  const [customDate, setCustomDate] = useState(() => toBalticInputs(endsAt).date);
-  const [customTime, setCustomTime] = useState(() => toBalticInputs(endsAt).time);
+  // The admin's own time zone ("UTC" until the page has loaded in the browser).
+  const tz = useTimeZone();
+  const at = (iso: string | null) => formatDateTime(iso, tz);
+  const [customDate, setCustomDate] = useState(() => toZonedInputs(endsAt, tz).date);
+  const [customTime, setCustomTime] = useState(() => toZonedInputs(endsAt, tz).time);
+  const customEdited = useRef(false);
+  useEffect(() => {
+    if (customEdited.current) return;
+    setCustomDate(toZonedInputs(endsAt, tz).date);
+    setCustomTime(toZonedInputs(endsAt, tz).time);
+  }, [tz, endsAt]);
 
   const ready = checks.every((c) => c.done) && !waitingForSeller;
   const ok = async (p: Promise<{ ok: boolean }>) => (await p).ok;
@@ -62,8 +72,8 @@ export function StatusActions({
     return (
       <>
         <p>
-          The auction will end <span className="text-chalk">{formatBaltic(new Date(ms).toISOString())}</span>, Eastern European time,
-          instead of {formatBaltic(endsAt)}. Bidders see the new time straight away.
+          The auction will end <span className="text-chalk">{at(new Date(ms).toISOString())}</span>
+          instead of {at(endsAt)}. Bidders see the new time straight away.
         </p>
         {long ? (
           <p className="text-signal">
@@ -75,7 +85,7 @@ export function StatusActions({
     );
   };
   const endMs = endsAt ? Date.parse(endsAt) : null;
-  const customIso = fromBalticInputs(customDate, customTime);
+  const customIso = fromZonedInputs(customDate, customTime, tz);
 
   return (
     <div className="space-y-4">
@@ -102,7 +112,7 @@ export function StatusActions({
               <span>
                 Waiting for the seller to choose: new report or list without an inspection.{" "}
                 <span className="text-mute">
-                  Deadline {formatBaltic(waitingForSeller)}, Eastern European time. If they don&apos;t choose, the listing is
+                  Deadline {at(waitingForSeller)}. If they don&apos;t choose, the listing is
                   withdrawn automatically.
                 </span>
               </span>
@@ -118,14 +128,14 @@ export function StatusActions({
                 <>
                   <p>The listing becomes public as a scheduled auction.</p>
                   <p>
-                    Bidding opens <span className="text-chalk">{formatBaltic(startsAt)}</span> and ends{" "}
-                    <span className="text-chalk">{formatBaltic(endsAt)}</span>, Eastern European time. If the start has already
+                    Bidding opens <span className="text-chalk">{at(startsAt)}</span> and ends{" "}
+                    <span className="text-chalk">{at(endsAt)}</span>. If the start has already
                     passed, bidding opens within a minute.
                   </p>
                 </>
               }
               confirmLabel="Approve and schedule"
-              onConfirm={() => ok(run(approveAuction, { auctionId }))}
+              onConfirm={() => ok(run(approveAuction, { auctionId, tz }))}
             >
               {dialogError}
             </ConfirmButton>
@@ -166,7 +176,7 @@ export function StatusActions({
       {status === "upcoming" ? (
         <>
           <p className="text-sm text-mute">
-            Bidding opens {formatBaltic(startsAt)} and ends {formatBaltic(endsAt)}, Eastern European time.
+            Bidding opens {at(startsAt)} and ends {at(endsAt)}.
           </p>
           <div className="flex flex-wrap gap-2">
             <ConfirmButton
@@ -212,7 +222,7 @@ export function StatusActions({
       {status === "live" ? (
         <>
           <p className="text-sm text-mute">
-            Ends {formatBaltic(endsAt)}, Eastern European time. {bidCount} {bidCount === 1 ? "bid" : "bids"}
+            Ends {at(endsAt)}. {bidCount} {bidCount === 1 ? "bid" : "bids"}
             {currentBid ? `, high bid ${formatEur(currentBid)}` : ""}.
           </p>
           <div>
@@ -232,7 +242,7 @@ export function StatusActions({
                   title={`Extend by ${label.slice(1)}?`}
                   description={extendTo(endMs ? endMs + add : null)}
                   confirmLabel="Extend"
-                  onConfirm={() => ok(run(extendAuction, { auctionId, mode }))}
+                  onConfirm={() => ok(run(extendAuction, { auctionId, mode, tz }))}
                 >
                   {dialogError}
                 </ConfirmButton>
@@ -241,11 +251,11 @@ export function StatusActions({
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div>
                 <label htmlFor="extend-date" className="mb-1 block text-xs text-mute">
-                  New end (Eastern European time)
+                  New end ({zoneAbbreviation(tz)}, your time zone)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  <Input id="extend-date" type="date" className="min-w-0 flex-1" value={customDate} onChange={(e) => setCustomDate(e.target.value)} />
-                  <Input aria-label="New end time" type="time" value={customTime} onChange={(e) => setCustomTime(e.target.value)} className="w-32" />
+                  <Input id="extend-date" type="date" className="min-w-0 flex-1" value={customDate} onChange={(e) => { customEdited.current = true; setCustomDate(e.target.value); }} />
+                  <Input aria-label="New end time" type="time" value={customTime} onChange={(e) => { customEdited.current = true; setCustomTime(e.target.value); }} className="w-32" />
                 </div>
               </div>
               <ConfirmButton
@@ -256,7 +266,7 @@ export function StatusActions({
                 title="Change the end time?"
                 description={extendTo(customIso ? Date.parse(customIso) : null)}
                 confirmLabel="Change end time"
-                onConfirm={() => ok(run(extendAuction, { auctionId, mode: "custom", date: customDate, time: customTime }))}
+                onConfirm={() => ok(run(extendAuction, { auctionId, mode: "custom", date: customDate, time: customTime, tz }))}
               >
                 {dialogError}
               </ConfirmButton>

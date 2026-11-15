@@ -1,4 +1,3 @@
-import type { Country } from "./types";
 
 const eur = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const km = new Intl.NumberFormat("en-IE");
@@ -6,7 +5,7 @@ const km = new Intl.NumberFormat("en-IE");
 export const formatEur = (n: number): string => eur.format(n);
 export const formatKm = (n: number): string => `${km.format(n)} km`;
 
-export const COUNTRY_NAMES: Record<Country, string> = { EE: "Estonia", LV: "Latvia", LT: "Lithuania" };
+export { COUNTRY_NAMES } from "./countries";
 
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return "0:00";
@@ -64,7 +63,7 @@ export function timeAgo(iso: string, now: number = Date.now(), timeZone?: string
     : cached(shortDateYearFmt, timeZone, { day: "numeric", month: "short", year: "numeric" }).format(then);
 }
 
-/** Exact date and 24-hour time, e.g. "13 Nov 2026, 14:32". Defaults to the user's own time zone. */
+/** Exact date and 24-hour time with the zone, e.g. "13 Nov 2026, 14:32 CET". Defaults to the user's own time zone. */
 export function formatExactTime(iso: string, timeZone?: string): string {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return "";
@@ -75,5 +74,6 @@ export function formatExactTime(iso: string, timeZone?: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
+    timeZoneName: "short",
   }).format(then);
 }

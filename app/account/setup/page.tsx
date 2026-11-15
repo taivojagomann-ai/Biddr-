@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LocalDateTime } from "@/components/local-date-time";
 import { redirect } from "next/navigation";
 import { loginPath } from "@/lib/login";
 import { isProfileComplete } from "@/lib/profile";
@@ -19,7 +20,6 @@ type OwnProfile = {
 
 type TermsStatus = { bidding_terms_version: string | null; bidding_terms_accepted_at: string | null };
 
-const acceptedFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Tallinn" });
 
 export default async function AccountSetupPage({ searchParams }: { searchParams: { next?: string | string[] } }) {
   const next = safeNext(searchParams.next);
@@ -80,7 +80,7 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
           <p className="mt-1 text-sm text-mute">
             {acceptedCurrent && terms?.bidding_terms_accepted_at ? (
               <>
-                Bidding terms accepted on {acceptedFmt.format(new Date(terms.bidding_terms_accepted_at))} (version{" "}
+                Bidding terms accepted on <LocalDateTime iso={terms.bidding_terms_accepted_at} dateOnly /> (version{" "}
                 {terms.bidding_terms_version}).
               </>
             ) : terms?.bidding_terms_accepted_at ? (

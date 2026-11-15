@@ -399,7 +399,7 @@ test.describe("newly listed", () => {
     await expect(page).toHaveURL(/\?status=newest/);
     await expect(page.getByRole("link", { name: "Newly listed" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: /^Newly listed \(\d+\)$/ })).toBeVisible();
-    await expect(page.getByText("Closing next")).toHaveCount(0); // no featured block on this tab
+    await expect(page.getByText("Ending next")).toHaveCount(0); // no featured block on this tab
     await expect(page.getByRole("status").filter({ hasText: /^Newly listed: \d+ auctions?\.$/ })).toHaveCount(1);
     const fresh = page.locator("article.auction-card", { hasText: "Black Series" });
     await expect(fresh.getByText("New", { exact: true })).toBeVisible();
@@ -747,12 +747,12 @@ test.describe("search", () => {
 
   test("typing searches after a pause; results get a heading, no featured car, and an announcement", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Closing next")).toBeVisible();
+    await expect(page.getByText("Ending next")).toBeVisible();
     await box(page).click();
     await box(page).pressSequentially("bmw");
     await expect(page).toHaveURL(/q=bmw/);
     await expect(page.getByRole("heading", { name: "Results for “bmw” (1)" })).toBeVisible();
-    await expect(page.getByText("Closing next")).toHaveCount(0);
+    await expect(page.getByText("Ending next")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: "Live: 1 result for “bmw”." })).toHaveCount(1);
     await expect(page.locator("article.auction-card")).toHaveCount(1);
 
@@ -1068,7 +1068,7 @@ test.describe("seller decides after a rejected inspection report", () => {
     test("admins can't approve while the seller decides, and see the deadline", async ({ page }) => {
       await page.goto(`/admin/auctions/${GT4}`);
       await expect(page.getByText("Waiting for the seller to choose: new report or list without an inspection.")).toBeVisible();
-      await expect(page.getByText(/Deadline .+, Eastern European time/).first()).toBeVisible();
+      await expect(page.getByText(/Deadline \w{3}, \d{1,2} \w{3} \d{4}, \d{2}:\d{2} \S+\./).first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Approve and schedule" })).toBeDisabled();
       const section = page.locator("#inspection");
       await expect(section).toContainText("Seller's decision: waiting for them to choose");
@@ -1139,6 +1139,57 @@ test.describe("Dealer inspected and Accident repaired badges", () => {
       const box = page.locator("#inspection").getByRole("checkbox", { name: "Inspected by the selling dealer" });
       await expect(box).not.toBeChecked();
       await expect(box).toHaveAccessibleDescription(/same business as the seller/);
+    });
+  });
+});
+
+test.describe("consistency with DECISIONS.md", () => {
+  test("the auction page has a seller card with public facts only", async ({ page }) => {
+    await page.goto(`/auctions/${LIVE}`);
+    const card = page.getByRole("region", { name: "Seller", exact: true });
+    await expect(card).toContainText("baltic_m");
+    await expect(card).toContainText("Estonia");
+    await expect(card).toContainText("Member since");
+    await expect(card).toContainText(/cars? listed, \d+ sold/);
+    // Never the full name or phone number.
+    await expect(page.getByText("Mari Maasikas")).toHaveCount(0);
+    await expect(page.getByText("+37255555555")).toHaveCount(0);
+    await expectNoSeriousViolations(page, "Seller card", "[aria-labelledby=seller-heading]");
+  });
+
+  test("the country filter lists only countries with listings", async ({ page }) => {
+    await page.goto("/");
+    const options = await page.getByLabel("Country").locator("option").allTextContents();
+    expect(options[0]).toBe("All countries");
+    expect(options.slice(1).sort()).toEqual(["Estonia", "Latvia", "Lithuania"]);
+  });
+
+  test("no seller fee, no Baltic time, and the legal pages are marked drafts", async ({ page }) => {
+    await page.goto("/how-it-works");
+    await expect(page.getByText(/seller fee|to be confirmed/i)).toHaveCount(0);
+    await expect(page.getByText(/pay for the car directly to the seller/)).toBeVisible();
+    for (const path of ["/terms", "/privacy", "/terms/bidding"]) {
+      await page.goto(path);
+      await expect(page.getByRole("note")).toContainText("Draft");
+    }
+    await page.goto("/");
+    await expect(page).toHaveTitle(/^(?!.*Baltic).*$/);
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("profile offers all 27 EU countries", async ({ page }) => {
+      await page.goto("/account/setup");
+      const options = page.getByLabel("Country").locator("option:not([disabled])");
+      await expect(options).toHaveCount(27);
+      await expect(page.getByLabel("Country").locator("option", { hasText: "Germany" })).toHaveCount(1);
+    });
+
+    test("admin schedule inputs say which time zone they use", async ({ page }) => {
+      await page.goto(`/admin/auctions/${MY_DRAFT}`);
+      await expect(page.getByText(/^Start \(.+, your time zone\)$/)).toBeVisible();
+      await expect(page.getByText(/Eastern European time|Baltic time/)).toHaveCount(0);
     });
   });
 });

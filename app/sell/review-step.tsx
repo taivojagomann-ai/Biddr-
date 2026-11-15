@@ -1,7 +1,7 @@
 import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COUNTRY_NAMES, formatEur, formatKm } from "@/lib/format";
-import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
+import { BODY_STYLES, REGISTRATION_LABELS, labelOf } from "@/lib/listing-details";
 import { STEP, euCountryName, photoSectionsFor, type SellErrors, type SellPhotos, type StepId } from "@/lib/sell";
 import { cn } from "@/lib/utils";
 import { FieldError, StepHeading, fieldId } from "./field";
@@ -152,7 +152,7 @@ export function ReviewStep({
           <Row
             label="Registration"
             value={[
-              labelOf(REGISTRATION_OPTIONS, values.registrationCountry || null),
+              labelOf(REGISTRATION_LABELS, values.registrationCountry || null),
               values.isRegistered === "yes" ? "registered" : values.isRegistered === "no" ? "not registered right now" : "",
             ]
               .filter(Boolean)
@@ -235,7 +235,6 @@ export function ReviewStep({
               />
             </>
           ) : null}
-          <Row label="Seller fee" value="[to be confirmed]" />
         </Block>
       </div>
 
