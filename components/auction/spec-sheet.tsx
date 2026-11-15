@@ -1,3 +1,4 @@
+import { MapPin } from "lucide-react";
 import { COUNTRY_NAMES, formatKm } from "@/lib/format";
 import { DEALER_INSPECTED, NOT_INSPECTED, isDealerInspected } from "@/lib/inspection";
 import { BODY_STYLES, REGISTRATION_LABELS, labelOf } from "@/lib/listing-details";
@@ -10,8 +11,36 @@ function registration(a: Auction): string | null {
   return [where, status].filter(Boolean).join(", ") || null;
 }
 
+/**
+ * A Google Maps search for the city and country only, never a street address
+ * (DECISIONS.md point 10). No embedded map: a link is enough.
+ */
+export function mapsSearchUrl(city: string, country: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${city}, ${country}`)}`;
+}
+
+function Location({ city, country }: { city: string; country: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center justify-end gap-x-2">
+      <span>
+        {city}, {country}
+      </span>
+      <a
+        href={mapsSearchUrl(city, country)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-6 items-center gap-1 font-normal text-mute underline underline-offset-4 hover:text-chalk"
+      >
+        <MapPin aria-hidden className="size-3.5" />
+        View on map<span className="sr-only"> (opens Google Maps in a new tab)</span>
+      </a>
+    </span>
+  );
+}
+
 export function SpecSheet({ auction }: { auction: Auction }) {
-  const rows: [string, string | null][] = [
+  const country = COUNTRY_NAMES[auction.location_country];
+  const rows: [string, React.ReactNode][] = [
     ["VIN", auction.vin],
     ["Mileage", formatKm(auction.mileage_km)],
     ["Engine", auction.engine],
@@ -20,7 +49,7 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Body style", labelOf(BODY_STYLES, auction.body_style)],
     ["Colour", auction.exterior_color],
     ["Interior", auction.interior_color],
-    ["Location", `${auction.location_city}, ${COUNTRY_NAMES[auction.location_country]}`],
+    ["Location", <Location key="location" city={auction.location_city} country={country} />],
     ["History", auction.condition_type === "clean" ? "Clean, no recorded accidents" : "Accident damage, repaired"],
     ["Owners", auction.owner_count ? String(auction.owner_count) : null],
     ["Seller", auction.seller_type === "dealer" ? (auction.dealer_name ? `Dealer: ${auction.dealer_name}` : "Dealer") : "Private seller"],
@@ -28,7 +57,7 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Inspection", isDealerInspected(auction) ? DEALER_INSPECTED : NOT_INSPECTED],
   ];
 
-  const visible = rows.filter((r): r is [string, string] => Boolean(r[1]));
+  const visible = rows.filter((r) => Boolean(r[1]));
 
   return (
     <section aria-labelledby="specs-heading">
