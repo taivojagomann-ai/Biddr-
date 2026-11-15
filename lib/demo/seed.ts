@@ -65,6 +65,8 @@ interface CarSpec {
   condition: ConditionType;
   /** The authorised dealer whose pre-sale report an admin accepted; null = listed without an inspection. */
   dealer: DemoDealer | null;
+  /** The inspecting dealer is the selling dealer itself: "Inspected by the selling dealer". */
+  inspectedBySeller?: boolean;
   damageSummary: string | null;
   startingBid: number;
   bids: number;
@@ -99,9 +101,11 @@ const DEMO_BMW_TALLINN: DemoDealer = { name: "Demo BMW Centre", city: "Tallinn",
 const DEMO_BMW_VILNIUS: DemoDealer = { name: "Demo BMW Centre", city: "Vilnius", country: "LT" };
 const DEMO_AUDI_RIGA: DemoDealer = { name: "Demo Audi Centre", city: "Riga", country: "LV" };
 const DEMO_AUDI_HELSINKI: DemoDealer = { name: "Demo Audi Centre", city: "Helsinki", country: "FI" };
-const DEMO_MERCEDES_HELSINKI: DemoDealer = { name: "Demo Mercedes-Benz Centre", city: "Helsinki", country: "FI" };
+const DEMO_MERCEDES_TARTU: DemoDealer = { name: "Demo Mercedes-Benz Centre", city: "Tartu", country: "EE" };
 
 const DEMO_DEALER = { name: "Tallinn M Garage OÜ (demo)", code: "00000000" };
+/** An authorised dealer selling a car it inspected itself (0017). */
+const DEMO_MERCEDES_SELLER = { name: "Demo Mercedes-Benz Centre (demo)", code: "00000001" };
 
 const CARS: CarSpec[] = [
   {
@@ -191,11 +195,13 @@ const CARS: CarSpec[] = [
   {
     scenario: "upcoming", make: "Mercedes-AMG", model: "C63 S", variant: "Coupe", year: 2018, wmi: "WDD",
     mileageKm: 58_700, engine: "4.0 V8 twin-turbo, 510 hp", transmission: "9-speed automatic", drivetrain: "RWD",
-    color: "Selenite Grey", city: "Tartu", country: "EE", dealer: DEMO_MERCEDES_HELSINKI, condition: "clean",
+    color: "Selenite Grey", city: "Tartu", country: "EE", dealer: DEMO_MERCEDES_TARTU, condition: "clean",
+    // Shows a dealer seller that inspected its own car.
+    inspectedBySeller: true,
     damageSummary: null, startingBid: 52_000, bids: 0,
     highlights: ["Spark plugs and coils replaced at 55,000 km", "Rear tyres new in 2026", "No oil leaks found"],
     listing: {
-      bodyStyle: "coupe", interior: "Black Nappa leather with red stitching", owners: 3, dealer: DEMO_DEALER,
+      bodyStyle: "coupe", interior: "Black Nappa leather with red stitching", owners: 3, dealer: DEMO_MERCEDES_SELLER,
       registration: "EE", registered: true,
       highlights: ["510 hp twin-turbo V8", "AMG Performance seats", "Panoramic roof", "Spark plugs and coils done at 55,000 km"],
       equipment: ["AMG Performance seats", "Burmester sound", "Panoramic roof", "AMG Ride Control", "Keyless entry", "360-degree camera"],
@@ -514,6 +520,7 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         condition_type: car.condition,
         damage_history_summary: car.damageSummary,
         inspection_type: dealer ? "authorised_dealer" : null,
+        inspected_by_seller: Boolean(dealer && car.inspectedBySeller),
         inspection_partner_name: dealer ? `${dealer.name}, ${dealer.city}` : null,
         inspection_report_url: reportUrl,
         inspection_date: dealer ? inspectionDate : null,
@@ -559,6 +566,7 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         reserve_price: reserve,
         requested_reserve: reserve,
         dealer_inspection_provided: dealer !== null,
+        inspected_by_seller: Boolean(dealer && car.inspectedBySeller),
         dealer_name: dealer?.name ?? null,
         dealer_city: dealer?.city ?? null,
         dealer_country: dealer?.country ?? null,
