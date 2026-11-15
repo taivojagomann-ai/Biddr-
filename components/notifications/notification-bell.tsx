@@ -134,7 +134,8 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
     setAnnouncement("All notifications marked as read.");
   }
 
-  const label = unread ? `Notifications, ${unread} unread` : "Notifications, none unread";
+  // The name includes the badge's visible text ("9+"), so voice control users can say what they see (WCAG 2.5.3).
+  const label = unread ? `Notifications, ${badgeCount(unread)} unread` : "Notifications, none unread";
 
   return (
     <div ref={rootRef} className="sm:relative">
