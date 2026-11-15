@@ -16,7 +16,7 @@ export const APP_URL = `http://localhost:${APP_PORT}`;
 export const STRIPE_MOCK_PORT = Number(process.env.E2E_STRIPE_MOCK_PORT ?? 12111);
 
 /** Shared with the app build (playwright.e2e.config.ts). Test-only values. */
-export const STRIPE_SECRET_KEY = "sk_test_e2e_only";
+export const STRIPE_SECRET_KEY = "sk_test_e2eonly";
 export const STRIPE_WEBHOOK_SECRET = "whsec_e2e_only";
 export const CRON_SECRET = "e2e-cron-secret";
 export const PASSWORD = "e2e-Password-1234";
