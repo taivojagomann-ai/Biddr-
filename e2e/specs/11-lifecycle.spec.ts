@@ -1,5 +1,6 @@
 // Area 11: the auction lifecycle (the scheduled advance_auction_states job, run
 // directly) and card holds released through /api/stripe/release against stripe-mock.
+import { readFileSync } from "node:fs";
 import { test, expect } from "../support/fixtures";
 import { APP_URL, CRON_SECRET } from "../support/env";
 import { authorizeHold, bid, createAuction, createUser, getAuction, iso, DAY, HOUR, readyBidder, runJob, service, setAuction } from "../support/factory";
@@ -99,9 +100,11 @@ test.describe("card holds", () => {
     expect(await holdStatus(liveHold)).toBe("authorized");
   });
 
-  test.fixme("holds are released automatically on a schedule", async () => {
-    // vercel.json no longer schedules /api/stripe/release, so in production holds
-    // are only released when someone calls it. Needs a decision: restore the cron
-    // or release holds another way (for example from advance_auction_states).
+  test("holds are released automatically: vercel.json schedules the release job", async () => {
+    // Vercel calls the path on this schedule with "Authorization: Bearer $CRON_SECRET".
+    const config = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons?: { path: string; schedule: string }[] };
+    const job = (config.crons ?? []).find((c) => c.path === "/api/stripe/release");
+    expect(job, "vercel.json must schedule /api/stripe/release").toBeTruthy();
+    expect(job!.schedule).toMatch(/^\S+ \S+ \S+ \S+ \S+$/);
   });
 });
