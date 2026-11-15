@@ -2,6 +2,7 @@
 // (accept, reject, the seller's choice and the daily deadline job), pricing,
 // schedule, extend, withdraw, withdrawal requests, the activity log and demo data.
 import type { Page } from "@playwright/test";
+import { authenticator } from "otplib";
 import { test, expect, signIn, expectAccessible } from "../support/fixtures";
 import {
   createAuction,
@@ -270,5 +271,72 @@ test.describe("admin", () => {
     await expect(remove).toBeHidden({ timeout: 120_000 });
     expect(await count()).toBe(0);
     expect((await getAuction<{ status: string }>(real.id)).status).toBe("live");
+  });
+});
+
+test.describe("admin sign-in with two-step verification", () => {
+  test("the sign-in screen has a small admin link at the bottom; its dialog offers only Google", async ({ page }) => {
+    await page.goto("/login");
+    const link = page.getByRole("button", { name: "Sign in as an admin" });
+    // It's the last control on the page's main content.
+    const last = await page.locator("main button, main a, main input").last().textContent();
+    expect(last?.trim()).toBe("Sign in as an admin");
+    await link.click();
+    const dialog = page.getByRole("dialog", { name: "Sign in as an admin" });
+    await expect(dialog).toContainText("Admins sign in with Google, then enter a code from their authenticator app.");
+    await expect(dialog.getByRole("button")).toHaveText(["Continue with Google", "Close"]);
+    await expect(dialog.getByRole("textbox")).toHaveCount(0);
+    await expectAccessible(page, "Admin sign-in dialog", "[role=dialog]");
+
+    // Google sign-in starts, and comes back to the two-step page.
+    let authorizeUrl = "";
+    await page.route("**/auth/v1/authorize**", (route) => {
+      authorizeUrl = route.request().url();
+      return route.fulfill({ status: 200, body: "stopped by the test" });
+    });
+    await dialog.getByRole("button", { name: "Continue with Google" }).click();
+    await expect.poll(() => authorizeUrl).toContain("provider=google");
+    const redirectTo = new URL(authorizeUrl).searchParams.get("redirect_to") ?? "";
+    expect(new URL(redirectTo).searchParams.get("next")).toBe("/two-factor?next=%2Fadmin");
+  });
+
+  test("an admin with an authenticator: the panel asks for the code first; a wrong code is refused", async ({ page, context, seed }) => {
+    await signIn(context, seed.admin, { twoFactor: false });
+    await page.goto("/admin?tab=live");
+    await expect(page).toHaveURL(/\/two-factor\?next=%2Fadmin%3Ftab%3Dlive$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Two-step verification" })).toBeVisible();
+    await expectAccessible(page, "Two-step verification");
+    const wrong = authenticator.generate(seed.admin.totpSecret) === "000000" ? "111111" : "000000";
+    await page.getByLabel("6-digit code").fill(wrong);
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page.locator("#totp-error")).toContainText("That code is wrong or has expired.");
+    await page.getByLabel("6-digit code").fill(authenticator.generate(seed.admin.totpSecret));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page).toHaveURL(/\/admin\?tab=live$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Admin" })).toBeVisible();
+  });
+
+  test("a new admin sets up an authenticator with the QR code or key, then gets in", async ({ page, context }) => {
+    const admin = await createUser({ role: "admin" });
+    await signIn(context, admin);
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/two-factor\?next=%2Fadmin$/);
+    await expect(page.getByRole("img", { name: "QR code to add Biddr to your authenticator app" })).toBeVisible();
+    const secret = (await page.getByTestId("totp-secret").textContent())!.trim();
+    await expectAccessible(page, "Authenticator setup");
+    await page.getByLabel("2. Enter the 6-digit code the app shows").fill(authenticator.generate(secret));
+    await page.getByRole("button", { name: "Verify and continue" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Admin" })).toBeVisible();
+    // Next time they only need a code.
+    await signIn(context, admin);
+    await page.goto("/admin");
+    await expect(page.getByLabel("6-digit code")).toBeVisible();
+    await expect(page.getByRole("img", { name: /QR code/ })).toHaveCount(0);
+  });
+
+  test("members who open the two-step page go to the home page", async ({ page, context }) => {
+    await signIn(context, await createUser());
+    await page.goto("/two-factor?next=%2Fadmin");
+    await expect(page).toHaveURL("http://localhost:3100/");
   });
 });

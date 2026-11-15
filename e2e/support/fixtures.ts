@@ -5,10 +5,18 @@ import type { SeedState } from "../global-setup";
 import { sessionCookies } from "./supabase";
 import type { TestUser } from "./factory";
 
-/** Signs `user` in for this browser context (the same cookies a real sign-in sets). */
-export async function signIn(context: BrowserContext, user: Pick<TestUser, "email">): Promise<void> {
+/**
+ * Signs `user` in for this browser context (the same cookies a real sign-in sets).
+ * A user with a `totpSecret` (the seeded admin) also passes two-step verification,
+ * as admins must; pass `{ twoFactor: false }` to stop after the first step.
+ */
+export async function signIn(
+  context: BrowserContext,
+  user: Pick<TestUser, "email"> & { totpSecret?: string },
+  { twoFactor = true }: { twoFactor?: boolean } = {},
+): Promise<void> {
   await context.clearCookies();
-  await context.addCookies(await sessionCookies(user.email));
+  await context.addCookies(await sessionCookies(user.email, { totpSecret: twoFactor ? user.totpSecret : undefined }));
 }
 
 /** axe (WCAG 2.2 AA): fails on serious or critical problems. */
