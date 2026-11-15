@@ -14,6 +14,7 @@ import {
   type ReportCheckKey,
 } from "@/lib/admin-schemas";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import type { SellerInspectionDecision } from "@/lib/types";
 import { acceptInspectionReport, rejectInspectionReport, saveInspectionReport } from "../../actions";
 import { ActionMessage, FieldNote, useAdminAction } from "./action-feedback";
 import { Label } from "./section";
@@ -26,7 +27,12 @@ export interface DealerReportView {
   review: { status: "pending" | "accepted" | "rejected" | null; note: string | null; reviewedAt: string | null };
   /** Plain-language warnings worked out on the server (mileage, report age). */
   warnings: string[];
+  /** The seller's choice after a rejected report (0016). */
+  decision: { required: boolean; deadline: string | null; choice: SellerInspectionDecision | null; at: string | null };
 }
+
+const dateTime = (iso: string) =>
+  new Date(iso).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Tallinn" });
 
 const STATUS_TEXT = {
   pending: "Waiting for your review",
@@ -69,13 +75,23 @@ export function InspectionPanel({
           <span className="font-semibold">Review: </span>
           {status ? STATUS_TEXT[status] : "Not reviewed"}
           {status === "rejected" && report.review.note ? <span className="text-mute"> ({report.review.note})</span> : null}
-          {report.review.reviewedAt ? (
-            <span className="text-mute">
-              {" "}
-              · {new Date(report.review.reviewedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
-            </span>
-          ) : null}
+          {report.review.reviewedAt ? <span className="text-mute"> · {dateTime(report.review.reviewedAt)}</span> : null}
         </p>
+        {report.decision.required ? (
+          <p className="text-sm">
+            <span className="font-semibold">Seller&apos;s decision: </span>
+            waiting for them to choose a new report or to list without an inspection
+            {report.decision.deadline ? <span className="text-mute"> · deadline {dateTime(report.decision.deadline)}</span> : null}
+          </p>
+        ) : report.decision.choice ? (
+          <p className="text-sm">
+            <span className="font-semibold">Seller&apos;s decision: </span>
+            {report.decision.choice === "new_report"
+              ? "uploaded a new report (shown here, waiting for your review)"
+              : "list without an inspection (the listing can be approved without a badge)"}
+            {report.decision.at ? <span className="text-mute"> · {dateTime(report.decision.at)}</span> : null}
+          </p>
+        ) : null}
 
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
           <div>
@@ -132,10 +148,14 @@ export function InspectionPanel({
         </div>
       </div>
 
-      {reviewable ? (
+      {reviewable && status === "rejected" ? (
+        <p className="text-sm text-mute">
+          The report was rejected. A new report from the seller will appear here for the same checks.
+        </p>
+      ) : reviewable ? (
         <>
           <AcceptForm auctionId={auctionId} accepted={status === "accepted"} initialHighlights={initialHighlights} />
-          <RejectForm auctionId={auctionId} rejected={status === "rejected"} />
+          <RejectForm auctionId={auctionId} />
         </>
       ) : (
         <p className="text-sm text-mute">The auction has started, so the report decision can no longer change.</p>
@@ -250,7 +270,7 @@ function AcceptForm({ auctionId, accepted, initialHighlights }: { auctionId: str
   );
 }
 
-function RejectForm({ auctionId, rejected }: { auctionId: string; rejected: boolean }) {
+function RejectForm({ auctionId }: { auctionId: string }) {
   const action = useAdminAction();
   const [reason, setReason] = useState("");
   const error = action.fieldErrors.reason;
@@ -264,10 +284,11 @@ function RejectForm({ auctionId, rejected }: { auctionId: string; rejected: bool
       }}
     >
       <h3 id="reject-report-heading" className="font-semibold">
-        {rejected ? "Change the rejection reason" : "Reject the report"}
+        Reject the report
       </h3>
       <p className="text-xs text-mute">
-        The seller is notified with the reason. The listing can still be approved, without the Dealer inspected badge.
+        The seller is notified with the reason and has 30 days to upload a new report or list without an inspection (or
+        withdraw). Until they choose, the listing can&apos;t be approved. Only for listings waiting for review.
       </p>
       <div>
         <Label htmlFor="reject-report-reason">Reason</Label>

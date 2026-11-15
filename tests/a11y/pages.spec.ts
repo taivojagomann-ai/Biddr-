@@ -1010,3 +1010,70 @@ test.describe("seller withdrawals", () => {
     });
   });
 });
+
+test.describe("seller decides after a rejected inspection report", () => {
+  const GT4 = "10000000-0000-4000-8000-000000000009";
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("My listings shows the decision panel with the reason, the deadline and three choices", async ({ page }) => {
+      await page.goto("/account/listings");
+      await expect(page.getByText("Waiting for your decision", { exact: true }).first()).toBeVisible();
+      const panel = page.getByRole("region", { name: "Waiting for your decision" });
+      await expect(panel).toContainText("Your inspection report wasn't accepted: Not an authorised Porsche dealer");
+      await expect(panel).toContainText(/Please choose by \d{1,2} \w+ \d{4}\./);
+      await expect(panel.getByRole("button", { name: "Withdraw listing: 2019 Porsche 718 Cayman GT4" })).toBeVisible();
+      await expectNoSeriousViolations(page, "Decision panel");
+
+      // Upload a new report: the same fields as the sell form, validated.
+      const upload = panel.getByRole("button", { name: "Upload a new report" });
+      await expect(upload).toHaveAttribute("aria-expanded", "false");
+      await upload.click();
+      await expect(upload).toHaveAttribute("aria-expanded", "true");
+      const form = panel.getByRole("form", { name: "New inspection report" });
+      for (const label of ["Dealer's name", "Dealer's city", "Dealer's country", "Inspection date", "Mileage on the report"]) {
+        await expect(form.getByLabel(label)).toBeVisible();
+      }
+      await expect(form.getByRole("button", { name: "Add report files" })).toHaveAccessibleDescription(/Only Biddr's team sees this file/);
+      await form.getByRole("button", { name: "Send the new report" }).click();
+      await expect(form.getByText("Enter the dealer's name.")).toBeVisible();
+      await expect(form.getByLabel("Dealer's name")).toBeFocused();
+      await expect(form.getByLabel("Dealer's name")).toHaveAttribute("aria-invalid", "true");
+      await expectNoSeriousViolations(page, "New report form", "[aria-label='New inspection report']");
+    });
+
+    test("List without an inspection asks first, then shows the outcome with focus", async ({ page }) => {
+      await page.goto("/account/listings");
+      const panel = page.getByRole("region", { name: "Waiting for your decision" });
+      await panel.getByRole("button", { name: "List without an inspection: 2019 Porsche 718 Cayman GT4" }).click();
+      const dialog = page.getByRole("dialog", { name: "List without an inspection?" });
+      await expect(dialog).toContainText(
+        "Your listing will go live without a Dealer inspected badge. Buyers will see that the car hasn't been inspected by a dealer.",
+      );
+      await expectNoSeriousViolations(page, "List without inspection dialog", "[role=dialog]");
+      await dialog.getByRole("button", { name: "List without an inspection" }).click();
+      const done = page.getByRole("status").filter({ hasText: "reviewed without a dealer inspection" });
+      await expect(done).toBeFocused();
+    });
+
+    test("the listing preview shows the same decision panel", async ({ page }) => {
+      await page.goto(`/auctions/${GT4}`);
+      await expect(page.getByRole("region", { name: "Preview: only you can see this." })).toContainText(
+        "Waiting for your decision about the inspection report.",
+      );
+      await expect(page.getByRole("region", { name: "Waiting for your decision" })).toContainText("Not an authorised Porsche dealer");
+    });
+
+    test("admins can't approve while the seller decides, and see the deadline", async ({ page }) => {
+      await page.goto(`/admin/auctions/${GT4}`);
+      await expect(page.getByText("Waiting for the seller to choose: new report or list without an inspection.")).toBeVisible();
+      await expect(page.getByText(/Deadline .+, Eastern European time/).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "Approve and schedule" })).toBeDisabled();
+      const section = page.locator("#inspection");
+      await expect(section).toContainText("Seller's decision: waiting for them to choose");
+      await expect(section.getByRole("button", { name: "Accept report" })).toHaveCount(0);
+      await expectNoSeriousViolations(page, "Admin waiting for seller");
+    });
+  });
+});

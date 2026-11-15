@@ -8,7 +8,8 @@ import { getCurrentAdminId } from "@/lib/admin";
 import { PREVIEW_TEXT, isPreviewStatus } from "@/lib/listing-preview";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { formatEur, formatKm } from "@/lib/format";
-import { COMMENT_COLUMNS, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
+import { DecisionPanel } from "@/app/account/listings/decision-panel";
+import { COMMENT_COLUMNS, type SellerInspectionDecision, type Auction, type BidHistoryRow, type CommentRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -103,6 +104,8 @@ export default async function AuctionPage({ params }: { params: { id: string } }
   let isAdmin = false;
   let rejectionReason: string | null = null;
   let inspectionPending = false;
+  // The seller's choice after a rejected dealer report (0016), shown to the seller.
+  let decision: { required: boolean; reason: string | null; deadline: string | null; choice: SellerInspectionDecision | null } | null = null;
   if (preview && user) {
     isAdmin = (await getCurrentAdminId()) === user.id;
     if (isAdmin || auction.seller_id === user.id) {
@@ -110,16 +113,30 @@ export default async function AuctionPage({ params }: { params: { id: string } }
       // choice with the service role.
       const { data: row } = await getAdminSupabase()
         .from("auction_private")
-        .select("rejection_reason, dealer_inspection_provided, inspection_review_status")
+        .select(
+          "rejection_reason, dealer_inspection_provided, inspection_review_status, inspection_review_note, seller_decision_required, seller_decision_deadline, seller_decision",
+        )
         .eq("auction_id", auction.id)
         .maybeSingle<{
           rejection_reason: string | null;
           dealer_inspection_provided: boolean | null;
           inspection_review_status: string | null;
+          inspection_review_note: string | null;
+          seller_decision_required: boolean;
+          seller_decision_deadline: string | null;
+          seller_decision: SellerInspectionDecision | null;
         }>();
       rejectionReason = auction.status === "rejected" ? row?.rejection_reason ?? null : null;
       // A dealer report Biddr hasn't checked yet.
       inspectionPending = row?.dealer_inspection_provided === true && row.inspection_review_status === "pending";
+      if (auction.status === "draft" && auction.seller_id === user.id && (row?.seller_decision_required || row?.seller_decision)) {
+        decision = {
+          required: row.seller_decision_required,
+          reason: row.inspection_review_note,
+          deadline: row.seller_decision_deadline,
+          choice: row.seller_decision,
+        };
+      }
     }
   }
 
@@ -150,10 +167,26 @@ export default async function AuctionPage({ params }: { params: { id: string } }
                 <span className="font-semibold text-chalk">Not accepted:</span>{" "}
                 {rejectionReason ?? "We couldn't accept this listing. Contact us for details."}
               </p>
+            ) : decision?.required ? (
+              <p>Waiting for your decision about the inspection report.</p>
             ) : (
               <p>{PREVIEW_TEXT.waiting}</p>
             )}
           </PreviewBanner>
+          {decision && user ? (
+            <div className="mt-3">
+              <DecisionPanel
+                auctionId={auction.id}
+                userId={user.id}
+                title={auction.title}
+                make={auction.make}
+                required={decision.required}
+                reason={decision.reason}
+                deadline={decision.deadline}
+                choice={decision.choice}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
       <AuctionView

@@ -113,6 +113,13 @@ const AUCTIONS = [
     condition_type: "clean", gallery_urls: gallery("rs3"), starting_bid: 25000, starts_at: null, ends_at: null,
     status: "rejected", seller: { username: "test_admin", country: "EE" },
   },
+  // The signed-in test user's draft whose dealer report was rejected: they must choose (0016).
+  {
+    ...base, id: "10000000-0000-4000-8000-000000000009", seller_id: ME, title: "2019 Porsche 718 Cayman GT4",
+    make: "Porsche", model: "718 Cayman", variant: "GT4", year: 2019, vin: "WP0ZZZ98ZKS800001", mileage_km: 21000,
+    location_city: "Tallinn", condition_type: "clean", gallery_urls: gallery("gt4"), starting_bid: 80000,
+    starts_at: null, ends_at: null, status: "draft", seller: { username: "test_admin", country: "EE" },
+  },
   // The signed-in test user's live auction (they can only request a withdrawal).
   {
     ...base, id: "10000000-0000-4000-8000-000000000008", seller_id: ME, title: "2019 Alpine A110 Premiere",
@@ -178,6 +185,14 @@ const TABLES = {
     dealer_report_paths: [`${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000001.pdf`,
       `${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000002.jpg`],
     inspection_review_status: "pending", inspection_review_note: null, inspection_reviewed_by: null, inspection_reviewed_at: null, admin_notes: null, contact_notes: null, rejection_reason: null },
+    // A rejected dealer report: the seller has until the deadline to choose (0016).
+    { auction_id: "10000000-0000-4000-8000-000000000009", dealer_inspection_provided: true,
+      dealer_name: "Example Car Service", dealer_city: "Tartu", dealer_country: "EE",
+      dealer_inspection_date: new Date(Date.now() - 20 * 24 * H).toISOString().slice(0, 10), dealer_inspection_mileage_km: 20900,
+      dealer_report_paths: [`${ME}/10000000-0000-4000-8000-000000000009/aaaaaaaa-0000-4000-8000-000000000003.pdf`],
+      inspection_review_status: "rejected", inspection_review_note: "Not an authorised Porsche dealer",
+      inspection_reviewed_at: iso(-24 * H), seller_decision_required: true, seller_decision_deadline: iso(29 * 24 * H),
+      seller_decision: null, seller_decision_at: null, auction: { seller_id: ME } },
     // Another seller asked to withdraw the live M3 (0015).
     { auction_id: "10000000-0000-4000-8000-000000000001", withdraw_request_status: "pending",
       withdraw_reason: "The car was damaged in a hailstorm yesterday; the bonnet and roof are dented.",

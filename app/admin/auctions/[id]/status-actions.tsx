@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, Clock, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_AUCTION_MS } from "@/lib/admin-schemas";
@@ -33,6 +33,7 @@ export function StatusActions({
   currentBid,
   holdCount,
   rejectionReason,
+  waitingForSeller = null,
 }: {
   auctionId: string;
   status: AuctionStatus;
@@ -43,13 +44,15 @@ export function StatusActions({
   currentBid: number | null;
   holdCount: number;
   rejectionReason: string | null;
+  /** Deadline (ISO) while the seller chooses after a rejected inspection report; null otherwise. */
+  waitingForSeller?: string | null;
 }) {
   const { run, pending, result } = useAdminAction();
   const [reason, setReason] = useState("");
   const [customDate, setCustomDate] = useState(() => toBalticInputs(endsAt).date);
   const [customTime, setCustomTime] = useState(() => toBalticInputs(endsAt).time);
 
-  const ready = checks.every((c) => c.done);
+  const ready = checks.every((c) => c.done) && !waitingForSeller;
   const ok = async (p: Promise<{ ok: boolean }>) => (await p).ok;
   const dialogError = result && !result.ok ? <ActionMessage result={result} /> : null;
 
@@ -93,6 +96,18 @@ export function StatusActions({
               </li>
             ))}
           </ul>
+          {waitingForSeller ? (
+            <p className="flex items-start gap-2 rounded-md border border-signal/60 px-3 py-2 text-sm">
+              <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-signal" />
+              <span>
+                Waiting for the seller to choose: new report or list without an inspection.{" "}
+                <span className="text-mute">
+                  Deadline {formatBaltic(waitingForSeller)}, Eastern European time. If they don&apos;t choose, the listing is
+                  withdrawn automatically.
+                </span>
+              </span>
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <ConfirmButton
               label="Approve and schedule"
@@ -144,7 +159,7 @@ export function StatusActions({
               {dialogError}
             </ConfirmButton>
           </div>
-          {!ready ? <p className="text-xs text-mute">Fix the missing items above to approve.</p> : null}
+          {!ready && !waitingForSeller ? <p className="text-xs text-mute">Fix the missing items above to approve.</p> : null}
         </>
       ) : null}
 

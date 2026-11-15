@@ -38,6 +38,7 @@ export function DealerReportUpload({
   onChange,
   onBusyChange,
   error,
+  idBase,
 }: {
   userId: string;
   draftId: string;
@@ -45,6 +46,8 @@ export function DealerReportUpload({
   onChange: (next: ReportFile[]) => void;
   onBusyChange: (busy: boolean) => void;
   error?: string;
+  /** Id for the button (and its hint and error); defaults to the sell form's field id. */
+  idBase?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -52,7 +55,7 @@ export function DealerReportUpload({
   const [status, setStatus] = useState("");
   const filesRef = useRef(files);
   filesRef.current = files;
-  const id = fieldId("reportFiles");
+  const id = idBase ?? fieldId("reportFiles");
   const room = MAX_REPORT_FILES - files.length - pending.length;
 
   useEffect(() => onBusyChange(pending.some((p) => p.status === "uploading")), [pending, onBusyChange]);

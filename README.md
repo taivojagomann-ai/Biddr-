@@ -127,6 +127,7 @@ supabase/migrations/0012_search.sql
 supabase/migrations/0013_optional_inspections.sql
 supabase/migrations/0014_dealer_inspections.sql
 supabase/migrations/0015_seller_withdraw.sql
+supabase/migrations/0016_seller_inspection_decision.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -173,6 +174,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0013_optional_inspections.sql` | Inspections become optional: drops the `restored_needs_inspection` check so restored cars can be approved without one, adds `auction_private.inspection_requested` (city required only when it is true), and lets the search filter by any restored car | Run before deploying this version (the sell form saves the inspection choice) |
 | `0014_dealer_inspections.sql` | Authorised dealer inspections: dealer report and review columns on `auction_private`, `auctions.inspection_type`, the private `inspection-uploads` bucket (owners write and delete only in their own folder, no public read), the `inspection_rejected` notification type, and `search_auctions` re-created to return `inspection_type`. The old partner-booking columns stay but are no longer used | Run before deploying this version (the sell form and admin review use it) |
 | `0015_seller_withdraw.sql` | Seller withdrawals: `withdraw_reason`, `withdraw_requested_at` and `withdraw_request_status` on `auction_private`, the `seller_withdraw` and `seller_request_withdrawal` functions (signed-in users only), `auctions.withdrawn_before_review` so a draft withdrawn before review stays private, the schedule rule allowing a withdrawn listing without times, and the `withdrawal_approved` / `withdrawal_declined` notification types | Run before deploying this version (My listings and the admin pages use it) |
+| `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
 
 ## Selling a car (`/sell`)
 
@@ -202,7 +204,7 @@ The only inspection Biddr accepts is a **pre-sale inspection by an authorised de
   - **No** hides those fields. For accident-repaired cars the seller is told the listing will show the car hasn't been inspected by a dealer.
 - **Admin review** (`/admin/auctions/<id>`, Inspection section): the dealer details, report mileage against listing mileage, and plain warnings when the report shows more kilometres than the listing or is more than 90 days old at the scheduled start. Each file opens through a signed URL that lasts one minute (`/api/admin/inspection-file`).
   - **Accept report** needs all four boxes ticked ("Dealer is an authorised dealer of this brand", "VIN on the report matches the listing", "Mileage is consistent", "Report date is within 90 days") and 3 to 6 highlights. It sets `inspection_type = 'authorised_dealer'`, the public dealer name and city, date and highlights. The checklist is saved with the decision in `admin_actions`. After accepting, the admin can upload a **redacted** PDF to the public `inspection-reports` bucket for buyers to download.
-  - **Reject report** needs a reason. It clears every public inspection field and notifies the seller ("Your dealer inspection report wasn't accepted: <reason>…"). For now the listing can still be approved without the badge.
+  - **Reject report** needs a reason and works while the listing is waiting for review. It clears every public inspection field and the **seller decides** what happens next (see below).
   - Approving a listing never requires an inspection.
 - **Buyers** see the **Dealer inspected** badge (cards, featured car, auction page) only when `inspection_type = 'authorised_dealer'`. The inspection card says "Inspected by <dealer, city> (authorised <make> dealer) on <date>. Report checked by Biddr.", lists the highlights, and offers "Download report (PDF)" only when a redacted copy exists. Specifications have an "Inspection" row: "Dealer inspected" or "Not inspected". A restored car without one shows its repair description and "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos."
 - **Home page History filter**: "Restored" (any restored car) and "Restored, dealer inspected".
@@ -213,6 +215,20 @@ The only inspection Biddr accepts is a **pre-sale inspection by an authorised de
 - **Before submitting:** on the Review step, **Preview listing** opens the auction page exactly as buyers will see it (`/sell?preview=1`), built from the form's answers and the photos already uploaded. Nothing is saved. A banner at the top has **Back to edit** (the browser's Back button works too) and **Submit for review**.
 - **After submitting:** in **My listings**, drafts and rejected listings have a **Preview** link to their auction page. Only the seller and admins can open it; everyone else gets "This auction isn't listed" (the database already hides these rows). A banner says "Waiting for review." or "Not accepted:" with the reason, and admins also get **Open in admin**. These pages are marked `noindex`.
 - In a preview, bidding ("Bidding opens after review"), questions ("Questions open when the auction starts"), Watch and Share are turned off, and the inspection section says "Your dealer inspection report will show here once Biddr has checked it" when a report is waiting for review. The preview uses the same components as the live auction page (`components/auction/auction-view.tsx`), so the two can't drift apart.
+
+### After a rejected dealer report: the seller decides
+
+When an admin rejects a dealer inspection report, the listing doesn't go ahead without a badge on its own. The seller chooses:
+
+1. **Upload a new report**: the same dealer fields and upload as in the sell form (files in their own folder, `<user id>/<auction id>/`). It replaces the report (the rejected files are deleted), goes back to review as `pending`, and goes through the same four-item checklist again.
+2. **List without an inspection**: after a confirmation ("Your listing will go live without a Dealer inspected badge. Buyers will see that the car hasn't been inspected by a dealer."), calls `seller_inspection_decision(..., 'without_inspection')`. The admin can then approve the listing without a badge.
+3. **Withdraw listing**: the normal withdraw.
+
+- **Reject report** sets `seller_decision_required` and a deadline 30 days ahead, and notifies the seller ("Your inspection report wasn't accepted: <reason>. Choose how to continue."). It only works while the listing is waiting for review; move a scheduled listing back to review first.
+- **Seller**: My listings shows "Waiting for your decision" and a panel with the reason, "Please choose by <date>" and the three choices. The same panel shows on the listing preview.
+- **Admins**: while the seller decides, **Approve and schedule** is disabled with "Waiting for the seller to choose: new report or list without an inspection." and the deadline. When the seller chooses, every admin is notified ("<car>: seller chose a new report / to list without an inspection") and the review panel shows the choice.
+- **Deadline**: a daily job (`inspection_decision_job`) sends one reminder 7 days before the deadline. When it passes, the listing is withdrawn with the reason "No response after the inspection report was rejected", stays private (it was never public), and the seller is notified.
+- `seller_inspection_decision` checks the caller is the seller, the listing is a draft and a choice is due; errors: `NOT_OWNER`, `NOT_DRAFT`, `NO_DECISION_NEEDED`, `NEW_REPORT_NEEDS_UPLOAD` ('new_report' is saved by the server together with the upload), `INVALID_DECISION`.
 
 ### Withdrawing a listing
 

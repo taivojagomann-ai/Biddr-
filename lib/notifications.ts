@@ -16,6 +16,7 @@ const TYPES: readonly NotificationType[] = [
   "auction_live", "auction_ended", "auction_won", "listing_submitted",
   "watch_ending_soon", "watch_live", "inspection_rejected",
   "withdrawal_approved", "withdrawal_declined",
+  "seller_decided", "inspection_decision_reminder", "inspection_decision_expired",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -82,10 +83,20 @@ export function notificationCopy(n: NotificationRow): NotificationCopy {
     }
     case "inspection_rejected": {
       const reason = str(n.data.reason);
+      return withTitle(`Your inspection report wasn't accepted${reason ? `: ${reason}` : ""}. Choose how to continue.`);
+    }
+    case "seller_decided":
+      return titled(
+        `${car}: seller chose ${n.data.decision === "new_report" ? "a new report" : "to list without an inspection"}`,
+      );
+    case "inspection_decision_reminder": {
+      const deadline = str(n.data.deadline);
       return withTitle(
-        `Your dealer inspection report wasn't accepted${reason ? `: ${reason}` : ""}. The listing can still go live without the Dealer inspected badge.`,
+        `Please choose how to continue${deadline ? ` by ${formatBaltic(deadline)}` : " soon"}: upload a new inspection report or list without an inspection. Otherwise the listing is withdrawn.`,
       );
     }
+    case "inspection_decision_expired":
+      return withTitle("Your listing was withdrawn: no response after the inspection report was rejected.");
   }
 }
 
@@ -106,10 +117,13 @@ export function notificationHref(n: NotificationRow): string {
     case "listing_approved":
     case "listing_rejected":
     case "inspection_rejected":
+    case "inspection_decision_reminder":
+    case "inspection_decision_expired":
     case "withdrawal_approved":
     case "withdrawal_declined":
       return "/account/listings";
     case "listing_submitted":
+    case "seller_decided":
       return a ? `/admin/auctions/${a}` : "/admin";
   }
 }

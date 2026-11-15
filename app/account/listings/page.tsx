@@ -9,14 +9,21 @@ import { loginPath } from "@/lib/login";
 import { STATUS_LABELS } from "@/lib/sell";
 import { withdrawOption } from "@/lib/withdraw";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
-import type { Auction } from "@/lib/types";
+import type { Auction, AuctionPrivate } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
 
-type ListingRow = Pick<Auction, "id" | "title" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at">;
+type ListingRow = Pick<Auction, "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at">;
+
+type PrivateRow = Pick<
+  AuctionPrivate,
+  | "auction_id" | "rejection_reason" | "withdraw_request_status" | "inspection_review_note"
+  | "seller_decision_required" | "seller_decision_deadline" | "seller_decision"
+>;
 
 const STATUS_STYLES: Record<Auction["status"], string> = {
   draft: "border-line text-mute",
@@ -36,7 +43,7 @@ export default async function MyListingsPage() {
 
   const { data } = await supabase
     .from("auctions")
-    .select("id, title, status, current_bid, bid_count, gallery_urls, created_at")
+    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
@@ -44,19 +51,17 @@ export default async function MyListingsPage() {
 
   // Rejection reasons and withdrawal requests live in auction_private, which only admins
   // can read. Read them with the service role, strictly for this seller's own listings.
-  const reasons = new Map<string, string>();
-  const requests = new Map<string, string | null>();
+  const privates = new Map<string, PrivateRow>();
   if (listings.length) {
     const { data: rows } = await getAdminSupabase()
       .from("auction_private")
-      .select("auction_id, rejection_reason, withdraw_request_status, auction:auctions!inner(seller_id)")
+      .select(
+        "auction_id, rejection_reason, withdraw_request_status, inspection_review_note, seller_decision_required, seller_decision_deadline, seller_decision, auction:auctions!inner(seller_id)",
+      )
       .in("auction_id", listings.map((l) => l.id))
       .eq("auction.seller_id", user.id)
-      .returns<{ auction_id: string; rejection_reason: string | null; withdraw_request_status: string | null }[]>();
-    for (const r of rows ?? []) {
-      if (r.rejection_reason) reasons.set(r.auction_id, r.rejection_reason);
-      requests.set(r.auction_id, r.withdraw_request_status);
-    }
+      .returns<PrivateRow[]>();
+    for (const r of rows ?? []) privates.set(r.auction_id, r);
   }
 
   return (
@@ -79,7 +84,10 @@ export default async function MyListingsPage() {
           {listings.map((l) => {
             const cover = l.gallery_urls?.exterior?.[0];
             const isPublic = l.status !== "draft" && l.status !== "rejected";
-            const reason = reasons.get(l.id);
+            const priv = privates.get(l.id);
+            const reason = priv?.rejection_reason ?? undefined;
+            // After a rejected dealer report the seller chooses how to continue (0016).
+            const deciding = l.status === "draft" && Boolean(priv?.seller_decision_required);
             const body = (
               <>
                 <div className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md bg-asphalt sm:w-32">
@@ -93,7 +101,7 @@ export default async function MyListingsPage() {
                   <p className="truncate font-semibold">{l.title}</p>
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                     <span className={cn("rounded-sm border px-1.5 py-0.5 text-xs font-semibold", STATUS_STYLES[l.status])}>
-                      {STATUS_LABELS[l.status]}
+                      {deciding ? "Waiting for your decision" : STATUS_LABELS[l.status]}
                     </span>
                     {l.current_bid ? (
                       <span className="text-mute">
@@ -124,7 +132,7 @@ export default async function MyListingsPage() {
                 {isPublic ? <ChevronRight aria-hidden className="size-5 shrink-0 text-mute" /> : null}
               </>
             );
-            const requestStatus = requests.get(l.id) ?? null;
+            const requestStatus = priv?.withdraw_request_status ?? null;
             return (
               <li key={l.id}>
                 {isPublic ? (
@@ -135,13 +143,28 @@ export default async function MyListingsPage() {
                   <div className="flex items-center gap-4 p-3">{body}</div>
                 )}
                 {/* Outside the link: no buttons inside links. */}
-                <div className="px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
-                  <WithdrawActions
-                    auctionId={l.id}
-                    title={l.title}
-                    option={withdrawOption(l.status, requestStatus)}
-                    declined={requestStatus === "declined"}
-                  />
+                <div className="space-y-3 px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
+                  {l.status === "draft" && (deciding || priv?.seller_decision) ? (
+                    <DecisionPanel
+                      auctionId={l.id}
+                      userId={user.id}
+                      title={l.title}
+                      make={l.make}
+                      required={deciding}
+                      reason={priv?.inspection_review_note ?? null}
+                      deadline={priv?.seller_decision_deadline ?? null}
+                      choice={priv?.seller_decision ?? null}
+                    />
+                  ) : null}
+                  {/* While deciding, Withdraw is one of the panel's three choices. */}
+                  {deciding ? null : (
+                    <WithdrawActions
+                      auctionId={l.id}
+                      title={l.title}
+                      option={withdrawOption(l.status, requestStatus)}
+                      declined={requestStatus === "declined"}
+                    />
+                  )}
                 </div>
               </li>
             );
