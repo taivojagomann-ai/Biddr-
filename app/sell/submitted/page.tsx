@@ -2,15 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Listing submitted" };
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const NEXT_STEPS = [
-  { title: "We review your listing", body: "We check the details and photos, and ask you if anything is missing." },
+const REVIEW = { title: "We review your listing", body: "We check the details and photos, and ask you if anything is missing." };
+
+const STEPS_WITH_INSPECTION = [
+  REVIEW,
   {
     title: "We contact you to book the inspection",
     body: "Our partner inspects the car in the city you chose. Bidders see the report.",
@@ -18,10 +20,16 @@ const NEXT_STEPS = [
   { title: "We schedule the auction", body: "Once the car passes inspection, we agree the dates with you and it goes live." },
 ];
 
+const STEPS_WITHOUT_INSPECTION = [
+  REVIEW,
+  { title: "We schedule the auction", body: "Once we approve the listing, we agree the dates with you and it goes live." },
+];
+
 export default async function SellSubmittedPage({ searchParams }: { searchParams: { id?: string | string[] } }) {
   const id = typeof searchParams.id === "string" && UUID_RE.test(searchParams.id) ? searchParams.id : null;
 
   let title: string | null = null;
+  let inspectionRequested = false;
   if (id) {
     // RLS: sellers can read their own drafts, nobody else's.
     const { data } = await getServerSupabase()
@@ -30,7 +38,18 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
       .eq("id", id)
       .maybeSingle<{ title: string }>();
     title = data?.title ?? null;
+    if (title) {
+      // auction_private is admin-only; RLS just showed this listing is the user's own
+      // (or they're an admin), so read only its inspection choice with the service role.
+      const { data: priv } = await getAdminSupabase()
+        .from("auction_private")
+        .select("inspection_requested")
+        .eq("auction_id", id)
+        .maybeSingle<{ inspection_requested: boolean | null }>();
+      inspectionRequested = priv?.inspection_requested === true;
+    }
   }
+  const steps = inspectionRequested ? STEPS_WITH_INSPECTION : STEPS_WITHOUT_INSPECTION;
 
   return (
     <main className="container max-w-2xl py-12 sm:py-20">
@@ -43,12 +62,13 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
           </>
         ) : (
           "Your listing is waiting for review."
-        )}
+        )}{" "}
+        {inspectionRequested ? "We'll contact you to book the inspection." : "We'll review your listing."}
       </p>
 
       <h2 className="mt-10 text-lg font-bold">What happens next</h2>
       <ol className="mt-4 space-y-4">
-        {NEXT_STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s.title} className="flex gap-4 rounded-lg border border-line bg-panel p-4">
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-line font-wide text-sm font-bold">
               {i + 1}

@@ -65,6 +65,8 @@ interface CarSpec {
   country: Country;
   inspectionCity: InspectionCity;
   condition: ConditionType;
+  /** false: listed without an independent inspection (the seller's choice). Default true. */
+  inspected?: boolean;
   damageSummary: string | null;
   startingBid: number;
   bids: number;
@@ -153,16 +155,20 @@ const CARS: CarSpec[] = [
   {
     scenario: "no_reserve_no_bids", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
     mileageKm: 24_900, engine: "3.0 flat-6 twin-turbo, 450 hp", transmission: "8-speed PDK", drivetrain: "RWD",
-    color: "Gentian Blue", city: "Vilnius", country: "LT", inspectionCity: "Vilnius", condition: "clean",
-    damageSummary: null, startingBid: 105_000, bids: 0,
-    highlights: ["PDK serviced at 20,000 km", "Paint thickness measured on all panels", "No signs of track use"],
+    color: "Gentian Blue", city: "Vilnius", country: "LT", inspectionCity: "Vilnius", condition: "restored_accident",
+    // Shows a restored car listed without an independent inspection.
+    inspected: false,
+    damageSummary:
+      "Rear-right impact while parked in 2022. Rear bumper and right rear quarter panel repaired and repainted at an independent body shop in Vilnius. No structural damage according to the shop. Airbags did not deploy.",
+    startingBid: 105_000, bids: 0,
+    highlights: [],
     listing: {
       bodyStyle: "coupe", interior: "Black leather with Chalk stitching", owners: 2, dealer: null,
       registration: "LT", registered: true,
       highlights: ["No reserve", "Sport Chrono package and sports exhaust", "Rear-axle steering", "PDK serviced at 20,000 km"],
       equipment: ["Sport Chrono package", "Sports exhaust", "Rear-axle steering", "BOSE sound", "Front axle lift", "Adaptive sports seats Plus", "LED Matrix headlights"],
       modifications: "none",
-      flaws: "none",
+      flaws: ["Slight orange peel on the repainted rear quarter panel"],
       service: [
         ["2020-11", 6_100, "Oil service", "Porsche Vilnius"],
         ["2021-11", 12_700, "Oil service and inspection", "Porsche Vilnius"],
@@ -424,6 +430,7 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       const id = randomUUID();
       const schedule = scheduleFor(car.scenario, now);
       const restored = car.condition === "restored_accident";
+      const inspected = car.inspected !== false;
 
       // Photos
       const set = PHOTO_SET.filter((p) => p.section !== "before" || restored);
@@ -438,9 +445,9 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       for (const u of uploads) urls[u.section]!.push(db.storage.from(PHOTO_BUCKET).getPublicUrl(u.path).data.publicUrl);
       files += uploads.length;
 
-      // Inspection report (restored cars need one)
+      // Inspection report for inspected restored cars (clean demo cars show the partner without a PDF)
       let reportUrl: string | null = null;
-      if (restored) {
+      if (restored && inspected) {
         const path = `${DEMO_FOLDER}/${id}/report.pdf`;
         const title = listingTitle({ year: car.year, make: car.make, model: car.model, variant: car.variant });
         const { error } = await db.storage
@@ -487,10 +494,10 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         location_country: car.country,
         condition_type: car.condition,
         damage_history_summary: car.damageSummary,
-        inspection_partner_name: PARTNER,
+        inspection_partner_name: inspected ? PARTNER : null,
         inspection_report_url: reportUrl,
-        inspection_date: inspectionDate,
-        inspection_highlights: car.highlights,
+        inspection_date: inspected ? inspectionDate : null,
+        inspection_highlights: inspected ? car.highlights : [],
         body_style: car.listing.bodyStyle,
         interior_color: car.listing.interior,
         owner_count: car.listing.owners,
@@ -531,7 +538,8 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         auction_id: id,
         reserve_price: reserve,
         requested_reserve: reserve,
-        inspection_city: car.inspectionCity,
+        inspection_requested: inspected,
+        inspection_city: inspected ? car.inspectionCity : null,
       });
       if (privateError) fail("Saving the reserve", privateError);
 

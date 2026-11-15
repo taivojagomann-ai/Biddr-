@@ -78,7 +78,7 @@ function sellDraft(step: number) {
       serviceHistory: [{ date: "2025-06", mileage: "11000", description: "Oil service", workshop: "BMW Tallinn" }],
       itemsIncluded: ["Second key"], sellerNotes: "Garaged.",
       damageSummary: "Rear bumper replaced at a main-dealer body shop after a car park scrape. Airbags did not deploy.",
-      videoUrl: "", startingBid: "60000", reserve: "70000", inspectionCity: "Tallinn", inspectionDates: "", confirmed: false,
+      videoUrl: "", startingBid: "60000", reserve: "70000", inspectionRequested: "yes", inspectionCity: "Tallinn", inspectionDates: "", confirmed: false,
     },
     photos: { exterior: list("exterior", 6), interior: list("interior", 4), mechanical: list("mechanical", 2), before: list("before", 2) },
   });
@@ -797,5 +797,89 @@ test.describe("search", () => {
     const field = await box(page).boundingBox();
     expect(field && field.width).toBeGreaterThan(320 - 2 * 16 - 2);
     await noHorizontalScroll(page, "search at 320px");
+  });
+});
+
+test.describe("optional inspections", () => {
+  test("a restored car without an inspection says so in words, and has no Partner verified badge", async ({ page }) => {
+    await page.goto(`/auctions/${UPCOMING}`);
+    const section = page.getByRole("region", { name: "Not independently inspected" });
+    await expect(section).toContainText(
+      "This restored car hasn't been independently inspected. Ask the seller for repair documents and photos.",
+    );
+    await expect(section).toContainText("Rear-right quarter panel repaired");
+    await expect(page.getByText(/Verified by/)).toHaveCount(0);
+    const specs = page.getByRole("region", { name: "Specifications" });
+    await expect(specs.getByText("Inspection", { exact: true })).toBeVisible();
+    await expect(specs.getByText("Not inspected", { exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "Restored, not inspected");
+  });
+
+  test("an inspected car shows Partner verified in its specifications", async ({ page }) => {
+    await page.goto(`/auctions/${RESTORED}`);
+    const specs = page.getByRole("region", { name: "Specifications" });
+    await expect(specs.getByText("Partner verified", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Not independently inspected" })).toHaveCount(0);
+  });
+
+  test("the History filter offers any restored car and partner-verified restored cars", async ({ page }) => {
+    await page.goto("/?status=upcoming");
+    const history = page.getByLabel("History");
+    await expect(history.locator("option")).toHaveText(["Any history", "Clean history", "Restored", "Restored, partner verified"]);
+    await history.selectOption("restored_any");
+    await expect(page).toHaveURL(/condition=restored_any/);
+    await expect(page.locator("article.auction-card", { hasText: "Porsche 911" })).toBeVisible();
+    await history.selectOption("restored");
+    await expect(page).toHaveURL(/condition=restored(&|$)/);
+    await expect(page.locator("article.auction-card", { hasText: "Porsche 911" })).toHaveCount(0);
+  });
+
+  test("the home page no longer promises inspections for every restored car", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/optional independent inspections\./)).toBeVisible();
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /optional independent inspections/);
+  });
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("the sell form asks about an inspection with no default and shows the city only for Yes", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(5).replace('"inspectionRequested":"yes"', '"inspectionRequested":""')] as const,
+      );
+      await page.goto("/sell");
+      const question = page.getByRole("group", { name: "Would you like an independent inspection?" });
+      await expect(question).toHaveAccessibleDescription(/An independent workshop checks the car/);
+      const yes = question.getByRole("radio", { name: "Yes, book an inspection" });
+      const no = question.getByRole("radio", { name: "No, list without an inspection" });
+      await expect(yes).not.toBeChecked();
+      await expect(no).not.toBeChecked();
+      await expect(page.getByLabel("Inspection location")).toHaveCount(0);
+
+      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(page.getByText("Choose whether you'd like an independent inspection.")).toBeVisible();
+      await expect(yes).toBeFocused();
+
+      await no.check();
+      await expect(page.getByText("Your listing will show that the car hasn't been independently inspected.", { exact: false })).toBeVisible();
+      await yes.check();
+      await expect(page.getByLabel("Inspection location")).toBeVisible();
+      await expectNoSeriousViolations(page, "Inspection question");
+
+      await no.check();
+      await page.getByRole("button", { name: "Continue" }).click();
+      await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+      await expect(page.getByText("No, list without an inspection")).toBeVisible();
+      await expect(page.getByText("We'll review your listing.")).toBeVisible();
+      await expect(page.getByText("Inspection location")).toHaveCount(0);
+    });
+
+    test("admins see whether the seller asked for an inspection", async ({ page }) => {
+      await page.goto(`/admin/auctions/${MY_DRAFT}`);
+      await expect(page.getByText("Inspection requested:").first()).toBeVisible();
+      await expect(page.getByText(/restored car\. It can.t be approved/)).toHaveCount(0);
+      await expect(page.getByText(/Inspection partner added \(restored car\)/)).toHaveCount(0);
+    });
   });
 });

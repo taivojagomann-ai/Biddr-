@@ -56,7 +56,7 @@ function dbMessage(error: { message?: string; code?: string } | null): string {
   const known = error.message ? DB_ERROR_MESSAGES[error.message] : undefined;
   if (known) return known;
   if (error.code === "23514") {
-    return "A restored car that is scheduled or live needs an inspection partner and a report PDF.";
+    return "The database refused this change because it breaks a rule for this auction, for example the schedule. Check the values and try again.";
   }
   console.error("admin db error", error);
   return FAILED_MSG;
@@ -406,9 +406,6 @@ export async function approveAuction(input: unknown): Promise<AdminResult> {
   else if (Date.parse(a.ends_at) <= Date.now()) missing.push("move the end time into the future");
   else if (Date.parse(a.ends_at) - Date.parse(a.starts_at) > MAX_AUCTION_MS) missing.push("shorten the auction to 7 days or less");
   if (!a.gallery_urls.exterior?.length) missing.push("keep at least one exterior photo for the cover");
-  if (a.condition_type === "restored_accident" && (!a.inspection_partner_name || !a.inspection_report_url)) {
-    missing.push("add the inspection partner and report PDF (required for restored cars)");
-  }
   if (missing.length) return { ok: false, error: `Before approving, ${missing.join(", and ")}.` };
 
   const changed = await changeStatus(ctx, v.auctionId, ["draft"], "upcoming");

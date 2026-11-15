@@ -26,7 +26,6 @@ export interface ApprovalCheck {
 export function StatusActions({
   auctionId,
   status,
-  restored,
   startsAt,
   endsAt,
   checks,
@@ -37,7 +36,6 @@ export function StatusActions({
 }: {
   auctionId: string;
   status: AuctionStatus;
-  restored: boolean;
   startsAt: string | null;
   endsAt: string | null;
   checks: ApprovalCheck[];
@@ -95,12 +93,6 @@ export function StatusActions({
               </li>
             ))}
           </ul>
-          {restored ? (
-            <p className="text-xs text-mute">
-              This is a restored car. It can&apos;t be approved until the inspection partner and the report PDF are added
-              below, because bidders rely on the independent inspection.
-            </p>
-          ) : null}
           <div className="flex flex-wrap gap-2">
             <ConfirmButton
               label="Approve and schedule"

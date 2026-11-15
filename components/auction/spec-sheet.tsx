@@ -24,6 +24,7 @@ export function SpecSheet({ auction }: { auction: Auction }) {
     ["Owners", auction.owner_count ? String(auction.owner_count) : null],
     ["Seller", auction.seller_type === "dealer" ? (auction.dealer_name ? `Dealer: ${auction.dealer_name}` : "Dealer") : "Private seller"],
     ["Registration", registration(auction)],
+    ["Inspection", auction.inspection_partner_name ? "Partner verified" : "Not inspected"],
   ];
 
   const visible = rows.filter((r): r is [string, string] => Boolean(r[1]));

@@ -50,9 +50,9 @@ export function HistoryStep({ values, errors, set }: StepProps) {
       <div className="mt-6 flex gap-3 rounded-lg border border-line bg-panel p-4 text-sm">
         <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-verified" />
         <p className="text-mute">
-          <span className="font-semibold text-chalk">Restored cars are welcome.</span> Every restored car gets an
-          independent inspection before we list it, and bidders see the report. An honest description of the repair
-          helps you get a better price.
+          <span className="font-semibold text-chalk">Restored cars are welcome.</span> An honest description of the
+          repair helps you get a better price. You can also book an independent inspection in a later step; bidders
+          then see the report.
         </p>
       </div>
 

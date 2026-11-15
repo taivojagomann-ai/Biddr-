@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   // Makes Open Graph and Twitter image URLs absolute. Set NEXT_PUBLIC_SITE_URL in Vercel.
   metadataBase: new URL(siteUrl()),
   title: { default: "Biddr: performance car auctions", template: "%s | Biddr" },
-  description: "Buy and sell exceptional performance cars with transparent bidding, documented service histories and independent inspections for restored cars.",
+  description: "Buy and sell exceptional performance cars with transparent bidding, documented service histories and optional independent inspections.",
 };
 
 export const viewport: Viewport = {

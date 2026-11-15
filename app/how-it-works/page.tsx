@@ -155,16 +155,18 @@ export default function HowItWorksPage() {
             <div>
               <dt className="font-semibold">Partner verified</dt>
               <dd className="mt-1 text-mute">
-                An independent workshop inspected the car before it was listed. The workshop is independent of the seller. You can
-                read the highlights on the auction page and download the full report.
+                The seller chose an independent inspection, and a partner workshop inspected the car before it was listed.
+                The workshop is independent of the seller. You can read the highlights on the auction page and download the
+                full report. Inspections are optional, so cars without this badge haven&apos;t been inspected; the
+                specifications say &ldquo;Not inspected&rdquo;.
               </dd>
             </div>
             <div>
               <dt className="font-semibold">Professionally restored</dt>
               <dd className="mt-1 text-mute">
                 The car had accident damage and has been repaired. The seller describes what was damaged and how it was
-                fixed, and we list a restored car only after a partner inspection, so you can read the report before you
-                bid.
+                fixed. If the car was also inspected, it carries the Partner verified badge and you can read the report
+                before you bid. If not, the auction page says so clearly: ask the seller for repair documents and photos.
               </dd>
             </div>
           </dl>
@@ -188,11 +190,13 @@ export default function HowItWorksPage() {
               form, and your answers are saved as you go.
             </li>
             <li>
-              <strong>Inspection.</strong> We book an independent inspection at a partner workshop. Restored cars are
-              welcome; every one is inspected before it&apos;s listed.
+              <strong>Inspection, if you want one.</strong> You choose whether to book an independent inspection at a
+              partner workshop. Inspected cars carry the Partner verified badge and give buyers more confidence. Restored
+              cars are welcome either way.
             </li>
             <li>
-              <strong>We review the listing</strong> with the inspection report and agree the auction dates with you.
+              <strong>We review the listing</strong> (with the inspection report, if there is one) and agree the auction
+              dates with you.
             </li>
             <li>
               <strong>Your auction runs</strong> for up to 7 days. If you set a reserve, the car only sells if bidding reaches

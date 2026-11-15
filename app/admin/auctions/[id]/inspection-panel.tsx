@@ -11,12 +11,10 @@ import { Label } from "./section";
 
 export function InspectionPanel({
   auctionId,
-  restored,
   initial,
   reportUrl,
 }: {
   auctionId: string;
-  restored: boolean;
   initial: { partnerName: string; inspectionDate: string; highlights: string[] };
   reportUrl: string | null;
 }) {
@@ -77,7 +75,7 @@ export function InspectionPanel({
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="insp-partner" optional={!restored}>
+            <Label htmlFor="insp-partner" optional>
               Inspection partner
             </Label>
             <Input id="insp-partner" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} maxLength={80} />

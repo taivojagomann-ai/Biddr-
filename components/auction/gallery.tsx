@@ -34,7 +34,9 @@ export function Gallery({ auction }: { auction: Auction }) {
         <TabsContent key={s.key} value={s.key}>
           {s.key === "before" && (
             <p className="mb-3 rounded-md border border-line bg-panel px-3 py-2 text-sm text-mute">
-              Photos of the damage before repair, supplied by the seller and checked by the inspection partner.
+              {auction.inspection_partner_name
+                ? "Photos of the damage before repair, supplied by the seller and checked by the inspection partner."
+                : "Photos of the damage before repair, supplied by the seller."}
             </p>
           )}
           <PhotoStrip photos={s.photos} alt={`${auction.title}, ${s.label.toLowerCase()}`} />

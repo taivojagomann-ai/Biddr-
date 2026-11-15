@@ -79,6 +79,7 @@ export function AuctionFilters({ status }: { status: FeedStatus }) {
             <select id="f-condition" className={selectClass} value={params.get("condition") ?? ""} onChange={(e) => setParam("condition", e.target.value)}>
               <option value="">Any history</option>
               <option value="clean">Clean history</option>
+              <option value="restored_any">Restored</option>
               <option value="restored">Restored, partner verified</option>
             </select>
           </div>

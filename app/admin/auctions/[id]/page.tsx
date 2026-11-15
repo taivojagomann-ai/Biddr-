@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, Mail, Phone } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, ExternalLink, Mail, Phone } from "lucide-react";
 import { requireAdmin } from "@/lib/admin";
 import { ADMIN_STATUS_LABELS, MAX_AUCTION_MS } from "@/lib/admin-schemas";
 import { formatBaltic } from "@/lib/baltic-time";
@@ -70,6 +70,9 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
   ]);
 
   const priv = privRes.data;
+  // null: submitted before sellers could choose (0013).
+  const inspectionLabel =
+    priv?.inspection_requested === true ? "Yes" : priv?.inspection_requested === false ? "No" : "Not answered (submitted before sellers could choose)";
   const seller = sellerRes.data;
   const email = authRes.data.user?.email ?? null;
   const bids = bidsRes.data ?? [];
@@ -87,12 +90,6 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
       done: Boolean(a.starts_at && a.ends_at && Date.parse(a.ends_at) - Date.parse(a.starts_at) <= MAX_AUCTION_MS),
     },
     { label: "Has a cover photo", done: (a.gallery_urls.exterior ?? []).length > 0 },
-    ...(restored
-      ? [
-          { label: "Inspection partner added (restored car)", done: Boolean(a.inspection_partner_name) },
-          { label: "Inspection report PDF attached (restored car)", done: Boolean(a.inspection_report_url) },
-        ]
-      : []),
   ];
 
   const pricingMode = a.status === "draft" || a.status === "upcoming" ? "full" : a.status === "live" ? "reserve-only" : "closed";
@@ -128,6 +125,18 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         </div>
       </div>
 
+      <p
+        className={cn(
+          "mt-4 inline-flex flex-wrap items-center gap-2 rounded-md border px-3 py-2 text-sm",
+          priv?.inspection_requested === true ? "border-verified/60" : "border-field",
+        )}
+      >
+        <ClipboardCheck aria-hidden className={cn("size-4 shrink-0", priv?.inspection_requested === true ? "text-verified" : "text-mute")} />
+        <span className="font-semibold">Inspection requested:</span>
+        <span>{inspectionLabel}</span>
+        {a.inspection_report_url ? <span className="text-mute">· report attached</span> : null}
+      </p>
+
       <nav aria-label="Sections" className="mt-6">
         <ul className="flex flex-wrap gap-1 text-sm">
           {NAV.map(([id, label]) => (
@@ -145,7 +154,6 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
           <StatusActions
             auctionId={a.id}
             status={a.status}
-            restored={restored}
             startsAt={a.starts_at}
             endsAt={a.ends_at}
             checks={checks}
@@ -184,8 +192,13 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             />
             <Item label="Country" value={seller?.country ? COUNTRY_NAMES[seller.country] : null} />
             <Item label="Requested reserve" value={priv?.requested_reserve ? formatEur(priv.requested_reserve) : "No reserve"} />
-            <Item label="Inspection city" value={priv?.inspection_city} />
-            <Item label="Preferred inspection dates" value={priv?.inspection_preferred_dates} />
+            <Item label="Inspection requested" value={inspectionLabel} />
+            {priv?.inspection_requested !== false ? (
+              <>
+                <Item label="Inspection city" value={priv?.inspection_city} />
+                <Item label="Preferred inspection dates" value={priv?.inspection_preferred_dates} />
+              </>
+            ) : null}
           </dl>
         </Section>
 
@@ -254,11 +267,14 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
         <Section
           id="inspection"
           title="Inspection"
-          intro={restored ? "Required before approval: this is a restored car." : "Optional for clean cars, but bidders trust inspected cars more."}
+          intro={
+            priv?.inspection_requested === false
+              ? "The seller chose to list without an inspection. If the car is inspected after all, add the partner and report here."
+              : "Add the partner and the report PDF once the car has been inspected. The public page then shows the Partner verified badge and the report."
+          }
         >
           <InspectionPanel
             auctionId={a.id}
-            restored={restored}
             reportUrl={a.inspection_report_url}
             initial={{
               partnerName: a.inspection_partner_name ?? "",

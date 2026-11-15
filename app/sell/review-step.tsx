@@ -208,8 +208,22 @@ export function ReviewStep({
         <Block title="Price and inspection" step={STEP.price} onEdit={onEdit} hasErrors={stepsWithErrors.has(STEP.price)}>
           <Row label="Starting bid" value={start !== null ? formatEur(start) : ""} />
           <Row label="Reserve price" value={reserve !== null ? `${formatEur(reserve)} (private)` : "No reserve"} />
-          <Row label="Inspection" value={values.inspectionCity} />
-          <Row label="Preferred dates" value={values.inspectionDates} />
+          <Row
+            label="Inspection"
+            value={
+              values.inspectionRequested === "yes"
+                ? "Yes, book an inspection"
+                : values.inspectionRequested === "no"
+                  ? "No, list without an inspection"
+                  : ""
+            }
+          />
+          {values.inspectionRequested === "yes" ? (
+            <>
+              <Row label="Inspection location" value={values.inspectionCity} />
+              <Row label="Preferred dates" value={values.inspectionDates} />
+            </>
+          ) : null}
           <Row label="Seller fee" value="[to be confirmed]" />
         </Block>
       </div>
@@ -235,6 +249,12 @@ export function ReviewStep({
         <div className="mt-1.5">
           <FieldError id={`${confirmId}-error`} error={errors.confirmed} />
         </div>
+        <p className="mt-4 text-sm text-mute">
+          <span className="font-semibold text-chalk">After you submit:</span>{" "}
+          {values.inspectionRequested === "yes"
+            ? "We'll review your listing and contact you to book the inspection."
+            : "We'll review your listing."}
+        </p>
       </div>
     </section>
   );

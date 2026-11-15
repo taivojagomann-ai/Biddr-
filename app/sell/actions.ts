@@ -74,6 +74,7 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
   const { error: privateError } = await admin.from("auction_private").insert({
     auction_id: auction.id,
     requested_reserve: v.reserve,
+    inspection_requested: v.inspectionRequested,
     inspection_city: v.inspectionCity,
     inspection_preferred_dates: v.inspectionDates,
   });

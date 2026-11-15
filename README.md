@@ -119,6 +119,7 @@ supabase/migrations/0009_notifications.sql
 supabase/migrations/0010_watchlist.sql
 supabase/migrations/0011_newly_listed_index.sql
 supabase/migrations/0012_search.sql
+supabase/migrations/0013_optional_inspections.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
 vercel.json                     cron for hold release
 ```
@@ -162,6 +163,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0010_watchlist.sql` | `watchlist` table (own rows only), `auctions.watch_count` kept by triggers, auto-watch when you bid, "now live" and "ends within the hour" notifications for watchers (cron every 5 minutes) | Run before deploying this version (Watch buttons and the demo loader use it) |
 | `0011_newly_listed_index.sql` | Index for the Newly listed tab (`status, starts_at desc`) | Optional, speeds up the tab |
 | `0012_search.sql` | Free-text search: `pg_trgm` and `unaccent` extensions, `auctions.search_text` and `search_words` kept by a trigger (and filled for existing cars), a trigram index, the `search_aliases` table (vw, merc, beemer...), and the `search_auctions` and `search_suggestions` functions | Run before deploying this version (the home page search uses it) |
+| `0013_optional_inspections.sql` | Inspections become optional: drops the `restored_needs_inspection` check so restored cars can be approved without one, adds `auction_private.inspection_requested` (city required only when it is true), and lets the search filter by any restored car | Run before deploying this version (the sell form saves the inspection choice) |
 
 ## Selling a car (`/sell`)
 
@@ -170,7 +172,7 @@ Signed-in members with a complete profile (username and country) submit a car in
 - **Draft on the device.** The form keeps all state in `sell/sell-form.tsx` and saves it to `localStorage` under `biddr:sell:v1:<user id>`, so a refresh keeps the work. "Start over" clears it and deletes the uploaded photos.
 - **Photos go straight to Storage.** The browser resizes each photo (longest edge 2560 px, WebP at 0.85; JPEG where the browser can't encode WebP) and uploads it to `auction-photos/<user id>/<draft id>/<section>/<random>.webp`. Storage policies only allow writes inside the user's own folder.
 - **Validated twice.** Each step is checked with the zod schemas in `lib/sell.ts` before Continue, and `submitListing` runs them all again. It also accepts only photo URLs from the user's own draft folder.
-- **What is stored where.** The `auctions` row is inserted with the user's own client, so RLS and column grants apply and `status` stays `draft`. Only after that insert succeeds, the service role writes the requested reserve, inspection city and preferred dates to `auction_private` (admin-only) and sets `has_reserve`. If that second write fails, the draft is deleted so the seller can submit again.
+- **What is stored where.** The `auctions` row is inserted with the user's own client, so RLS and column grants apply and `status` stays `draft`. Only after that insert succeeds, the service role writes the requested reserve, the inspection choice (`inspection_requested`) and, when an inspection is wanted, the inspection city and preferred dates to `auction_private` (admin-only) and sets `has_reserve`. If that second write fails, the draft is deleted so the seller can submit again.
 - **One open listing per VIN.** A VIN that is already a draft, scheduled or live is refused with "This car is already listed or waiting for review."
 - **Structured details.**
   - The Car step asks for body style, interior colour, number of owners, seller type (dealers give a company name and registry code) and registration.
@@ -181,6 +183,14 @@ Signed-in members with a complete profile (username and country) submit a car in
 - `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
 
 Photos from a draft that is never submitted stay in the bucket. Clean them up later with a scheduled job that removes folders with no matching auction.
+
+### Inspections are optional
+
+On the **Price and inspection** step every seller answers "Would you like an independent inspection?" (no default). **Yes** asks for the inspection city (required) and preferred dates, and the submitted page says "We'll contact you to book the inspection". **No** hides those fields; for restored cars the seller is told the listing will say the car hasn't been independently inspected.
+
+- **Admins** see "Inspection requested: Yes / No" at the top of each auction (listings from before `0013` show "Not answered"). Approving never requires an inspection.
+- **Buyers** see the Partner verified badge and the inspection card only when an inspection was added, as before. Specifications always have an "Inspection" row: "Partner verified" or "Not inspected". A restored car without an inspection shows its damage and repair description with the notice "This restored car hasn't been independently inspected. Ask the seller for repair documents and photos."
+- **Home page History filter**: "Restored" (any restored car) and "Restored, partner verified".
 
 ### Previewing a listing
 
@@ -207,7 +217,7 @@ To remove admin access, set `role = 'user'` the same way. The header shows an "A
 - **Lists** every auction in five tabs with counts: To review (`draft`), Scheduled (`upcoming`), Live (ending soonest first), Finished (`ended`, `sold`, `reserve_not_met`) and Rejected or withdrawn.
 - **Per auction** (`/admin/auctions/<id>`): every listing detail is editable. Admins aren't held to the seller-only rules (minimum highlights, declaring modifications and flaws), so older listings can be saved. Also on the page: seller contact details (email from Supabase Auth, phone and full name from `profiles`) and their requested reserve and inspection preferences. The admin can edit the listing text, remove photos or change the cover, enter the inspection partner, date and highlights, and upload the report PDF. They also set the starting bid, increment and reserve, set the schedule in Baltic time, and see all bids and delete comments.
 - **Status changes**: approve and schedule or reject (with a reason the seller sees) a draft. Move a scheduled auction back to review, or withdraw it. Extend a live auction (+1 hour, +1 day or a custom later time), or withdraw it, which cancels the bids and releases the card holds straight away. Every destructive step asks for confirmation and says what will happen.
-- **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. A restored car can't be scheduled without an inspection partner and report. Auctions run at most 7 days because card holds expire after about 7 days.
+- **Rules the database enforces**: `admin_set_reserve` and `admin_set_schedule` lock the auction row like `place_bid`. While an auction is live, the reserve can only go down and the end can only move later. Inspections are optional for every car since `0013`, so restored cars can be approved without one. Auctions run at most 7 days because card holds expire after about 7 days.
 - **Security**: browser clients still can't write status, price or schedule columns. Every admin write is a server action or route handler that calls `requireAdmin()` first, re-validates its input with zod, uses the service-role client only after that, and records the change in `admin_actions`. The inspection PDF goes straight from the browser to Storage through a signed upload URL the server creates for that auction only.
 
 ## Bidding requirements
@@ -307,7 +317,7 @@ The admin panel can fill the site with six example auctions, with bids, comments
 - **Load demo data** creates 1 demo seller and 5 demo bidders, and six auctions marked "Demo":
   - live and closing in 12 minutes, 21 bids, reserve met;
   - live, ending in 26 hours, 6 bids, reserve not met yet;
-  - live with no reserve and no bids;
+  - live with no reserve and no bids (a restored car listed without an inspection, so the "Not inspected" state is visible);
   - scheduled for tomorrow 12:00;
   - sold yesterday (a restored car with before photos and a demo report PDF);
   - ended 3 days ago below its reserve.

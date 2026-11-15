@@ -98,6 +98,8 @@ export interface SellInput extends OwnershipInput, DetailsInput {
   videoUrl: string;
   startingBid: string;
   reserve: string;
+  /** Required, no default: the seller decides whether to book an independent inspection. */
+  inspectionRequested: "yes" | "no" | "";
   inspectionCity: InspectionCity | "";
   inspectionDates: string;
   confirmed: boolean;
@@ -115,7 +117,7 @@ export const FIELD_STEP: Record<SellField, StepId> = {
   highlights: 3, equipment: 3, modifications: 3, noModifications: 3, knownFlaws: 3, noKnownFlaws: 3,
   serviceHistory: 3, itemsIncluded: 3, sellerNotes: 3,
   "photos.exterior": 4, "photos.interior": 4, "photos.mechanical": 4, "photos.before": 4, videoUrl: 4,
-  startingBid: 5, reserve: 5, inspectionCity: 5, inspectionDates: 5,
+  startingBid: 5, reserve: 5, inspectionRequested: 5, inspectionCity: 5, inspectionDates: 5,
   confirmed: 6,
 };
 
@@ -131,7 +133,7 @@ export function emptySellInput(draftId: string, country: Country | ""): SellInpu
     noKnownFlaws: false, serviceHistory: [emptyServiceRow()], itemsIncluded: [""], sellerNotes: "",
     photos: { exterior: [], interior: [], mechanical: [], before: [] },
     videoUrl: "",
-    startingBid: "", reserve: "", inspectionCity: "", inspectionDates: "",
+    startingBid: "", reserve: "", inspectionRequested: "", inspectionCity: "", inspectionDates: "",
     confirmed: false,
   };
 }
@@ -309,12 +311,16 @@ export const priceSchema = z
           .transform((v) => (v === "" ? null : Number(v)))
           .pipe(z.number().int().max(MAX_PRICE, "Check the reserve price.").nullable()),
       ),
-    inspectionCity: z.enum(["Tallinn", "Riga", "Vilnius"], {
-      errorMap: () => ({ message: "Choose where the car can be inspected." }),
+    inspectionRequested: z.enum(["yes", "no"], {
+      errorMap: () => ({ message: "Choose whether you'd like an independent inspection." }),
     }),
+    inspectionCity: z.enum(["Tallinn", "Riga", "Vilnius", ""]).catch(""),
     inspectionDates: optionalText("preferred dates", 500),
   })
   .superRefine((v, ctx) => {
+    if (v.inspectionRequested === "yes" && v.inspectionCity === "") {
+      ctx.addIssue({ code: "custom", path: ["inspectionCity"], message: "Choose where the car can be inspected." });
+    }
     if (v.reserve !== null && v.reserve < v.startingBid) {
       ctx.addIssue({
         code: "custom",
@@ -322,6 +328,16 @@ export const priceSchema = z
         message: "The reserve can't be lower than the starting bid. Raise it, or leave it empty for no reserve.",
       });
     }
+  })
+  // City and dates only matter when an inspection is wanted.
+  .transform(({ inspectionRequested, inspectionCity, inspectionDates, ...rest }) => {
+    const requested = inspectionRequested === "yes";
+    return {
+      ...rest,
+      inspectionRequested: requested,
+      inspectionCity: requested && inspectionCity !== "" ? (inspectionCity as InspectionCity) : null,
+      inspectionDates: requested ? inspectionDates : null,
+    };
   });
 
 /** Sellers must give 3 to 10 highlights. */

@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 type SearchParams = { status?: string; q?: string; country?: string; condition?: string };
 
 const COUNTRIES: readonly Country[] = ["EE", "LV", "LT"];
+const CONDITIONS = ["clean", "restored", "restored_any"] as const;
 
 /** Home page link keeping the given filters; empty values are left out. */
 function homeHref(values: Record<string, string | null | undefined>): string {
@@ -25,7 +26,8 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const status = parseFeedStatus(searchParams.status);
   const q = parseSearchQuery(searchParams.q);
   const country = searchParams.country && COUNTRIES.includes(searchParams.country as Country) ? searchParams.country : null;
-  const condition = searchParams.condition === "clean" || searchParams.condition === "restored" ? searchParams.condition : null;
+  // restored = restored and partner verified; restored_any = every restored car.
+  const condition = CONDITIONS.find((c) => c === searchParams.condition) ?? null;
   const now = Date.now();
 
   let data: AuctionCard[] | null;
@@ -83,6 +85,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     if (condition === "restored") {
       query = query.eq("condition_type", "restored_accident").not("inspection_partner_name", "is", null);
     }
+    if (condition === "restored_any") query = query.eq("condition_type", "restored_accident");
 
     const res = await query.returns<AuctionCard[]>();
     ({ data, error, count } = res);
@@ -115,7 +118,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         </h1>
         <p className="mt-2 text-mute">
           Buy and sell exceptional performance cars with transparent bidding, documented service histories and
-          independent inspections for restored cars.
+          optional independent inspections.
         </p>
       </div>
 
