@@ -32,9 +32,9 @@ export const HELP = {
     text: "Bids in the last 2 minutes add 2 minutes to the clock, so nobody can win by bidding at the last second.",
     href: "/how-it-works#extensions",
   },
-  partnerVerified: {
-    label: "What does Partner verified mean?",
-    text: "An independent workshop inspected this car and its report is attached to the listing.",
+  dealerInspected: {
+    label: "What does Dealer inspected mean?",
+    text: "An authorised dealer of this brand inspected the car before the sale, and Biddr checked the report.",
     href: "/how-it-works#badges",
   },
 } satisfies Record<string, HelpTopic>;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
 import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { isDealerInspected } from "@/lib/inspection";
 import { useMinuteNow } from "@/hooks/use-minute-now";
 import { isNewListing } from "@/lib/feed";
 import { formatEur, formatKm } from "@/lib/format";
@@ -48,7 +49,7 @@ export function FeaturedLot({
             {formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}
           </p>
           <div className="mt-3 flex flex-wrap gap-1.5">
-            <InspectionBadge partner={auction.inspection_partner_name} />
+            <InspectionBadge dealer={isDealerInspected(auction) ? (auction.inspection_partner_name ?? "an authorised dealer") : null} />
             {auction.condition_type === "restored_accident" && <RestoredBadge />}
           </div>
         </div>

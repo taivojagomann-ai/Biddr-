@@ -48,6 +48,8 @@ export interface Auction {
   inspection_report_url: string | null;
   inspection_date: string | null;
   inspection_highlights: string[];
+  /** 'authorised_dealer' once an admin accepted the dealer's report (0014); the badge shows only then. */
+  inspection_type: InspectionType | null;
   before_photos_urls: string[];
   gallery_urls: GalleryUrls;
   video_url: string | null;
@@ -92,14 +94,34 @@ export interface AuctionPrivate {
   auction_id: string;
   reserve_price: number | null;
   admin_notes: string | null;
-  /** Seller's choice (0013): true = book an inspection, false = list without one, null = not answered (older listings). */
+  /** 0013, no longer used (Biddr partner bookings were replaced by dealer reports in 0014). */
   inspection_requested: boolean | null;
+  /** No longer used since 0014. */
   inspection_city: InspectionCity | null;
   requested_reserve: number | null;
   inspection_preferred_dates: string | null;
   contact_notes: string | null;
   rejection_reason: string | null;
+  // Authorised dealer inspection report (0014). Private: only admins and the server read these.
+  /** true: the seller uploaded a report; false: listed without one; null: submitted before 0014. */
+  dealer_inspection_provided: boolean | null;
+  dealer_name: string | null;
+  dealer_city: string | null;
+  /** EU country code */
+  dealer_country: string | null;
+  dealer_inspection_date: string | null;
+  dealer_inspection_mileage_km: number | null;
+  /** Paths in the private inspection-uploads bucket: <user id>/<draft id>/<uuid>.<ext> */
+  dealer_report_paths: string[];
+  inspection_review_status: InspectionReviewStatus | null;
+  inspection_review_note: string | null;
+  inspection_reviewed_by: string | null;
+  inspection_reviewed_at: string | null;
 }
+
+export type InspectionReviewStatus = "pending" | "accepted" | "rejected";
+/** auctions.inspection_type (0014): set when an admin accepted an authorised dealer's report. */
+export type InspectionType = "authorised_dealer";
 
 /** Row in admin_actions (service role only). */
 export interface AdminActionRow {
@@ -113,13 +135,13 @@ export interface AdminActionRow {
 
 /** Columns the feed needs; keeps list queries light. */
 export const AUCTION_CARD_COLUMNS =
-  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status,is_demo,watch_count" as const;
+  "id,title,make,model,year,mileage_km,location_city,location_country,condition_type,inspection_partner_name,gallery_urls,starting_bid,has_reserve,reserve_met,current_bid,bid_count,ends_at,starts_at,status,is_demo,watch_count,inspection_type" as const;
 
 export type AuctionCard = Pick<
   Auction,
   | "id" | "title" | "make" | "model" | "year" | "mileage_km" | "location_city" | "location_country"
   | "condition_type" | "inspection_partner_name" | "gallery_urls" | "starting_bid" | "has_reserve"
-  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo" | "watch_count"
+  | "reserve_met" | "current_bid" | "bid_count" | "ends_at" | "starts_at" | "status" | "is_demo" | "watch_count" | "inspection_type"
 >;
 
 /**
@@ -176,7 +198,7 @@ export interface PlaceBidResult {
 export type NotificationType =
   | "question" | "answer" | "outbid" | "listing_approved" | "listing_rejected"
   | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted"
-  | "watch_ending_soon" | "watch_live";
+  | "watch_ending_soon" | "watch_live" | "inspection_rejected";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

@@ -34,7 +34,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const status = parseFeedStatus(searchParams.status);
   const q = parseSearchQuery(searchParams.q);
   const country = searchParams.country && COUNTRIES.includes(searchParams.country as Country) ? searchParams.country : null;
-  // restored = restored and partner verified; restored_any = every restored car.
+  // restored = restored and dealer inspected; restored_any = every restored car.
   const condition = CONDITIONS.find((c) => c === searchParams.condition) ?? null;
   const now = Date.now();
 
@@ -91,7 +91,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     if (country) query = query.eq("location_country", country);
     if (condition === "clean") query = query.eq("condition_type", "clean");
     if (condition === "restored") {
-      query = query.eq("condition_type", "restored_accident").not("inspection_partner_name", "is", null);
+      query = query.eq("condition_type", "restored_accident").eq("inspection_type", "authorised_dealer");
     }
     if (condition === "restored_any") query = query.eq("condition_type", "restored_accident");
 

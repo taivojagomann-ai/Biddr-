@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
 import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { isDealerInspected } from "@/lib/inspection";
 import { useMinuteNow } from "@/hooks/use-minute-now";
 import { isNewListing } from "@/lib/feed";
 import { formatEur, formatKm } from "@/lib/format";
@@ -25,6 +26,7 @@ export function AuctionCard({
   watching: boolean;
 }) {
   const cover = auction.gallery_urls.exterior[0];
+  const inspected = isDealerInspected(auction);
   const finished = ["ended", "sold", "reserve_not_met"].includes(auction.status);
   const price = auction.current_bid ?? auction.starting_bid;
   // One shared minute timer, so the badge drops off 24 hours after going live.
@@ -81,9 +83,9 @@ export function AuctionCard({
           {formatKm(auction.mileage_km)}, {auction.location_city}
           <span className="hidden sm:inline">, {auction.location_country}</span>
         </p>
-        {(auction.inspection_partner_name || auction.condition_type === "restored_accident") && (
+        {(inspected || auction.condition_type === "restored_accident") && (
           <div className="flex flex-wrap gap-1">
-            {auction.inspection_partner_name && <InspectionBadge partner={auction.inspection_partner_name} compact />}
+            {inspected && <InspectionBadge dealer={auction.inspection_partner_name ?? "an authorised dealer"} />}
             {auction.condition_type === "restored_accident" && <RestoredBadge collapsible />}
           </div>
         )}

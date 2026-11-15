@@ -51,8 +51,8 @@ export function HistoryStep({ values, errors, set }: StepProps) {
         <ShieldCheck aria-hidden className="mt-0.5 size-5 shrink-0 text-verified" />
         <p className="text-mute">
           <span className="font-semibold text-chalk">Restored cars are welcome.</span> An honest description of the
-          repair helps you get a better price. You can also book an independent inspection in a later step; bidders
-          then see the report.
+          repair helps you get a better price. If an authorised dealer of the brand has inspected the car, you can add
+          their report in a later step.
         </p>
       </div>
 

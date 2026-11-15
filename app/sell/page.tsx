@@ -34,7 +34,7 @@ export default async function SellPage() {
             <>
               <h1 className="font-wide text-3xl font-extrabold tracking-tight">Sell your car</h1>
               <p className="mt-2 max-w-xl text-sm text-mute">
-                Tell us about the car and add photos. We review every listing, book an inspection if you want one, and then schedule the auction.
+                Tell us about the car and add photos. We review every listing and then schedule the auction.
                 Your answers are saved on this device as you go.
               </p>
             </>

@@ -29,6 +29,7 @@ const base = {
   variant: null, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "AWD",
   exterior_color: "Isle of Man Green", location_country: "EE", damage_history_summary: null,
   inspection_partner_name: null, inspection_report_url: null, inspection_date: null, inspection_highlights: [],
+  inspection_type: null,
   before_photos_urls: [], video_url: null, has_reserve: false, reserve_met: false, current_bid: null,
   leading_bidder_id: null, bid_count: 0, min_bid_increment: 250, created_at: iso(-72 * H), updated_at: iso(-H),
   seller: { username: "baltic_m", country: "EE" },
@@ -38,7 +39,7 @@ const AUCTIONS = [
   {
     ...base, id: "10000000-0000-4000-8000-000000000001", seller_id: SELLER, title: "2022 BMW M3 Competition xDrive",
     make: "BMW", model: "M3", variant: "Competition xDrive", year: 2022, vin: "WBS43AY0X0FN12345", mileage_km: 18400,
-    location_city: "Tallinn", condition_type: "clean", inspection_partner_name: "Autotest Tallinn",
+    location_city: "Tallinn", condition_type: "clean", inspection_partner_name: "Demo BMW Centre, Tallinn", inspection_type: "authorised_dealer",
     inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r1.pdf`, inspection_date: "2026-11-02",
     inspection_highlights: ["Paint thickness measured on all panels", "Brakes at 80%", "No fault codes stored"],
     gallery_urls: gallery("m3"), video_url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
@@ -65,7 +66,7 @@ const AUCTIONS = [
     make: "Audi", model: "RS 4", variant: "Avant", year: 2019, vin: "WUAZZZF41KA912345", mileage_km: 61200,
     location_city: "Riga", location_country: "LV", condition_type: "restored_accident",
     damage_history_summary: "Front-left impact in 2023. Bonnet, wing and headlight replaced at a main-dealer body shop. Airbags did not deploy.",
-    inspection_partner_name: "Riga Motor Lab", inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r2.pdf`,
+    inspection_partner_name: "Demo Audi Centre, Riga", inspection_type: "authorised_dealer", inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r2.pdf`,
     inspection_highlights: ["Chassis measured within factory tolerance"], gallery_urls: gallery("rs4"),
     before_photos_urls: [photo("rs4-before-1"), photo("rs4-before-2")], starting_bid: 30000, has_reserve: false,
     starts_at: iso(-2 * 24 * H), ends_at: iso(30 * H), status: "live",
@@ -92,7 +93,7 @@ const AUCTIONS = [
     title: "2021 Mercedes-AMG GT Black Series Coupé with Magno Paint and Track Package",
     make: "Mercedes-AMG", model: "GT Black Series", year: 2021, vin: "WDD1903791A912345", mileage_km: 1250,
     location_city: "Kohtla-Järve", location_country: "EE", condition_type: "restored_accident",
-    damage_history_summary: "Rear bumper replaced after a car park scrape.", inspection_partner_name: "Autotest Tallinn",
+    damage_history_summary: "Rear bumper replaced after a car park scrape.", inspection_partner_name: "Demo Mercedes-Benz Centre, Helsinki", inspection_type: "authorised_dealer",
     inspection_report_url: `${BASE}/storage/v1/object/public/inspection-reports/r7.pdf`, gallery_urls: gallery("gt"),
     starting_bid: 900000, current_bid: 1250000, bid_count: 31, leading_bidder_id: BIDDER, has_reserve: true, reserve_met: true,
     watch_count: 140, starts_at: iso(-6 * H), ends_at: iso(4 * 24 * H + 7 * H), status: "live", // went live 6h ago: "New"
@@ -164,8 +165,12 @@ const TABLES = {
   comments: COMMENTS,
   bids: BIDS,
   bid_holds: [],
-  auction_private: [{ auction_id: "10000000-0000-4000-8000-000000000005", reserve_price: null, requested_reserve: 48000, inspection_city: "Tallinn", inspection_requested: true,
-    inspection_preferred_dates: "Weekday mornings", admin_notes: null, contact_notes: null, rejection_reason: null },
+  auction_private: [{ auction_id: "10000000-0000-4000-8000-000000000005", reserve_price: null, requested_reserve: 48000, dealer_inspection_provided: true,
+    dealer_name: "Demo BMW Centre", dealer_city: "Helsinki", dealer_country: "FI",
+    dealer_inspection_date: new Date(Date.now() - 10 * 24 * H).toISOString().slice(0, 10), dealer_inspection_mileage_km: 36100,
+    dealer_report_paths: [`${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000001.pdf`,
+      `${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000002.jpg`],
+    inspection_review_status: "pending", inspection_review_note: null, inspection_reviewed_by: null, inspection_reviewed_at: null, admin_notes: null, contact_notes: null, rejection_reason: null },
     { auction_id: "10000000-0000-4000-8000-000000000006", rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
   admin_actions: [],
 };
@@ -226,7 +231,7 @@ function searchAuctions({ p_query, p_tab = "live", p_country, p_condition, p_lim
     .filter((a) => p_tab !== "ending" || new Date(a.ends_at).getTime() <= Date.now() + 24 * H)
     .filter((a) => !p_country || a.location_country === p_country)
     .filter((a) => p_condition !== "clean" || a.condition_type === "clean")
-    .filter((a) => p_condition !== "restored" || (a.condition_type === "restored_accident" && a.inspection_partner_name))
+    .filter((a) => p_condition !== "restored" || (a.condition_type === "restored_accident" && a.inspection_type === "authorised_dealer"))
     .filter((a) => matches(a, words));
   const key = p_tab === "newest" || p_tab === "upcoming" ? "starts_at" : "ends_at";
   const dir = p_tab === "newest" || p_tab === "past" ? -1 : 1;
@@ -303,6 +308,10 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600" });
     return res.end(IMAGE);
+  }
+  // createSignedUrl: like Storage, answer with a relative signed URL.
+  if (path.startsWith("/storage/v1/object/sign/")) {
+    return send(res, 200, { signedURL: `${path.replace("/storage/v1", "")}?token=a11y-signed` });
   }
   if (path.startsWith("/storage/v1/")) return send(res, 200, { Key: "ok" });
 

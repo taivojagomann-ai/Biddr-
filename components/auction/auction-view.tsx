@@ -18,6 +18,7 @@ import { WatchButton, WatchCount } from "@/components/auction/watch-button";
 import { InfoTip } from "@/components/info-tip";
 import { ShareButton } from "@/components/share-button";
 import { HELP } from "@/lib/help";
+import { isDealerInspected } from "@/lib/inspection";
 import { formatKm } from "@/lib/format";
 import type { Auction, BidHistoryRow, CommentRow } from "@/lib/types";
 
@@ -74,10 +75,10 @@ export function AuctionView({
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm text-mute">
           <span>{formatKm(auction.mileage_km)} in {auction.location_city}, {auction.location_country}</span>
-          {auction.inspection_partner_name ? (
+          {isDealerInspected(auction) ? (
             <span className="inline-flex items-center gap-0.5">
-              <InspectionBadge partner={auction.inspection_partner_name} />
-              <InfoTip topic={HELP.partnerVerified} />
+              <InspectionBadge dealer={auction.inspection_partner_name ?? "an authorised dealer"} />
+              <InfoTip topic={HELP.dealerInspected} />
             </span>
           ) : null}
           {/* Phones and tablets have no bid box, so the reserve shows here (lg+ shows it in the bid box). */}

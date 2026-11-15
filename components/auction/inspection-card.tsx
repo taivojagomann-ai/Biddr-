@@ -1,5 +1,6 @@
 import { Check, ClipboardCheck, Download, Info, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEALER_INSPECTED, isDealerInspected } from "@/lib/inspection";
 import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import type { Auction } from "@/lib/types";
 
@@ -15,10 +16,10 @@ function DamageHistory({ summary }: { summary: string | null }) {
 }
 
 export const NOT_INSPECTED_NOTICE =
-  "This restored car hasn't been independently inspected. Ask the seller for repair documents and photos.";
+  "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.";
 
 /**
- * Partner verified card when an inspection was added. Without one: nothing for clean
+ * Dealer inspected card when an admin accepted an authorised dealer's report. Without one: nothing for clean
  * cars; for restored cars the seller's repair story with a "not inspected" notice.
  * In a seller's preview with an inspection on the way, a placeholder instead.
  */
@@ -29,11 +30,11 @@ export function InspectionCard({
 }: {
   auction: Auction;
   preview?: boolean;
-  /** Preview only: the seller asked for an inspection that hasn't been added yet. */
+  /** Preview only: the seller uploaded a dealer report that Biddr hasn't checked yet. */
   inspectionPending?: boolean;
 }) {
   const restored = auction.condition_type === "restored_accident";
-  if (!auction.inspection_partner_name) {
+  if (!isDealerInspected(auction)) {
     if (preview && inspectionPending) {
       // Listing preview: the inspection comes later, show where it will go.
       return (
@@ -55,7 +56,7 @@ export function InspectionCard({
         <div className="flex items-start gap-3 p-4">
           <Info className="mt-0.5 size-6 shrink-0 text-chalk" aria-hidden />
           <div className="min-w-0 flex-1">
-            <h2 id="inspection-heading" className="font-bold">Not independently inspected</h2>
+            <h2 id="inspection-heading" className="font-bold">Not inspected by a dealer</h2>
             <p className="text-sm">{NOT_INSPECTED_NOTICE}</p>
           </div>
         </div>
@@ -69,11 +70,12 @@ export function InspectionCard({
       <div className="flex items-start gap-3 border-b border-line p-4">
         <ShieldCheck className="mt-0.5 size-6 shrink-0 text-verified" aria-hidden />
         <div className="min-w-0 flex-1">
-          <h2 id="inspection-heading" className="font-bold">Partner verified</h2>
+          <h2 id="inspection-heading" className="font-bold">{DEALER_INSPECTED}</h2>
           <p className="text-sm text-mute">
-            Inspected by {auction.inspection_partner_name}
-            {auction.inspection_date && ` on ${new Date(auction.inspection_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`}.
-            The workshop is independent of the seller.
+            Inspected by {auction.inspection_partner_name ?? "an authorised dealer"} (authorised {auction.make} dealer)
+            {auction.inspection_date &&
+              ` on ${new Date(`${auction.inspection_date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`}
+            . Report checked by Biddr.
           </p>
         </div>
       </div>
@@ -101,7 +103,7 @@ export function InspectionCard({
           <Button asChild variant="outline" className="w-full sm:w-auto">
             <a href={auction.inspection_report_url} target="_blank" rel="noopener noreferrer">
               <Download aria-hidden />
-              Download full report (PDF)
+              Download report (PDF)
             </a>
           </Button>
         </div>

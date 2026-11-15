@@ -78,7 +78,10 @@ function sellDraft(step: number) {
       serviceHistory: [{ date: "2025-06", mileage: "11000", description: "Oil service", workshop: "BMW Tallinn" }],
       itemsIncluded: ["Second key"], sellerNotes: "Garaged.",
       damageSummary: "Rear bumper replaced at a main-dealer body shop after a car park scrape. Airbags did not deploy.",
-      videoUrl: "", startingBid: "60000", reserve: "70000", inspectionRequested: "yes", inspectionCity: "Tallinn", inspectionDates: "", confirmed: false,
+      videoUrl: "", startingBid: "60000", reserve: "70000", confirmed: false,
+      dealerInspection: "yes", reportDealerName: "Demo BMW Centre", reportDealerCity: "Helsinki", reportDealerCountry: "FI",
+      reportDate: new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10), reportMileage: "11900",
+      reportFiles: [{ path: `${ME}/3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f/aaaaaaaa-0000-4000-8000-000000000001.pdf`, name: "bmw-report.pdf" }],
     },
     photos: { exterior: list("exterior", 6), interior: list("interior", 4), mechanical: list("mechanical", 2), before: list("before", 2) },
   });
@@ -437,13 +440,13 @@ test.describe("contextual help", () => {
 
   test("info tip opens by keyboard, focus moves in, Escape returns focus", async ({ page }) => {
     await page.goto(`/auctions/${LIVE}`);
-    const tip = page.getByRole("button", { name: "What does Partner verified mean?" });
+    const tip = page.getByRole("button", { name: "What does Dealer inspected mean?" });
     await tip.focus();
     await page.keyboard.press("Enter");
-    const dialog = page.getByRole("dialog", { name: "What does Partner verified mean?" });
+    const dialog = page.getByRole("dialog", { name: "What does Dealer inspected mean?" });
     await expect(dialog).toBeVisible();
     await expect(dialog).toBeFocused();
-    await expect(dialog).toContainText("An independent workshop inspected this car");
+    await expect(dialog).toContainText("An authorised dealer of this brand inspected the car");
     await expect(dialog.getByRole("link", { name: /Learn more/ })).toHaveAttribute("href", "/how-it-works#badges");
     await expect(tip).toHaveAttribute("aria-expanded", "true");
     await expectNoSeriousViolations(page, "Info tip", '[role="dialog"]');
@@ -628,7 +631,7 @@ test.describe("listing preview", () => {
       await expect(bid).toHaveAccessibleDescription("Bidding opens after review.");
       await expect(page.getByText("Questions open when the auction starts.")).toBeVisible();
       await expect(page.getByLabel("Ask the seller a question")).toHaveCount(0);
-      await expect(page.getByText("Inspection will be added after your car is inspected.")).toBeVisible();
+      await expect(page.getByText("Your dealer inspection report will show here once Biddr has checked it.")).toBeVisible();
       await expect(page.getByRole("button", { name: /^Watch/ })).toHaveCount(0);
       await expectNoSeriousViolations(page, "Draft preview");
     });
@@ -655,7 +658,7 @@ test.describe("listing preview", () => {
       await expect(page.getByRole("heading", { level: 1, name: "2023 BMW M3 Touring" })).toBeVisible();
       await expect(visibleText(page, "Bidding opens after review.")).toHaveCount(1);
       await expect(page.getByText("Questions open when the auction starts.")).toBeVisible();
-      await expect(page.getByText("Inspection will be added after your car is inspected.")).toBeVisible();
+      await expect(page.getByText("Your dealer inspection report will show here once Biddr has checked it.")).toBeVisible();
       await expect(page.getByRole("heading", { name: "Sell your car" })).toHaveCount(0);
       await expectNoSeriousViolations(page, "Sell preview");
 
@@ -800,32 +803,37 @@ test.describe("search", () => {
   });
 });
 
-test.describe("optional inspections", () => {
-  test("a restored car without an inspection says so in words, and has no Partner verified badge", async ({ page }) => {
+test.describe("dealer inspections", () => {
+  test("a restored car without a dealer inspection says so in words, with no badge", async ({ page }) => {
     await page.goto(`/auctions/${UPCOMING}`);
-    const section = page.getByRole("region", { name: "Not independently inspected" });
+    const section = page.getByRole("region", { name: "Not inspected by a dealer" });
     await expect(section).toContainText(
-      "This restored car hasn't been independently inspected. Ask the seller for repair documents and photos.",
+      "This restored car hasn't been inspected by an authorised dealer. Ask the seller for repair documents and photos.",
     );
     await expect(section).toContainText("Rear-right quarter panel repaired");
-    await expect(page.getByText(/Verified by/)).toHaveCount(0);
+    await expect(page.getByText("Dealer inspected", { exact: true })).toHaveCount(0);
     const specs = page.getByRole("region", { name: "Specifications" });
-    await expect(specs.getByText("Inspection", { exact: true })).toBeVisible();
     await expect(specs.getByText("Not inspected", { exact: true })).toBeVisible();
     await expectNoSeriousViolations(page, "Restored, not inspected");
   });
 
-  test("an inspected car shows Partner verified in its specifications", async ({ page }) => {
+  test("a dealer-inspected car shows the badge, the dealer card and the spec row", async ({ page }) => {
     await page.goto(`/auctions/${RESTORED}`);
+    await expect(page.getByText("Dealer inspected", { exact: true }).first()).toBeVisible();
+    const card = page.getByRole("region", { name: "Dealer inspected" });
+    await expect(card).toContainText("Inspected by Demo Audi Centre, Riga (authorised Audi dealer)");
+    await expect(card).toContainText("Report checked by Biddr.");
+    await expect(card.getByRole("link", { name: "Download report (PDF)" })).toBeVisible();
     const specs = page.getByRole("region", { name: "Specifications" });
-    await expect(specs.getByText("Partner verified", { exact: true })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Not independently inspected" })).toHaveCount(0);
+    await expect(specs.getByText("Dealer inspected", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Partner verified/)).toHaveCount(0);
+    await expectNoSeriousViolations(page, "Dealer inspected");
   });
 
-  test("the History filter offers any restored car and partner-verified restored cars", async ({ page }) => {
+  test("the History filter offers any restored car and dealer-inspected restored cars", async ({ page }) => {
     await page.goto("/?status=upcoming");
     const history = page.getByLabel("History");
-    await expect(history.locator("option")).toHaveText(["Any history", "Clean history", "Restored", "Restored, partner verified"]);
+    await expect(history.locator("option")).toHaveText(["Any history", "Clean history", "Restored", "Restored, dealer inspected"]);
     await history.selectOption("restored_any");
     await expect(page).toHaveURL(/condition=restored_any/);
     await expect(page.locator("article.auction-card", { hasText: "Porsche 911" })).toBeVisible();
@@ -841,49 +849,92 @@ test.describe("optional inspections", () => {
     await expect(page.getByText(intro, { exact: true })).toBeVisible();
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", intro);
     await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", intro);
-    await expect(page.getByText(/inspect/i)).toHaveCount(0);
+    // No marketing promise about inspections in the intro (badges on inspected cars are fine).
+    await expect(page.getByText(intro, { exact: true })).not.toContainText(/inspect/i);
   });
 
   test.describe("signed in", () => {
     test.beforeEach(async ({ context }) => signIn(context));
 
-    test("the sell form asks about an inspection with no default and shows the city only for Yes", async ({ page }) => {
+    test("the sell form asks for a dealer report with no default; Yes shows the dealer fields and upload", async ({ page }) => {
       await page.addInitScript(
         ([key, value]) => window.localStorage.setItem(key, value),
-        [`biddr:sell:v1:${ME}`, sellDraft(5).replace('"inspectionRequested":"yes"', '"inspectionRequested":""')] as const,
+        [`biddr:sell:v1:${ME}`, sellDraft(5).replace('"dealerInspection":"yes"', '"dealerInspection":""')] as const,
       );
       await page.goto("/sell");
-      const question = page.getByRole("group", { name: "Would you like an independent inspection?" });
-      await expect(question).toHaveAccessibleDescription(/An independent workshop checks the car/);
-      const yes = question.getByRole("radio", { name: "Yes, book an inspection" });
+      const question = page.getByRole("group", { name: "Do you have a pre-sale inspection report from an authorised BMW dealer?" });
+      await expect(question).toHaveAccessibleDescription(/We only accept inspections done by an official dealer/);
+      const yes = question.getByRole("radio", { name: "Yes, I'll upload it" });
       const no = question.getByRole("radio", { name: "No, list without an inspection" });
       await expect(yes).not.toBeChecked();
       await expect(no).not.toBeChecked();
-      await expect(page.getByLabel("Inspection location")).toHaveCount(0);
+      await expect(page.getByLabel("Dealer's name")).toHaveCount(0);
 
       await page.getByRole("button", { name: "Continue" }).click();
-      await expect(page.getByText("Choose whether you'd like an independent inspection.")).toBeVisible();
+      await expect(page.getByText("Choose whether you have a dealer inspection report.")).toBeVisible();
       await expect(yes).toBeFocused();
 
       await no.check();
-      await expect(page.getByText("Your listing will show that the car hasn't been independently inspected.", { exact: false })).toBeVisible();
-      await yes.check();
-      await expect(page.getByLabel("Inspection location")).toBeVisible();
-      await expectNoSeriousViolations(page, "Inspection question");
+      await expect(page.getByText("Your listing will show that the car hasn't been inspected by a dealer.", { exact: false })).toBeVisible();
 
-      await no.check();
+      await yes.check();
+      await expect(page.getByLabel("Dealer's name")).toHaveValue("Demo BMW Centre");
+      await expect(page.getByLabel("Dealer's country")).toHaveValue("FI");
+      await expect(page.getByLabel("Inspection date")).toBeVisible();
+      await expect(page.getByLabel("Mileage on the report")).toHaveValue("11900");
+      await expect(page.getByRole("button", { name: "Add report files" })).toHaveAccessibleDescription(/Only Biddr's team sees this file/);
+      await expect(page.getByRole("list", { name: "Report files" })).toContainText("bmw-report.pdf");
+      await expectNoSeriousViolations(page, "Dealer report question");
+
+      // An old report is refused.
+      await page.getByLabel("Inspection date").fill("2020-01-01");
       await page.getByRole("button", { name: "Continue" }).click();
+      await expect(page.getByText("The report must be from the last 90 days.")).toBeVisible();
+      await expect(page.getByLabel("Inspection date")).toBeFocused();
+    });
+
+    test("without a report, the review step and the next steps say we'll review the listing", async ({ page }) => {
+      await page.addInitScript(
+        ([key, value]) => window.localStorage.setItem(key, value),
+        [`biddr:sell:v1:${ME}`, sellDraft(6).replace('"dealerInspection":"yes"', '"dealerInspection":"no"')] as const,
+      );
+      await page.goto("/sell");
       await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
       await expect(page.getByText("No, list without an inspection")).toBeVisible();
       await expect(page.getByText("We'll review your listing.")).toBeVisible();
-      await expect(page.getByText("Inspection location")).toHaveCount(0);
+      await expect(page.getByText("Report files")).toHaveCount(0);
     });
 
-    test("admins see whether the seller asked for an inspection", async ({ page }) => {
+    test("admins review the dealer report: details, warning, private files, checklist and reject reason", async ({ page }) => {
       await page.goto(`/admin/auctions/${MY_DRAFT}`);
-      await expect(page.getByText("Inspection requested:").first()).toBeVisible();
-      await expect(page.getByText(/restored car\. It can.t be approved/)).toHaveCount(0);
-      await expect(page.getByText(/Inspection partner added \(restored car\)/)).toHaveCount(0);
+      await expect(page.getByText("Dealer inspection:").first()).toBeVisible();
+      const section = page.locator("#inspection");
+      await expect(section).toContainText("Demo BMW Centre, Helsinki, Finland");
+      await expect(section).toContainText("The report shows 36,100 km, more than the 35,500 km in the listing.");
+
+      const file = section.getByRole("link", { name: /File 1 \(PDF\)/ });
+      await expect(file).toHaveAttribute("href", `/api/admin/inspection-file?auction=${MY_DRAFT}&file=0`);
+      const res = await page.request.get(`/api/admin/inspection-file?auction=${MY_DRAFT}&file=0`, { maxRedirects: 0 });
+      expect(res.status()).toBe(302);
+      expect(res.headers()["location"]).toContain("/object/sign/inspection-uploads/");
+
+      await section.getByRole("button", { name: "Accept report" }).click();
+      await expect(section.getByText("Confirm this before accepting the report.").first()).toBeVisible();
+      await expect(section.getByRole("checkbox", { name: "VIN on the report matches the listing" })).toHaveAttribute("aria-invalid", "true");
+
+      await section.getByRole("button", { name: "Reject report" }).click();
+      await expect(section.getByLabel("Reason")).toHaveAttribute("aria-invalid", "true");
+      await expectNoSeriousViolations(page, "Admin dealer report review", "#inspection");
+
+      // Approving doesn't wait for the report.
+      await expect(page.getByText(/can.t be approved until the inspection/)).toHaveCount(0);
+    });
+
+    test("signed out, the private report file link is not available", async ({ browser }) => {
+      const context = await browser.newContext();
+      const res = await context.request.get(`/api/admin/inspection-file?auction=${MY_DRAFT}&file=0`, { maxRedirects: 0 });
+      expect(res.status()).toBe(404);
+      await context.close();
     });
   });
 });

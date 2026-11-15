@@ -9,7 +9,7 @@ export const PREVIEW_TEXT = {
   waiting: "Waiting for review.",
   bidding: "Bidding opens after review",
   comments: "Questions open when the auction starts",
-  inspection: "Inspection will be added after your car is inspected",
+  inspection: "Your dealer inspection report will show here once Biddr has checked it",
 } as const;
 
 /** Statuses whose page is a preview: only the seller and admins can open it. */
@@ -34,6 +34,7 @@ export function previewAuction(input: SellInput, sellerId: string): Auction | nu
     inspection_report_url: null,
     inspection_date: null,
     inspection_highlights: [],
+    inspection_type: null,
     has_reserve: parsed.data.reserve !== null,
     reserve_met: false,
     current_bid: null,

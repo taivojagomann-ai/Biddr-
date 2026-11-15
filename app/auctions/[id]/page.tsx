@@ -110,12 +110,16 @@ export default async function AuctionPage({ params }: { params: { id: string } }
       // choice with the service role.
       const { data: row } = await getAdminSupabase()
         .from("auction_private")
-        .select("rejection_reason, inspection_requested")
+        .select("rejection_reason, dealer_inspection_provided, inspection_review_status")
         .eq("auction_id", auction.id)
-        .maybeSingle<{ rejection_reason: string | null; inspection_requested: boolean | null }>();
+        .maybeSingle<{
+          rejection_reason: string | null;
+          dealer_inspection_provided: boolean | null;
+          inspection_review_status: string | null;
+        }>();
       rejectionReason = auction.status === "rejected" ? row?.rejection_reason ?? null : null;
-      // Older listings (null) were all submitted expecting an inspection.
-      inspectionPending = row?.inspection_requested !== false;
+      // A dealer report Biddr hasn't checked yet.
+      inspectionPending = row?.dealer_inspection_provided === true && row.inspection_review_status === "pending";
     }
   }
 

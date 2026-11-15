@@ -2,7 +2,7 @@ import { Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COUNTRY_NAMES, formatEur, formatKm } from "@/lib/format";
 import { BODY_STYLES, REGISTRATION_OPTIONS, labelOf } from "@/lib/listing-details";
-import { STEP, photoSectionsFor, type SellErrors, type SellPhotos, type StepId } from "@/lib/sell";
+import { STEP, euCountryName, photoSectionsFor, type SellErrors, type SellPhotos, type StepId } from "@/lib/sell";
 import { cn } from "@/lib/utils";
 import { FieldError, StepHeading, fieldId } from "./field";
 import type { SellValues } from "./types";
@@ -94,6 +94,7 @@ export function ReviewStep({
   const mileage = num(values.mileageKm);
   const start = num(values.startingBid);
   const reserve = num(values.reserve);
+  const reportKm = num(values.reportMileage);
   const cover = photos.exterior[0];
   const confirmId = fieldId("confirmed");
 
@@ -209,19 +210,29 @@ export function ReviewStep({
           <Row label="Starting bid" value={start !== null ? formatEur(start) : ""} />
           <Row label="Reserve price" value={reserve !== null ? `${formatEur(reserve)} (private)` : "No reserve"} />
           <Row
-            label="Inspection"
+            label="Dealer inspection"
             value={
-              values.inspectionRequested === "yes"
-                ? "Yes, book an inspection"
-                : values.inspectionRequested === "no"
+              values.dealerInspection === "yes"
+                ? "Yes, report uploaded"
+                : values.dealerInspection === "no"
                   ? "No, list without an inspection"
                   : ""
             }
           />
-          {values.inspectionRequested === "yes" ? (
+          {values.dealerInspection === "yes" ? (
             <>
-              <Row label="Inspection location" value={values.inspectionCity} />
-              <Row label="Preferred dates" value={values.inspectionDates} />
+              <Row
+                label="Dealer"
+                value={[values.reportDealerName, values.reportDealerCity, euCountryName(values.reportDealerCountry)]
+                  .filter(Boolean)
+                  .join(", ")}
+              />
+              <Row label="Inspection date" value={values.reportDate} />
+              <Row label="Mileage on the report" value={reportKm !== null ? formatKm(reportKm) : ""} />
+              <Row
+                label="Report files"
+                value={values.reportFiles.length ? `${values.reportFiles.length} ${values.reportFiles.length === 1 ? "file" : "files"}` : ""}
+              />
             </>
           ) : null}
           <Row label="Seller fee" value="[to be confirmed]" />
@@ -251,8 +262,8 @@ export function ReviewStep({
         </div>
         <p className="mt-4 text-sm text-mute">
           <span className="font-semibold text-chalk">After you submit:</span>{" "}
-          {values.inspectionRequested === "yes"
-            ? "We'll review your listing and contact you to book the inspection."
+          {values.dealerInspection === "yes"
+            ? "We'll review your listing and check the dealer's inspection report."
             : "We'll review your listing."}
         </p>
       </div>

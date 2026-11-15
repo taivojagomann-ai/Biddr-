@@ -12,12 +12,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const REVIEW = { title: "We review your listing", body: "We check the details and photos, and ask you if anything is missing." };
 
 const STEPS_WITH_INSPECTION = [
-  REVIEW,
   {
-    title: "We contact you to book the inspection",
-    body: "Our partner inspects the car in the city you chose. Bidders see the report.",
+    title: "We review your listing and the dealer report",
+    body: "We check the details and photos, and that the report is from an authorised dealer of the brand and matches the car.",
   },
-  { title: "We schedule the auction", body: "Once the car passes inspection, we agree the dates with you and it goes live." },
+  { title: "We schedule the auction", body: "Once we approve the listing, we agree the dates with you and it goes live." },
 ];
 
 const STEPS_WITHOUT_INSPECTION = [
@@ -29,7 +28,7 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
   const id = typeof searchParams.id === "string" && UUID_RE.test(searchParams.id) ? searchParams.id : null;
 
   let title: string | null = null;
-  let inspectionRequested = false;
+  let dealerReport = false;
   if (id) {
     // RLS: sellers can read their own drafts, nobody else's.
     const { data } = await getServerSupabase()
@@ -40,16 +39,16 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
     title = data?.title ?? null;
     if (title) {
       // auction_private is admin-only; RLS just showed this listing is the user's own
-      // (or they're an admin), so read only its inspection choice with the service role.
+      // (or they're an admin), so read only whether a dealer report was provided with the service role.
       const { data: priv } = await getAdminSupabase()
         .from("auction_private")
-        .select("inspection_requested")
+        .select("dealer_inspection_provided")
         .eq("auction_id", id)
-        .maybeSingle<{ inspection_requested: boolean | null }>();
-      inspectionRequested = priv?.inspection_requested === true;
+        .maybeSingle<{ dealer_inspection_provided: boolean | null }>();
+      dealerReport = priv?.dealer_inspection_provided === true;
     }
   }
-  const steps = inspectionRequested ? STEPS_WITH_INSPECTION : STEPS_WITHOUT_INSPECTION;
+  const steps = dealerReport ? STEPS_WITH_INSPECTION : STEPS_WITHOUT_INSPECTION;
 
   return (
     <main className="container max-w-2xl py-12 sm:py-20">
@@ -63,7 +62,7 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
         ) : (
           "Your listing is waiting for review."
         )}{" "}
-        {inspectionRequested ? "We'll contact you to book the inspection." : "We'll review your listing."}
+        {dealerReport ? "We'll review your listing and check the dealer's inspection report." : "We'll review your listing."}
       </p>
 
       <h2 className="mt-10 text-lg font-bold">What happens next</h2>

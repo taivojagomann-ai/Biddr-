@@ -2,6 +2,8 @@
 import { revalidatePath } from "next/cache";
 import {
   PHOTO_SECTION_KEYS,
+  REPORT_BUCKET,
+  REPORT_PATH_RE,
   draftFolder,
   listingColumns,
   parseSubmission,
@@ -33,6 +35,20 @@ function checkPhotoUrls(photos: Record<PhotoSection, string[]>, userId: string, 
   return errors;
 }
 
+/**
+ * Dealer report files must sit in the private bucket under <user id>/<draft id>/
+ * and actually exist there (checked with the service role, for this folder only).
+ */
+async function checkReportPaths(paths: string[], userId: string, draftId: string): Promise<boolean> {
+  const folder = `${userId}/${draftId}`;
+  if (paths.length === 0 || new Set(paths).size !== paths.length) return false;
+  if (!paths.every((p) => REPORT_PATH_RE.test(p) && p.startsWith(`${folder}/`))) return false;
+  const { data, error } = await getAdminSupabase().storage.from(REPORT_BUCKET).list(folder, { limit: 100 });
+  if (error || !data) return false;
+  const names = new Set(data.map((f) => f.name));
+  return paths.every((p) => names.has(p.slice(folder.length + 1)));
+}
+
 export async function submitListing(input: unknown): Promise<SubmitResult> {
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -48,6 +64,9 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
 
   const photoErrors = checkPhotoUrls(v.photos, user.id, v.draftId);
   if (Object.keys(photoErrors).length) return { ok: false, errors: photoErrors };
+  if (v.dealer && !(await checkReportPaths(v.dealer.reportPaths, user.id, v.draftId))) {
+    return { ok: false, errors: { reportFiles: "One of the report files didn't upload correctly. Remove it and add it again." } };
+  }
 
   // Normal server client: RLS ("sellers submit drafts") and the column grants apply.
   // status is not in the insert grant; it defaults to 'draft', which the policy requires.
@@ -74,9 +93,14 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
   const { error: privateError } = await admin.from("auction_private").insert({
     auction_id: auction.id,
     requested_reserve: v.reserve,
-    inspection_requested: v.inspectionRequested,
-    inspection_city: v.inspectionCity,
-    inspection_preferred_dates: v.inspectionDates,
+    dealer_inspection_provided: v.dealer !== null,
+    dealer_name: v.dealer?.name ?? null,
+    dealer_city: v.dealer?.city ?? null,
+    dealer_country: v.dealer?.country ?? null,
+    dealer_inspection_date: v.dealer?.date ?? null,
+    dealer_inspection_mileage_km: v.dealer?.mileageKm ?? null,
+    dealer_report_paths: v.dealer?.reportPaths ?? [],
+    inspection_review_status: v.dealer ? "pending" : null,
   });
 
   // has_reserve is server-owned (not in the seller's column grant).
