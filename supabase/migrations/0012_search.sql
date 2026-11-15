@@ -209,6 +209,10 @@ create index if not exists auctions_search_text_trgm on public.auctions using gi
 -- first. Words are reduced to [a-z0-9] before they reach the SQL text below.
 -- Returns the card columns, the row's position and the total number of matches.
 -- -----------------------------------------------------------------------------
+-- A later migration (0014) changes this function's result columns, which
+-- "create or replace" can't undo, so drop it first when running this again.
+drop function if exists public.search_auctions(text, text, text, text, int, int);
+
 create or replace function public.search_auctions(
   p_query     text,
   p_tab       text default 'live',

@@ -110,12 +110,28 @@ create policy "inspection uploads: owners read own folder" on storage.objects
 -- -----------------------------------------------------------------------------
 -- Notifications: tell the seller when their report wasn't accepted.
 -- -----------------------------------------------------------------------------
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check check (type in (
-  'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+-- Replaced only when the current check is missing or doesn't allow every type
+-- below, so re-running this file never narrows a list a later migration widened.
+do $$
+declare
+  v_def text;
+begin
+  select pg_get_constraintdef(oid) into v_def from pg_constraint
+   where conrelid = 'public.notifications'::regclass and conname = 'notifications_type_check';
+  if v_def is null or exists (
+    select 1 from unnest(array['question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
   'auction_live', 'auction_ended', 'auction_won', 'listing_submitted',
-  'watch_ending_soon', 'watch_live', 'inspection_rejected'
-));
+  'watch_ending_soon', 'watch_live', 'inspection_rejected']) as t(v)
+     where position(quote_literal(t.v) in v_def) = 0
+  ) then
+    alter table public.notifications drop constraint if exists notifications_type_check;
+    alter table public.notifications add constraint notifications_type_check check (type in (
+      'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+      'auction_live', 'auction_ended', 'auction_won', 'listing_submitted',
+      'watch_ending_soon', 'watch_live', 'inspection_rejected'
+    ));
+  end if;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- Home page search: "Restored, dealer inspected" now means inspection_type =

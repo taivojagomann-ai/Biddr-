@@ -132,8 +132,17 @@ supabase/migrations/0016_seller_inspection_decision.sql
 supabase/migrations/0017_inspected_by_seller.sql
 supabase/migrations/0018_eu_countries.sql
 tests/a11y/                     axe, reflow and keyboard tests + mock Supabase (npm run test:a11y)
+e2e/                            end-to-end tests: one spec per area, helpers, seed (npm run test:e2e)
+playwright.e2e.config.ts        end-to-end test projects (desktop Berlin, phone Tallinn) and test server
+supabase/config.toml            local, test-only Supabase stack (never used in production)
+scripts/check-migrations.sh     applies every migration a second time and compares the schema
+.github/workflows/e2e.yml       runs the tests on every pull request and push to main
 vercel.json                     cron for hold release
 ```
+
+## Testing
+
+See [TESTING.md](TESTING.md). `npm run test:e2e` runs the end-to-end tests against a local Supabase stack, a local mail catcher and stripe-mock, with no real keys, users or payments. `npm run test:migrations` proves every migration can run twice. [MANUAL_TESTS.md](MANUAL_TESTS.md) lists what a person still needs to check (Google sign-in, real cards, real emails, real phones, link previews). All automated tests run on every pull request.
 
 ## Accessibility
 

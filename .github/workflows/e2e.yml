@@ -1,0 +1,116 @@
+name: End-to-end tests
+
+# Runs on every pull request and on every push to main. Everything runs inside
+# the GitHub runner: a local Supabase stack (Docker), the Mailpit mail catcher
+# that comes with it, and stripe-mock. No secrets are used, and nothing here can
+# reach the production database, real users or Stripe.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (local Supabase, Mailpit, stripe-mock)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      stripe-mock:
+        image: stripe/stripe-mock:v0.206.0
+        ports:
+          - 12111:12111
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium system libraries
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Cache the Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next-e2e/cache
+          key: next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**', 'components/**', 'lib/**', 'hooks/**') }}
+          restore-keys: next-e2e-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.1
+
+      # Applies every migration in supabase/migrations to a fresh database and
+      # fails on the first error.
+      - name: Start local Supabase (applies all migrations from scratch)
+        run: supabase start
+
+      - name: Apply every migration a second time (idempotency)
+        run: npm run test:migrations
+
+      - name: Run the end-to-end tests
+        run: npm run test:e2e
+
+      # Again, now that the tests have filled the database: re-running a
+      # migration must also work on a database with real-looking data.
+      - name: Apply every migration again, with test data in the database
+        run: npm run test:migrations
+
+      - name: Upload the HTML report and traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e-report/
+            test-results/
+          retention-days: 14
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+  a11y:
+    name: Accessibility (mock Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - run: npm run test:a11y

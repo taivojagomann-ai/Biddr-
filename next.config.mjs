@@ -5,6 +5,8 @@ const supabaseHost = supabaseUrl ? supabaseUrl.hostname : "localhost";
 const supabaseProtocol = supabaseUrl?.protocol === "http:" ? "http" : "https";
 
 const nextConfig = {
+  // The end-to-end build uses its own folder so it never overwrites the normal one.
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   images: {
     remotePatterns: [{ protocol: supabaseProtocol, hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }],
   },

@@ -19,11 +19,26 @@ create table if not exists public.notifications (
   created_at  timestamptz not null default now()
 );
 
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check check (type in (
-  'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
-  'auction_live', 'auction_ended', 'auction_won', 'listing_submitted'
-));
+-- Replaced only when the current check is missing or doesn't allow every type
+-- below, so re-running this file never narrows a list a later migration widened.
+do $$
+declare
+  v_def text;
+begin
+  select pg_get_constraintdef(oid) into v_def from pg_constraint
+   where conrelid = 'public.notifications'::regclass and conname = 'notifications_type_check';
+  if v_def is null or exists (
+    select 1 from unnest(array['question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+  'auction_live', 'auction_ended', 'auction_won', 'listing_submitted']) as t(v)
+     where position(quote_literal(t.v) in v_def) = 0
+  ) then
+    alter table public.notifications drop constraint if exists notifications_type_check;
+    alter table public.notifications add constraint notifications_type_check check (type in (
+      'question', 'answer', 'outbid', 'listing_approved', 'listing_rejected',
+      'auction_live', 'auction_ended', 'auction_won', 'listing_submitted'
+    ));
+  end if;
+end $$;
 
 create index if not exists notifications_user_created_idx on public.notifications (user_id, created_at desc);
 create index if not exists notifications_user_unread_idx on public.notifications (user_id) where read_at is null;
