@@ -245,6 +245,12 @@ export const extendSchema = z
   });
 export type ExtendInput = z.input<typeof extendSchema>;
 
+/** Declining a seller's withdrawal request: the note is optional and goes to the seller. */
+export const declineWithdrawalSchema = z.object({
+  auctionId: id,
+  note: z.string().trim().max(500, "Keep the note under 500 characters."),
+});
+
 export const rejectSchema = z.object({
   auctionId: id,
   reason: z

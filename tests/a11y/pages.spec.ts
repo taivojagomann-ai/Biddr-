@@ -938,3 +938,75 @@ test.describe("dealer inspections", () => {
     });
   });
 });
+
+test.describe("seller withdrawals", () => {
+  const LIVE_MINE = "10000000-0000-4000-8000-000000000008";
+
+  test.describe("signed in", () => {
+    test.beforeEach(async ({ context }) => signIn(context));
+
+    test("waiting for review: withdraw directly with an optional reason; rejected listings have no button", async ({ page }) => {
+      await page.goto("/account/listings");
+      const trigger = page.getByRole("button", { name: "Withdraw listing: 2020 BMW M2 Competition" });
+      await expect(page.getByRole("button", { name: /2016 Audi RS 3 Sportback/ })).toHaveCount(0);
+
+      await trigger.click();
+      const dialog = page.getByRole("dialog", { name: "Withdraw this listing?" });
+      await expect(dialog.getByLabel("Reason (optional)")).toBeVisible();
+      await expectNoSeriousViolations(page, "Withdraw dialog", "[role=dialog]");
+      await dialog.getByLabel("Reason (optional)").fill("Sold privately");
+      await dialog.getByRole("button", { name: "Withdraw listing" }).click();
+      const done = page.getByRole("status").filter({ hasText: "Listing withdrawn." });
+      await expect(done).toBeVisible();
+      await expect(done).toBeFocused();
+    });
+
+    test("live: only a request, with the note and a reason of at least 20 characters", async ({ page }) => {
+      await page.goto("/account/listings");
+      await page.getByRole("button", { name: "Request withdrawal: 2019 Alpine A110 Premiere" }).click();
+      const dialog = page.getByRole("dialog", { name: "Request withdrawal?" });
+      await expect(dialog).toContainText("live auctions can only be withdrawn by the Biddr team for a good reason");
+      const reason = dialog.getByLabel("Why do you want to withdraw it?");
+      await expect(reason).toHaveAccessibleDescription(/At least 20 characters/);
+
+      await reason.fill("Changed my mind");
+      await dialog.getByRole("button", { name: "Send request" }).click();
+      await expect(dialog.getByRole("alert")).toHaveText("Explain why in at least 20 characters.");
+      await expect(reason).toHaveAttribute("aria-invalid", "true");
+      await expectNoSeriousViolations(page, "Request withdrawal dialog", "[role=dialog]");
+
+      await reason.fill("The car was damaged in a hailstorm yesterday.");
+      await dialog.getByRole("button", { name: "Send request" }).click();
+      const done = page.getByRole("status").filter({ hasText: "Withdrawal requested." });
+      await expect(done).toBeFocused();
+      await expect(page.getByRole("link", { name: /2019 Alpine A110 Premiere/ })).toHaveAttribute("href", `/auctions/${LIVE_MINE}`);
+    });
+
+    test("admins see the count, can filter, and decide from the auction page", async ({ page }) => {
+      await page.goto("/admin?tab=live");
+      const filter = page.getByRole("navigation", { name: "Live auction filter" });
+      await expect(filter.getByRole("link", { name: /Withdrawal requests\s*1/ })).toBeVisible();
+      await filter.getByRole("link", { name: /Withdrawal requests/ }).click();
+      await expect(page).toHaveURL(/requests=1/);
+      await expect(page.getByText("Withdrawal requested")).toHaveCount(1);
+      await expect(page.getByRole("link", { name: /BMW M3/ })).toBeVisible();
+      await expect(page.getByRole("link", { name: /Alpine/ })).toHaveCount(0);
+
+      await page.goto(`/admin/auctions/${LIVE}`);
+      const panel = page.getByRole("region", { name: "The seller asked to withdraw this auction" });
+      await expect(panel).toContainText("damaged in a hailstorm");
+      await panel.getByRole("button", { name: "Approve and withdraw" }).click();
+      const approve = page.getByRole("dialog", { name: "Approve the request and withdraw this auction?" });
+      await expect(approve).toContainText(/bids? (is|are) cancelled/);
+      await expectNoSeriousViolations(page, "Approve withdrawal dialog", "[role=dialog]");
+      await approve.getByRole("button", { name: "Cancel" }).click();
+      await expect(panel.getByRole("button", { name: "Approve and withdraw" })).toBeFocused();
+
+      await panel.getByRole("button", { name: "Decline" }).click();
+      const decline = page.getByRole("dialog", { name: "Decline the withdrawal request?" });
+      await expect(decline.getByLabel("Note to the seller (optional)")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expectNoSeriousViolations(page, "Admin withdrawal request");
+    });
+  });
+});

@@ -113,6 +113,13 @@ const AUCTIONS = [
     condition_type: "clean", gallery_urls: gallery("rs3"), starting_bid: 25000, starts_at: null, ends_at: null,
     status: "rejected", seller: { username: "test_admin", country: "EE" },
   },
+  // The signed-in test user's live auction (they can only request a withdrawal).
+  {
+    ...base, id: "10000000-0000-4000-8000-000000000008", seller_id: ME, title: "2019 Alpine A110 Premiere",
+    make: "Alpine", model: "A110", variant: "Premiere", year: 2019, vin: "VFADVF00000012345", mileage_km: 15800,
+    location_city: "Tallinn", condition_type: "clean", gallery_urls: gallery("a110"), starting_bid: 45000,
+    starts_at: iso(-3 * 24 * H), ends_at: iso(5 * 24 * H), status: "live", seller: { username: "test_admin", country: "EE" },
+  },
 ];
 
 const PROFILES = [
@@ -171,6 +178,10 @@ const TABLES = {
     dealer_report_paths: [`${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000001.pdf`,
       `${ME}/10000000-0000-4000-8000-000000000005/aaaaaaaa-0000-4000-8000-000000000002.jpg`],
     inspection_review_status: "pending", inspection_review_note: null, inspection_reviewed_by: null, inspection_reviewed_at: null, admin_notes: null, contact_notes: null, rejection_reason: null },
+    // Another seller asked to withdraw the live M3 (0015).
+    { auction_id: "10000000-0000-4000-8000-000000000001", withdraw_request_status: "pending",
+      withdraw_reason: "The car was damaged in a hailstorm yesterday; the bonnet and roof are dented.",
+      withdraw_requested_at: iso(-2 * H), auction: { seller_id: SELLER, status: "live" } },
     { auction_id: "10000000-0000-4000-8000-000000000006", rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
   admin_actions: [],
 };

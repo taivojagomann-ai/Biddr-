@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
 import { STATUS_LABELS } from "@/lib/sell";
+import { withdrawOption } from "@/lib/withdraw";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { WithdrawActions } from "./withdraw-actions";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
@@ -40,18 +42,21 @@ export default async function MyListingsPage() {
     .returns<ListingRow[]>();
   const listings = data ?? [];
 
-  // Rejection reasons live in auction_private, which only admins can read. Read them
-  // with the service role, strictly for this seller's own rejected listings.
-  const rejectedIds = listings.filter((l) => l.status === "rejected").map((l) => l.id);
+  // Rejection reasons and withdrawal requests live in auction_private, which only admins
+  // can read. Read them with the service role, strictly for this seller's own listings.
   const reasons = new Map<string, string>();
-  if (rejectedIds.length) {
+  const requests = new Map<string, string | null>();
+  if (listings.length) {
     const { data: rows } = await getAdminSupabase()
       .from("auction_private")
-      .select("auction_id, rejection_reason, auction:auctions!inner(seller_id)")
-      .in("auction_id", rejectedIds)
+      .select("auction_id, rejection_reason, withdraw_request_status, auction:auctions!inner(seller_id)")
+      .in("auction_id", listings.map((l) => l.id))
       .eq("auction.seller_id", user.id)
-      .returns<{ auction_id: string; rejection_reason: string | null }[]>();
-    for (const r of rows ?? []) if (r.rejection_reason) reasons.set(r.auction_id, r.rejection_reason);
+      .returns<{ auction_id: string; rejection_reason: string | null; withdraw_request_status: string | null }[]>();
+    for (const r of rows ?? []) {
+      if (r.rejection_reason) reasons.set(r.auction_id, r.rejection_reason);
+      requests.set(r.auction_id, r.withdraw_request_status);
+    }
   }
 
   return (
@@ -119,6 +124,7 @@ export default async function MyListingsPage() {
                 {isPublic ? <ChevronRight aria-hidden className="size-5 shrink-0 text-mute" /> : null}
               </>
             );
+            const requestStatus = requests.get(l.id) ?? null;
             return (
               <li key={l.id}>
                 {isPublic ? (
@@ -128,6 +134,15 @@ export default async function MyListingsPage() {
                 ) : (
                   <div className="flex items-center gap-4 p-3">{body}</div>
                 )}
+                {/* Outside the link: no buttons inside links. */}
+                <div className="px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
+                  <WithdrawActions
+                    auctionId={l.id}
+                    title={l.title}
+                    option={withdrawOption(l.status, requestStatus)}
+                    declined={requestStatus === "declined"}
+                  />
+                </div>
               </li>
             );
           })}
