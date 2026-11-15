@@ -368,11 +368,11 @@ The admin panel can fill the site with six example auctions, with bids, comments
   - live and closing in 12 minutes, 21 bids, reserve met;
   - live, ending in 26 hours, 6 bids, reserve not met yet;
   - live with no reserve and no bids (a restored car listed without an inspection, so the "Not inspected" state is visible);
-  - scheduled for tomorrow 12:00;
+  - scheduled for tomorrow 12:00 (sold by a fictional Mercedes-Benz dealer that inspected the car itself, so "Inspected by the selling dealer" is visible);
   - sold yesterday (a restored car with an accepted dealer inspection, before photos and a public demo report PDF);
   - ended 3 days ago below its reserve.
 
-  Every car except the restored Porsche has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre, Tallinn", "Demo Mercedes-Benz Centre, Helsinki" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
+  Every car except the restored Porsche has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre, Tallinn", "Demo Audi Centre, Riga" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
 
   The demo users have `@biddr.invalid` emails and no passwords, so nobody can sign in as them.
 - **Reset demo data** (shown once demo data exists) removes it and creates it again with times relative to now. Demo auctions close on their own like real ones (the 12-minute one closes first), so reset whenever you need the live states back.
