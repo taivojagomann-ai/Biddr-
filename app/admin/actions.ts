@@ -251,7 +251,12 @@ export async function makeCover(input: unknown): Promise<AdminResult> {
 // Only before an auction goes live: the badge must not change under bidders.
 const REVIEWABLE: readonly AuctionStatus[] = ["draft", "upcoming"];
 
+/** How long the seller has to choose after a rejected report. */
+const SELLER_DECISION_DAYS = 30;
+
 type DealerReportRow = {
+  inspection_review_status: string | null;
+  seller_decision_required: boolean;
   dealer_inspection_provided: boolean | null;
   dealer_name: string | null;
   dealer_city: string | null;
@@ -262,7 +267,9 @@ type DealerReportRow = {
 async function loadDealerReport(ctx: AdminContext, auctionId: string): Promise<DealerReportRow | null> {
   const { data } = await ctx.db
     .from("auction_private")
-    .select("dealer_inspection_provided, dealer_name, dealer_city, dealer_inspection_date, dealer_report_paths")
+    .select(
+      "inspection_review_status, seller_decision_required, dealer_inspection_provided, dealer_name, dealer_city, dealer_inspection_date, dealer_report_paths",
+    )
     .eq("auction_id", auctionId)
     .maybeSingle<DealerReportRow>();
   return data;
@@ -278,6 +285,9 @@ export async function acceptInspectionReport(input: unknown): Promise<AdminResul
   const report = await loadDealerReport(ctx, v.auctionId);
   if (!report?.dealer_inspection_provided || !report.dealer_name || !report.dealer_inspection_date) {
     return { ok: false, error: "The seller didn't provide a dealer inspection report." };
+  }
+  if (report.seller_decision_required || report.inspection_review_status === "rejected") {
+    return { ok: false, error: "This report was rejected. Wait for the seller's new report." };
   }
 
   const { error: privError } = await ctx.db
@@ -316,7 +326,13 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
   if (!REVIEWABLE.includes(a.status)) return { ok: false, error: "Reports can only be reviewed before the auction goes live." };
   const report = await loadDealerReport(ctx, v.auctionId);
   if (!report?.dealer_inspection_provided) return { ok: false, error: "The seller didn't provide a dealer inspection report." };
+  // The seller decides what happens next, which only works before approval.
+  if (a.status !== "draft") {
+    return { ok: false, error: "Move the listing back to review before rejecting its report, so the seller can choose what happens next." };
+  }
+  if (report.inspection_review_status === "rejected") return { ok: false, error: "This report has already been rejected." };
 
+  const deadline = new Date(Date.now() + SELLER_DECISION_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { error: privError } = await ctx.db
     .from("auction_private")
     .update({
@@ -324,6 +340,11 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
       inspection_review_note: v.reason,
       inspection_reviewed_by: ctx.adminId,
       inspection_reviewed_at: new Date().toISOString(),
+      // Now the seller chooses: a new report, or list without an inspection (or withdraw).
+      seller_decision_required: true,
+      seller_decision_deadline: deadline,
+      seller_decision: null,
+      seller_decision_at: null,
     })
     .eq("auction_id", v.auctionId);
   if (privError) return { ok: false, error: dbMessage(privError) };
@@ -345,12 +366,15 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
 
   const { error: notifyError } = await ctx.db
     .from("notifications")
-    .insert({ user_id: a.seller_id, type: "inspection_rejected", auction_id: v.auctionId, data: { reason: v.reason } });
+    .insert({ user_id: a.seller_id, type: "inspection_rejected", auction_id: v.auctionId, data: { reason: v.reason, deadline } });
   if (notifyError) console.error("inspection_rejected notification failed", notifyError);
 
-  await logAdminAction(ctx, v.auctionId, "inspection.reject", { reason: v.reason });
+  await logAdminAction(ctx, v.auctionId, "inspection.reject", { reason: v.reason, seller_decision_deadline: deadline });
   refresh(v.auctionId);
-  return { ok: true, message: "Report rejected. The seller has been told why; the listing can still be approved without a badge." };
+  return {
+    ok: true,
+    message: `Report rejected. The seller has ${SELLER_DECISION_DAYS} days to upload a new report or list without an inspection.`,
+  };
 }
 
 export async function saveInspectionReport(input: unknown): Promise<AdminResult> {
@@ -504,6 +528,12 @@ export async function approveAuction(input: unknown): Promise<AdminResult> {
   else if (Date.parse(a.ends_at) <= Date.now()) missing.push("move the end time into the future");
   else if (Date.parse(a.ends_at) - Date.parse(a.starts_at) > MAX_AUCTION_MS) missing.push("shorten the auction to 7 days or less");
   if (!a.gallery_urls.exterior?.length) missing.push("keep at least one exterior photo for the cover");
+  const { data: decision } = await ctx.db
+    .from("auction_private")
+    .select("seller_decision_required")
+    .eq("auction_id", v.auctionId)
+    .maybeSingle<{ seller_decision_required: boolean }>();
+  if (decision?.seller_decision_required) missing.push("wait for the seller to choose: new report or list without an inspection");
   if (missing.length) return { ok: false, error: `Before approving, ${missing.join(", and ")}.` };
 
   const changed = await changeStatus(ctx, v.auctionId, ["draft"], "upcoming");

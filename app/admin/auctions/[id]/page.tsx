@@ -84,6 +84,12 @@ function dealerReportView(priv: AuctionPrivate | null, listingKm: number, starts
       note: priv?.inspection_review_note ?? null,
       reviewedAt: priv?.inspection_reviewed_at ?? null,
     },
+    decision: {
+      required: priv?.seller_decision_required ?? false,
+      deadline: priv?.seller_decision_deadline ?? null,
+      choice: priv?.seller_decision ?? null,
+      at: priv?.seller_decision_at ?? null,
+    },
     warnings,
   };
 }
@@ -236,6 +242,7 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             currentBid={a.current_bid}
             holdCount={holdsRes.count ?? 0}
             rejectionReason={priv?.rejection_reason ?? null}
+            waitingForSeller={priv?.seller_decision_required ? (priv.seller_decision_deadline ?? null) : null}
           />
         </Section>
 

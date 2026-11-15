@@ -125,7 +125,15 @@ export interface AuctionPrivate {
   withdraw_requested_at: string | null;
   /** Only for live auctions, where the seller can only ask. */
   withdraw_request_status: WithdrawRequestStatus | null;
+  // The seller's choice after a rejected dealer report (0016)
+  /** True from "Reject report" until the seller chooses (or the deadline withdraws the listing). */
+  seller_decision_required: boolean;
+  seller_decision_deadline: string | null;
+  seller_decision: SellerInspectionDecision | null;
+  seller_decision_at: string | null;
 }
+
+export type SellerInspectionDecision = "new_report" | "without_inspection";
 
 export type WithdrawRequestStatus = "pending" | "approved" | "declined";
 
@@ -209,7 +217,8 @@ export type NotificationType =
   | "question" | "answer" | "outbid" | "listing_approved" | "listing_rejected"
   | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted"
   | "watch_ending_soon" | "watch_live" | "inspection_rejected"
-  | "withdrawal_approved" | "withdrawal_declined";
+  | "withdrawal_approved" | "withdrawal_declined"
+  | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

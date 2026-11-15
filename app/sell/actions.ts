@@ -2,8 +2,6 @@
 import { revalidatePath } from "next/cache";
 import {
   PHOTO_SECTION_KEYS,
-  REPORT_BUCKET,
-  REPORT_PATH_RE,
   draftFolder,
   listingColumns,
   parseSubmission,
@@ -12,6 +10,7 @@ import {
   type SellErrors,
   type SubmitResult,
 } from "@/lib/sell";
+import { checkReportPaths } from "@/lib/report-files";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
 const FILE_RE = /^[A-Za-z0-9-]{8,64}\.(webp|jpg)$/;
@@ -35,20 +34,6 @@ function checkPhotoUrls(photos: Record<PhotoSection, string[]>, userId: string, 
   return errors;
 }
 
-/**
- * Dealer report files must sit in the private bucket under <user id>/<draft id>/
- * and actually exist there (checked with the service role, for this folder only).
- */
-async function checkReportPaths(paths: string[], userId: string, draftId: string): Promise<boolean> {
-  const folder = `${userId}/${draftId}`;
-  if (paths.length === 0 || new Set(paths).size !== paths.length) return false;
-  if (!paths.every((p) => REPORT_PATH_RE.test(p) && p.startsWith(`${folder}/`))) return false;
-  const { data, error } = await getAdminSupabase().storage.from(REPORT_BUCKET).list(folder, { limit: 100 });
-  if (error || !data) return false;
-  const names = new Set(data.map((f) => f.name));
-  return paths.every((p) => names.has(p.slice(folder.length + 1)));
-}
-
 export async function submitListing(input: unknown): Promise<SubmitResult> {
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -64,7 +49,7 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
 
   const photoErrors = checkPhotoUrls(v.photos, user.id, v.draftId);
   if (Object.keys(photoErrors).length) return { ok: false, errors: photoErrors };
-  if (v.dealer && !(await checkReportPaths(v.dealer.reportPaths, user.id, v.draftId))) {
+  if (v.dealer && !(await checkReportPaths(v.dealer.reportPaths, `${user.id}/${v.draftId}`))) {
     return { ok: false, errors: { reportFiles: "One of the report files didn't upload correctly. Remove it and add it again." } };
   }
 

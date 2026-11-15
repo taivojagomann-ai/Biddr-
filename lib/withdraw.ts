@@ -44,3 +44,14 @@ export const WITHDRAW_ERRORS: Record<string, string> = {
   REASON_TOO_LONG: `Keep the reason under ${REASON_MAX.toLocaleString("en-IE")} characters.`,
   ALREADY_REQUESTED: "You've already asked to withdraw this auction. The Biddr team will reply soon.",
 };
+
+/** Error codes from seller_inspection_decision (0016), in plain words. */
+export const DECISION_ERRORS: Record<string, string> = {
+  NOT_AUTHENTICATED: "Your session has expired. Sign in again.",
+  AUCTION_NOT_FOUND: "This listing no longer exists.",
+  NOT_OWNER: "You can only decide for your own listings.",
+  NOT_DRAFT: "This listing isn't waiting for review any more. Reload the page to see its status.",
+  NO_DECISION_NEEDED: "You've already chosen how to continue. Reload the page to see the status.",
+  NEW_REPORT_NEEDS_UPLOAD: "Upload the new report to choose this.",
+  INVALID_DECISION: "Choose one of the options.",
+};

@@ -37,6 +37,9 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   inspection_rejected: FileX,
   withdrawal_approved: CircleSlash,
   withdrawal_declined: XCircle,
+  seller_decided: Send,
+  inspection_decision_reminder: AlarmClock,
+  inspection_decision_expired: CircleSlash,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

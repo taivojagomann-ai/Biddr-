@@ -346,6 +346,64 @@ export function photosSchema(restored: boolean) {
     }));
 }
 
+// The dealer report fields and their rules, shared by the sell form and the
+// "Upload a new report" form after a rejected report.
+const dealerReportShape = {
+  reportDealerName: z.string().trim().max(120, "Keep the dealer's name under 120 characters."),
+  reportDealerCity: z.string().trim().max(80, "Keep the city under 80 characters."),
+  reportDealerCountry: z.enum([...EU_CODES, ""]).catch(""),
+  reportDate: z.string().trim(),
+  reportMileage: z.string().transform((v) => v.replace(/[\s.,]/g, "")),
+  reportFiles: z
+    .array(z.object({ path: z.string().regex(REPORT_PATH_RE), name: z.string().max(255) }))
+    .max(MAX_REPORT_FILES, `Add at most ${MAX_REPORT_FILES} files.`)
+    .catch([]),
+};
+
+type DealerReportValues = {
+  reportDealerName: string;
+  reportDealerCity: string;
+  reportDealerCountry: string;
+  reportDate: string;
+  reportMileage: string;
+  reportFiles: ReportFile[];
+};
+
+/** Every dealer report field is required once the seller has a report. */
+function refineDealerReport(v: DealerReportValues, ctx: z.RefinementCtx) {
+  const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+  if (v.reportDealerName.length < 2) issue("reportDealerName", "Enter the dealer's name.");
+  if (v.reportDealerCity.length < 2) issue("reportDealerCity", "Enter the dealer's city.");
+  if (v.reportDealerCountry === "") issue("reportDealerCountry", "Choose the country (EU only).");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.reportDate)) issue("reportDate", "Enter the inspection date.");
+  else {
+    const age = daysSince(v.reportDate);
+    if (age < 0) issue("reportDate", "The inspection date can't be in the future.");
+    else if (age > REPORT_MAX_AGE_DAYS) {
+      issue("reportDate", `The report must be from the last ${REPORT_MAX_AGE_DAYS} days.`);
+    }
+  }
+  if (!/^\d{1,7}$/.test(v.reportMileage)) {
+    issue("reportMileage", "Enter the mileage on the report, in whole kilometres.");
+  }
+  if (v.reportFiles.length === 0) issue("reportFiles", "Upload the inspection report (PDF or photos).");
+}
+
+/** "Upload a new report" after a rejected report (0016). */
+export const newReportSchema = z
+  .object({ auctionId: z.string().uuid("This link is broken. Reload the page."), ...dealerReportShape })
+  .superRefine((v, ctx) => refineDealerReport(v, ctx))
+  .transform((v) => ({
+    auctionId: v.auctionId,
+    name: v.reportDealerName,
+    city: v.reportDealerCity,
+    country: v.reportDealerCountry as EuCountry,
+    date: v.reportDate,
+    mileageKm: Number(v.reportMileage),
+    reportPaths: v.reportFiles.map((f) => f.path),
+  }));
+export type NewReportInput = z.input<typeof newReportSchema>;
+
 export const priceSchema = z
   .object({
     startingBid: wholeNumber(
@@ -367,34 +425,11 @@ export const priceSchema = z
     dealerInspection: z.enum(["yes", "no"], {
       errorMap: () => ({ message: "Choose whether you have a dealer inspection report." }),
     }),
-    reportDealerName: z.string().trim().max(120, "Keep the dealer's name under 120 characters."),
-    reportDealerCity: z.string().trim().max(80, "Keep the city under 80 characters."),
-    reportDealerCountry: z.enum([...EU_CODES, ""]).catch(""),
-    reportDate: z.string().trim(),
-    reportMileage: z.string().transform((v) => v.replace(/[\s.,]/g, "")),
-    reportFiles: z
-      .array(z.object({ path: z.string().regex(REPORT_PATH_RE), name: z.string().max(255) }))
-      .max(MAX_REPORT_FILES, `Add at most ${MAX_REPORT_FILES} files.`)
-      .catch([]),
+    ...dealerReportShape,
   })
   .superRefine((v, ctx) => {
     if (v.dealerInspection === "yes") {
-      const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
-      if (v.reportDealerName.length < 2) issue("reportDealerName", "Enter the dealer's name.");
-      if (v.reportDealerCity.length < 2) issue("reportDealerCity", "Enter the dealer's city.");
-      if (v.reportDealerCountry === "") issue("reportDealerCountry", "Choose the country (EU only).");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.reportDate)) issue("reportDate", "Enter the inspection date.");
-      else {
-        const age = daysSince(v.reportDate);
-        if (age < 0) issue("reportDate", "The inspection date can't be in the future.");
-        else if (age > REPORT_MAX_AGE_DAYS) {
-          issue("reportDate", `The report must be from the last ${REPORT_MAX_AGE_DAYS} days.`);
-        }
-      }
-      if (!/^\d{1,7}$/.test(v.reportMileage)) {
-        issue("reportMileage", "Enter the mileage on the report, in whole kilometres.");
-      }
-      if (v.reportFiles.length === 0) issue("reportFiles", "Upload the inspection report (PDF or photos).");
+      refineDealerReport(v, ctx);
     }
     if (v.reserve !== null && v.reserve < v.startingBid) {
       ctx.addIssue({
