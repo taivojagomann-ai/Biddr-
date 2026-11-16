@@ -39,6 +39,10 @@ export function DealerReportUpload({
   onBusyChange,
   error,
   idBase,
+  title = "Inspection report",
+  hint,
+  buttonLabel = "Add report files",
+  listLabel = "Report files",
 }: {
   userId: string;
   draftId: string;
@@ -48,6 +52,11 @@ export function DealerReportUpload({
   error?: string;
   /** Id for the button (and its hint and error); defaults to the sell form's field id. */
   idBase?: string;
+  /** Texts, so the same uploader serves the dealer report and the vehicle history report. */
+  title?: string;
+  hint?: React.ReactNode;
+  buttonLabel?: string;
+  listLabel?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -119,10 +128,14 @@ export function DealerReportUpload({
     <div className={cn("rounded-lg border bg-panel p-4", error ? "border-signal" : "border-line")}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold">Inspection report</h3>
+          <h3 className="text-sm font-semibold">{title}</h3>
           <p id={`${id}-hint`} className="text-xs text-mute">
-            PDF or photos of every page, up to {MAX_REPORT_FILES} files, 20 MB each. Only Biddr&apos;s team sees this file.
-            We&apos;ll publish a summary, not your personal details.
+            {hint ?? (
+              <>
+                PDF or photos of every page, up to {MAX_REPORT_FILES} files, 20 MB each. Only Biddr&apos;s team sees this
+                file. We&apos;ll publish a summary, not your personal details.
+              </>
+            )}
           </p>
         </div>
         <Button
@@ -135,7 +148,7 @@ export function DealerReportUpload({
           aria-describedby={describedBy}
         >
           <Upload aria-hidden />
-          Add report files
+          {buttonLabel}
         </Button>
         <input
           ref={inputRef}
@@ -154,7 +167,7 @@ export function DealerReportUpload({
       </div>
 
       {files.length + pending.length > 0 ? (
-        <ul className="mt-3 divide-y divide-line rounded-md border border-line" aria-label="Report files">
+        <ul className="mt-3 divide-y divide-line rounded-md border border-line" aria-label={listLabel}>
           {files.map((f) => (
             <li key={f.path} className="flex items-center gap-3 px-3 py-1.5 text-sm">
               <FileText aria-hidden className="size-4 shrink-0 text-mute" />

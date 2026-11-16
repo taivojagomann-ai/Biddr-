@@ -1,4 +1,5 @@
-import { ShieldCheck, Wrench } from "lucide-react";
+import { FileCheck, ShieldCheck, Wrench } from "lucide-react";
+import { HISTORY_TEXT } from "@/lib/history-report";
 import { ACCIDENT_REPAIRED, DEALER_INSPECTED } from "@/lib/inspection";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,16 @@ export function InspectionBadge({ dealer, className }: { dealer: string | null; 
     >
       <ShieldCheck className="size-3.5" aria-hidden />
       {DEALER_INSPECTED}
+    </span>
+  );
+}
+
+/** "History report": only for cars whose carVertical report an admin accepted (0020). Text, not colour only. */
+export function HistoryBadge({ className }: { className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold text-chalk", className)}>
+      <FileCheck className="size-3.5 shrink-0" aria-hidden />
+      {HISTORY_TEXT.badge}
     </span>
   );
 }

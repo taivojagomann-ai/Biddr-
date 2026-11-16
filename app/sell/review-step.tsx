@@ -235,6 +235,23 @@ export function ReviewStep({
               />
             </>
           ) : null}
+          <Row
+            label="Vehicle history report"
+            value={values.historyReport === "yes" ? "Yes, carVertical report added" : "No"}
+          />
+          {values.historyReport === "yes" ? (
+            <>
+              <Row
+                label="History report files"
+                value={values.historyFiles.length ? `${values.historyFiles.length} ${values.historyFiles.length === 1 ? "file" : "files"}` : ""}
+              />
+              <Row label="carVertical link" value={values.historyLink} />
+              <Row
+                label="Share with buyers"
+                value={values.historyShareAllowed ? "Yes, buyers can open the report" : "No, buyers see Biddr's summary only"}
+              />
+            </>
+          ) : null}
         </Block>
       </div>
 

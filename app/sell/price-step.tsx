@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -6,6 +7,11 @@ import { cn } from "@/lib/utils";
 import { Field, FieldError, StepHeading, fieldId, fieldProps } from "./field";
 import { DealerReportUpload } from "./dealer-report-upload";
 import type { StepProps } from "./types";
+
+const HISTORY_OPTIONS = [
+  { value: "yes", label: "Yes, add it" },
+  { value: "no", label: "No" },
+] as const;
 
 function EuroInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
@@ -37,6 +43,10 @@ export function PriceStep({
   const restored = values.hadDamage === "yes";
   const make = (values.make === "Other" ? values.makeOther : values.make).trim();
   const today = new Date().toISOString().slice(0, 10);
+  // Two uploaders on this step: tell the form while either is still uploading.
+  const [dealerBusy, setDealerBusy] = useState(false);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  useEffect(() => onReportBusy(dealerBusy || historyBusy), [dealerBusy, historyBusy, onReportBusy]);
   return (
     <section>
       <StepHeading title="Price and inspection" />
@@ -189,7 +199,7 @@ export function PriceStep({
               draftId={draftId}
               files={values.reportFiles}
               onChange={(next) => set("reportFiles", next)}
-              onBusyChange={onReportBusy}
+              onBusyChange={setDealerBusy}
               error={errors.reportFiles}
             />
           </div>
@@ -206,6 +216,111 @@ export function PriceStep({
         </p>
       ) : null}
 
+      <HistoryReportQuestion
+        values={values}
+        errors={errors}
+        set={set}
+        userId={userId}
+        draftId={draftId}
+        onBusy={setHistoryBusy}
+      />
     </section>
+  );
+}
+
+/** Optional: the seller's own carVertical vehicle history report (file and/or share link). */
+function HistoryReportQuestion({
+  values,
+  errors,
+  set,
+  userId,
+  draftId,
+  onBusy,
+}: StepProps & { userId: string; draftId: string; onBusy: (busy: boolean) => void }) {
+  const shareId = fieldId("historyShareAllowed");
+  return (
+    <div className="mt-10">
+      <fieldset className="min-w-0" aria-describedby="history-note">
+        <legend className="text-sm font-semibold">
+          Do you have a carVertical vehicle history report for this car?
+          <span className="ml-1.5 font-normal text-mute">(optional)</span>
+        </legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {HISTORY_OPTIONS.map((o, i) => (
+            <label
+              key={o.value}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border bg-panel p-4 transition-colors",
+                values.historyReport === o.value ? "border-signal" : "border-field hover:border-chalk",
+              )}
+            >
+              <input
+                type="radio"
+                name="historyReport"
+                id={i === 0 ? fieldId("historyReport") : undefined}
+                value={o.value}
+                checked={values.historyReport === o.value}
+                onChange={() => set("historyReport", o.value)}
+                className="size-4 shrink-0 accent-[#FF5500]"
+              />
+              <span className="font-semibold">{o.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <p id="history-note" className="mt-2 text-sm text-mute">
+        Only Biddr&apos;s team sees the uploaded file. We check that it matches your car and your description.
+      </p>
+
+      {values.historyReport === "yes" ? (
+        <div className="mt-5 space-y-5">
+          <DealerReportUpload
+            userId={userId}
+            draftId={draftId}
+            files={values.historyFiles}
+            onChange={(next) => set("historyFiles", next)}
+            onBusyChange={onBusy}
+            error={errors.historyFiles}
+            idBase={fieldId("historyFiles")}
+            title="carVertical report"
+            hint="The report as a PDF, or photos of every page: up to 10 files, 20 MB each. You can also (or instead) paste the report's share link below."
+            buttonLabel="Add report files"
+            listLabel="History report files"
+          />
+          <Field
+            field="historyLink"
+            label="carVertical share link"
+            optional
+            error={errors.historyLink}
+            hint="The link carVertical gives you to share the report, starting with https://www.carvertical.com/"
+          >
+            <Input
+              {...fieldProps("historyLink", errors.historyLink, true)}
+              type="url"
+              inputMode="url"
+              value={values.historyLink}
+              onChange={(e) => set("historyLink", e.target.value)}
+              placeholder="https://www.carvertical.com/…"
+            />
+          </Field>
+          <div>
+            <label htmlFor={shareId} className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+              <input
+                id={shareId}
+                type="checkbox"
+                checked={values.historyShareAllowed}
+                onChange={(e) => set("historyShareAllowed", e.target.checked)}
+                aria-describedby={`${shareId}-hint`}
+                className="mt-0.5 size-4 shrink-0 accent-[#FF5500]"
+              />
+              <span className="font-semibold">I&apos;m allowed to share this report with buyers</span>
+            </label>
+            <p id={`${shareId}-hint`} className="ml-7 text-xs text-mute">
+              If you don&apos;t tick this, buyers will only see our summary, not the report itself.
+            </p>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

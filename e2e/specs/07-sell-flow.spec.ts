@@ -58,7 +58,7 @@ test.describe("sell flow", () => {
     // Price: minimum starting bid and reserve rules.
     await page.getByLabel("Starting bid").fill("500");
     await page.getByLabel("Reserve price").fill("400");
-    await page.getByRole("radio", { name: /^No/ }).check();
+    await page.getByRole("radio", { name: "No, list without an inspection" }).check();
     await continueButton(page).click();
     await expect(page.getByText("The starting bid must be at least €1,000.")).toBeVisible();
     await page.getByLabel("Starting bid").fill("20 000");

@@ -14,7 +14,8 @@ import {
 import { SellerCard, type SellerInfo } from "@/components/auction/seller-card";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
-import { DemoBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
+import { DemoBadge, HistoryBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
+import { HistoryReportSection } from "@/components/auction/history-report";
 import { WatchButton, WatchCount } from "@/components/auction/watch-button";
 import { InfoTip } from "@/components/info-tip";
 import { ShareButton } from "@/components/share-button";
@@ -89,6 +90,12 @@ export function AuctionView({
             <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
             <InfoTip topic={auction.has_reserve ? HELP.reserve : HELP.noReserve} />
           </span>
+          {auction.history_report_verified ? (
+            <span className="inline-flex items-center gap-0.5">
+              <HistoryBadge />
+              <InfoTip topic={HELP.historyReport} />
+            </span>
+          ) : null}
           {auction.condition_type === "restored_accident" ? (
             <span className="inline-flex items-center gap-0.5">
               <RestoredBadge />
@@ -114,6 +121,7 @@ export function AuctionView({
           <Gallery auction={auction} />
           <Highlights auction={auction} />
           <InspectionCard auction={auction} preview={preview} inspectionPending={inspectionPending} />
+          <HistoryReportSection auction={auction} />
           <SpecSheet auction={auction} />
           <Equipment auction={auction} />
           <Modifications auction={auction} />

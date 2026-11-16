@@ -20,6 +20,7 @@ const SECTIONS = [
   ["reserve", "Reserve or no reserve"],
   ["extensions", "Late bids add 2 minutes"],
   ["badges", "Dealer inspected and Accident repaired"],
+  ["history-report", "Vehicle history reports"],
   ["after-you-win", "After you win"],
   ["selling", "How selling works"],
 ] as const;
@@ -173,6 +174,22 @@ export default function HowItWorksPage() {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section aria-labelledby="history-report">
+          <H2 id="history-report">Vehicle history reports</H2>
+          <p>
+            Sellers can add their own <strong>carVertical</strong> vehicle history report. Our team checks that it matches
+            the car: the VIN, mileage records that are no higher than the listing and consistent, and damage records that
+            match the seller&apos;s description. Cars with an accepted report carry the <strong>History report</strong>{" "}
+            badge and a short summary written by us. You can open the full report only when the seller has agreed to share
+            it.
+          </p>
+          <p>
+            Reports are optional. When a car has none, the auction page says so and links to carVertical, where you can
+            check the car&apos;s history yourself using its VIN. For older cars, history databases often have little data,
+            so restoration records and photos matter more.
+          </p>
         </section>
 
         <section aria-labelledby="after-you-win">

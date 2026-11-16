@@ -52,6 +52,10 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
   if (v.dealer && !(await checkReportPaths(v.dealer.reportPaths, `${user.id}/${v.draftId}`))) {
     return { ok: false, errors: { reportFiles: "One of the report files didn't upload correctly. Remove it and add it again." } };
   }
+  const history = v.historyReport;
+  if (history && history.paths.length && !(await checkReportPaths(history.paths, `${user.id}/${v.draftId}`))) {
+    return { ok: false, errors: { historyFiles: "One of the history report files didn't upload correctly. Remove it and add it again." } };
+  }
 
   // Normal server client: RLS ("sellers submit drafts") and the column grants apply.
   // status is not in the insert grant; it defaults to 'draft', which the policy requires.
@@ -86,6 +90,11 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
     dealer_inspection_mileage_km: v.dealer?.mileageKm ?? null,
     dealer_report_paths: v.dealer?.reportPaths ?? [],
     inspection_review_status: v.dealer ? "pending" : null,
+    history_report_provided: history !== null,
+    history_report_paths: history?.paths ?? [],
+    history_report_link: history?.link ?? null,
+    history_report_share_allowed: history?.shareAllowed ?? false,
+    history_review_status: history ? "pending" : null,
   });
 
   // has_reserve is server-owned (not in the seller's column grant).
