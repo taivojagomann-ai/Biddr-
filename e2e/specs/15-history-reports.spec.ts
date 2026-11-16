@@ -255,3 +255,78 @@ test.describe("vehicle history reports", () => {
     expect(tooMany.error?.code).toBe("23514");
   });
 });
+
+/** Checks the carVertical logo: the file as provided, scaled proportionally, at least 16 px high, with clear space. */
+async function expectLogo(page: import("@playwright/test").Page) {
+  const section = page.getByRole("region", { name: "Vehicle history report" });
+  const logo = section.getByRole("img", { name: "carVertical", exact: true });
+  await expect(logo).toHaveCount(1);
+  await expect(logo).toBeVisible();
+  expect(await logo.getAttribute("src")).toContain(encodeURIComponent("/partners/carvertical-logo.png"));
+  const m = await logo.evaluate((img: HTMLImageElement) => {
+    const r = img.getBoundingClientRect();
+    return { w: r.width, h: r.height, nw: img.naturalWidth, nh: img.naturalHeight, filter: getComputedStyle(img).filter };
+  });
+  expect(m.h).toBeGreaterThanOrEqual(16);
+  // Proportional: the same ratio as the 2000 × 280 source, within a pixel.
+  expect(Math.abs(m.w / m.h - 2000 / 280)).toBeLessThan(0.1);
+  expect(m.filter).toBe("none");
+  // Clear space of at least half the logo's height: no text or control within it.
+  const intruders = await section.evaluate((root, clear) => {
+    const img = root.querySelector('img[alt="carVertical"]')!.getBoundingClientRect();
+    const box = { l: img.left - clear, r: img.right + clear, t: img.top - clear, b: img.bottom + clear };
+    return Array.from(root.querySelectorAll("h2, p, a, button, li, [role=status]"))
+      .filter((el) => !el.classList.contains("sr-only") && !el.contains(root.querySelector('img[alt="carVertical"]')))
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.width > 1 && r.height > 1 && r.left < box.r && r.right > box.l && r.top < box.b && r.bottom > box.t)
+      .map(({ el }) => `${el.tagName}: ${(el.textContent ?? "").trim().slice(0, 40)}`);
+  }, m.h / 2 - 0.5);
+  expect(intruders, "inside the logo's clear space").toEqual([]);
+  return { section, logo };
+}
+
+test.describe("carVertical logo", () => {
+  test("with an accepted report: next to the section heading, above the checked-by-Biddr line", async ({ page }) => {
+    const a = await createAuction({
+      seller: await createUser({ role: "seller" }),
+      extra: { history_report_verified: true, history_summary: ["Mileage records consistent", "No recorded damage"] },
+    });
+    await page.goto(`/auctions/${a.id}`);
+    const { section, logo } = await expectLogo(page);
+    const heading = section.getByRole("heading", { name: "Vehicle history report" });
+    const line = section.getByText("carVertical report provided by the seller and checked by Biddr.");
+    const [lb, hb, tb] = [await logo.boundingBox(), await heading.boundingBox(), await line.boundingBox()];
+    // Same row as the heading (or wrapped just below it on narrow screens), and above the text line.
+    expect(lb!.y + lb!.height).toBeLessThanOrEqual(tb!.y);
+    expect(lb!.y).toBeLessThan(hb!.y + hb!.height + 30);
+    await expectAccessible(page, "History section with logo", 'section[aria-labelledby="vehicle-history-heading"]');
+  });
+
+  test("without a report: next to the Check on carVertical link, which keeps its text", async ({ page }) => {
+    const a = await createAuction({ seller: await createUser({ role: "seller" }) });
+    await page.goto(`/auctions/${a.id}`);
+    const { section, logo } = await expectLogo(page);
+    const link = section.getByRole("link", { name: /Check on carVertical/ });
+    // The logo isn't part of the link: the link's name stays "Check on carVertical".
+    await expect(link.getByRole("img")).toHaveCount(0);
+    const [lb, kb] = [await logo.boundingBox(), await link.boundingBox()];
+    expect(Math.abs(lb!.y + lb!.height / 2 - (kb!.y + kb!.height / 2)) < 20 || lb!.y > kb!.y).toBe(true);
+  });
+
+  test("nowhere else: not on home page cards, in the badge, header or footer", async ({ page }) => {
+    const model = `Q${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    const a = await createAuction({
+      seller: await createUser({ role: "seller" }),
+      model,
+      extra: { history_report_verified: true, history_summary: ["Mileage records consistent", "No recorded damage"] },
+    });
+    await page.goto(`/?q=${model}`);
+    await expect(page.locator(`a[href="/auctions/${a.id}"]`).first()).toBeVisible();
+    await expect(page.getByRole("img", { name: "carVertical" })).toHaveCount(0);
+    await page.goto(`/auctions/${a.id}`);
+    await expect(page.getByRole("img", { name: "carVertical" })).toHaveCount(1);
+    for (const where of ["banner", "contentinfo"] as const) {
+      await expect(page.getByRole(where).getByRole("img", { name: "carVertical" })).toHaveCount(0);
+    }
+  });
+});
