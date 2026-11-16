@@ -112,4 +112,4 @@ Tips:
 | 12 | `12-copy-consistency` | Forbidden phrases from DECISIONS.md in the code and on every page, title and meta description, the fixed bidding numbers, navigation names, times in the viewer's zone with its abbreviation (CET in Berlin, EET in Tallinn) |
 | 13 | `13-accessibility` | axe (WCAG 2.2 AA) on every page at desktop and phone size, and the bid and sell flows done with the keyboard only |
 
-Tests marked `test.fixme` are known gaps that need a product decision or a feature that isn't built yet; each one says why in a comment.
+No tests are marked `test.fixme` today. When a test finds a gap that needs a product decision or a feature that isn't built yet, mark it `test.fixme` with a comment saying why.
