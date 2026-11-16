@@ -12,6 +12,8 @@ export interface SellOptions {
   inspection?: { dealer: string; city: string; country: string; date: string; mileage: string };
   startingBid?: string;
   reserve?: string;
+  /** The seller's own carVertical vehicle history report (optional). */
+  history?: { file?: boolean; link?: string; share?: boolean };
 }
 
 let photo: Buffer | null = null;
@@ -91,21 +93,37 @@ export async function fillPriceStep(page: Page, o: SellOptions = {}) {
   await page.getByLabel("Starting bid").fill(o.startingBid ?? "20000");
   if (o.reserve) await page.getByLabel("Reserve price").fill(o.reserve);
   if (o.inspection) {
-    await page.getByRole("radio", { name: /^Yes/ }).check();
+    await page.getByRole("radio", { name: "Yes, I'll upload it" }).check();
     await page.getByLabel("Dealer's name").fill(o.inspection.dealer);
     await page.getByLabel("Dealer's city").fill(o.inspection.city);
     await page.getByLabel("Dealer's country").selectOption(o.inspection.country);
     await page.getByLabel("Inspection date").fill(o.inspection.date);
     await page.getByLabel("Mileage on the report").fill(o.inspection.mileage);
-    await page.locator('input[type="file"][accept^="application/pdf"]').setInputFiles({
+    await page.locator('input[type="file"][accept^="application/pdf"]').first().setInputFiles({
       name: "inspection-report.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"),
     });
     await expect(page.getByRole("list", { name: "Report files" })).toContainText("inspection-report.pdf");
   } else {
-    await page.getByRole("radio", { name: /^No/ }).check();
+    await page.getByRole("radio", { name: "No, list without an inspection" }).check();
   }
+}
+
+/** The optional carVertical history report question on the Price and inspection step. */
+export async function fillHistoryReport(page: Page, history: SellOptions["history"]) {
+  if (!history) {
+    await page.getByRole("radio", { name: "No", exact: true }).check();
+    return;
+  }
+  await page.getByRole("radio", { name: "Yes, add it" }).check();
+  if (history.file) {
+    // The history uploader comes after the dealer report's (if that one is shown).
+    await page.locator('input[type="file"][accept^="application/pdf"]').last().setInputFiles({ name: "carvertical-report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n") });
+    await expect(page.getByRole("list", { name: "History report files" })).toContainText("carvertical-report.pdf");
+  }
+  if (history.link) await page.getByLabel("carVertical share link").fill(history.link);
+  if (history.share) await page.getByLabel("I'm allowed to share this report with buyers").check();
 }
 
 /** Goes from an empty form to the Review step. */
@@ -119,6 +137,7 @@ export async function fillSellForm(page: Page, o: SellOptions = {}) {
   await fillPhotosStep(page, o);
   await continueButton(page).click();
   await fillPriceStep(page, o);
+  await fillHistoryReport(page, o.history);
   await continueButton(page).click();
   await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
 }

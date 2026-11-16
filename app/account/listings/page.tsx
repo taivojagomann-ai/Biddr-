@@ -12,18 +12,23 @@ import { withdrawOption } from "@/lib/withdraw";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction, AuctionPrivate } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { HistoryRejectedPanel } from "./history-panel";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
 
-type ListingRow = Pick<Auction, "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at">;
+type ListingRow = Pick<
+  Auction,
+  "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "damage_history_summary"
+>;
 
 type PrivateRow = Pick<
   AuctionPrivate,
   | "auction_id" | "rejection_reason" | "withdraw_request_status" | "inspection_review_note"
   | "seller_decision_required" | "seller_decision_deadline" | "seller_decision"
+  | "history_review_status" | "history_review_note"
 >;
 
 const STATUS_STYLES: Record<Auction["status"], string> = {
@@ -44,7 +49,7 @@ export default async function MyListingsPage() {
 
   const { data } = await supabase
     .from("auctions")
-    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at")
+    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, damage_history_summary")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
@@ -57,7 +62,7 @@ export default async function MyListingsPage() {
     const { data: rows } = await getAdminSupabase()
       .from("auction_private")
       .select(
-        "auction_id, rejection_reason, withdraw_request_status, inspection_review_note, seller_decision_required, seller_decision_deadline, seller_decision, auction:auctions!inner(seller_id)",
+        "auction_id, rejection_reason, withdraw_request_status, inspection_review_note, seller_decision_required, seller_decision_deadline, seller_decision, history_review_status, history_review_note, auction:auctions!inner(seller_id)",
       )
       .in("auction_id", listings.map((l) => l.id))
       .eq("auction.seller_id", user.id)
@@ -155,6 +160,18 @@ export default async function MyListingsPage() {
                       reason={priv?.inspection_review_note ?? null}
                       deadline={priv?.seller_decision_deadline ?? null}
                       choice={priv?.seller_decision ?? null}
+                    />
+                  ) : null}
+                  {/* Rejected, or sent again after a rejection (the reason stays until the next review). */}
+                  {l.status === "draft" &&
+                  (priv?.history_review_status === "rejected" || (priv?.history_review_status === "pending" && priv.history_review_note)) ? (
+                    <HistoryRejectedPanel
+                      auctionId={l.id}
+                      userId={user.id}
+                      title={l.title}
+                      reason={priv.history_review_note}
+                      damageSummary={l.damage_history_summary}
+                      resubmitted={priv.history_review_status === "pending"}
                     />
                   ) : null}
                   {/* While deciding, Withdraw is one of the panel's three choices. */}

@@ -13,6 +13,8 @@ import {
 } from "@/lib/listing-details";
 import { EU_CODES, EU_COUNTRIES as EU_LIST, type EuCountry } from "@/lib/countries";
 import type { AuctionStatus, Country } from "@/lib/types";
+import { REPORT_PATH_RE, type ReportFile } from "@/lib/report-paths";
+import { historyReportSchema, type HistoryReportValues } from "@/lib/history-report";
 
 const EU_COUNTRIES_SORTED = [...EU_LIST].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -41,14 +43,7 @@ export const REPORT_MAX_AGE_DAYS = 90;
 
 export { EU_COUNTRIES, euCountryName, type EuCountry } from "@/lib/countries";
 
-/** An uploaded report file: its path in REPORT_BUCKET and the name the seller saw. */
-export interface ReportFile {
-  path: string;
-  name: string;
-}
-
-/** Report path inside the bucket: <user id>/<draft id>/<uuid>.<ext> */
-export const REPORT_PATH_RE = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png|webp)$/;
+export { REPORT_PATH_RE, type ReportFile } from "@/lib/report-paths";
 
 /** Whole days between an ISO date (YYYY-MM-DD) and today; negative if it's in the future. */
 export function daysSince(isoDate: string, now: Date = new Date()): number {
@@ -111,7 +106,7 @@ export function storageKey(userId: string): string {
 // -----------------------------------------------------------------------------
 export type SellPhotos = Record<PhotoSection, string[]>;
 
-export interface SellInput extends OwnershipInput, DetailsInput {
+export interface SellInput extends OwnershipInput, DetailsInput, HistoryReportValues {
   draftId: string;
   make: MakeOption | "";
   makeOther: string;
@@ -158,6 +153,7 @@ export const FIELD_STEP: Record<SellField, StepId> = {
   "photos.exterior": 4, "photos.interior": 4, "photos.mechanical": 4, "photos.before": 4, videoUrl: 4,
   startingBid: 5, reserve: 5, dealerInspection: 5, reportDealerName: 5, reportDealerCity: 5, reportDealerCountry: 5,
   reportDate: 5, reportMileage: 5, reportFiles: 5,
+  historyReport: 5, historyFiles: 5, historyLink: 5, historyShareAllowed: 5,
   confirmed: 6,
 };
 
@@ -175,6 +171,7 @@ export function emptySellInput(draftId: string, country: Country | ""): SellInpu
     videoUrl: "",
     startingBid: "", reserve: "", dealerInspection: "", reportDealerName: "", reportDealerCity: "", reportDealerCountry: "",
     reportDate: "", reportMileage: "", reportFiles: [],
+    historyReport: "", historyFiles: [], historyLink: "", historyShareAllowed: false,
     confirmed: false,
   };
 }
@@ -475,7 +472,7 @@ export function validateStep(step: StepId, input: SellInput): SellErrors {
           : step === STEP.photos
             ? [photosSchema(restored).safeParse(input)]
             : step === STEP.price
-              ? [priceSchema.safeParse(input)]
+              ? [priceSchema.safeParse(input), historyReportSchema.safeParse(input)]
               : [confirmSchema.safeParse(input)];
   for (const r of results) if (!r.success) collect(r.error, errors);
   return errors;
@@ -515,16 +512,20 @@ export function parseSubmission(input: unknown) {
   const history = historySchema.safeParse(raw);
   const photos = photosSchema(restored).safeParse(raw);
   const price = priceSchema.safeParse(raw);
+  const historyReport = historyReportSchema.safeParse(raw);
   const confirm = confirmSchema.safeParse(raw);
 
   const errors: SellErrors = {};
-  for (const r of [car, ownership, history, details, photos, price, confirm]) if (!r.success) collect(r.error, errors);
-  if (!car.success || !ownership.success || !history.success || !details.success || !photos.success || !price.success || !confirm.success) {
+  for (const r of [car, ownership, history, details, photos, price, historyReport, confirm]) if (!r.success) collect(r.error, errors);
+  if (
+    !car.success || !ownership.success || !history.success || !details.success || !photos.success || !price.success ||
+    !historyReport.success || !confirm.success
+  ) {
     return { success: false as const, errors };
   }
   return {
     success: true as const,
-    data: { draftId: base.data.draftId, ...car.data, ...history.data, ...photos.data, ...price.data },
+    data: { draftId: base.data.draftId, ...car.data, ...history.data, ...photos.data, ...price.data, ...historyReport.data },
     ownership: ownership.data,
     details: details.data,
   };

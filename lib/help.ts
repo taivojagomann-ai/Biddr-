@@ -2,6 +2,7 @@
 // charges with, so the help can't drift from the rules.
 import { formatEur } from "@/lib/format";
 import { PREMIUM_MAX, PREMIUM_MIN, PREMIUM_RATE } from "@/lib/pricing";
+import { HISTORY_TEXT } from "@/lib/history-report";
 
 export interface HelpTopic {
   /** Accessible name of the "i" button, phrased as the question it answers. */
@@ -42,6 +43,11 @@ export const HELP = {
     label: "What does Dealer inspected mean?",
     text: "Inspected by the selling dealer: the seller is an authorised dealer of the car's brand and inspected the car itself, so this isn't an independent check. We checked the report matches the VIN and mileage and is no older than 90 days.",
     href: "/how-it-works#badges",
+  },
+  historyReport: {
+    label: "What does History report mean?",
+    text: HISTORY_TEXT.tip,
+    href: "/how-it-works#history-report",
   },
   accidentRepaired: {
     label: "What does Accident repaired mean?",

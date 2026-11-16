@@ -70,6 +70,12 @@ interface CarSpec {
   dealer: DemoDealer | null;
   /** The inspecting dealer is the selling dealer itself: "Inspected by the selling dealer". */
   inspectedBySeller?: boolean;
+  /**
+   * Summary lines of an accepted carVertical vehicle history report (0020); omitted =
+   * no report, so the page shows the standard notice. Demo reports have no files and
+   * no public link: nothing points at a real carVertical report.
+   */
+  history?: string[];
   damageSummary: string | null;
   startingBid: number;
   bids: number;
@@ -116,6 +122,7 @@ const CARS: CarSpec[] = [
     mileageKm: 42_800, engine: "3.0 inline-6 twin-turbo, 410 hp", transmission: "6-speed manual", drivetrain: "RWD",
     color: "Hockenheim Silver", city: "Tallinn", country: "EE", dealer: DEMO_BMW_TALLINN, condition: "clean",
     damageSummary: null, startingBid: 38_000, bids: 21,
+    history: ["Mileage records consistent", "No recorded damage", "2 previous owners", "First registered in Estonia"],
     highlights: ["Paint thickness measured on all panels", "Clutch and flywheel within spec", "No fault codes stored", "Tyres 6 mm all round"],
     listing: {
       bodyStyle: "coupe", interior: "Black Dakota leather with blue stitching", owners: 2, dealer: DEMO_DEALER,
@@ -528,6 +535,9 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         inspection_report_url: reportUrl,
         inspection_date: dealer ? inspectionDate : null,
         inspection_highlights: dealer ? car.highlights : [],
+        history_report_verified: Boolean(car.history),
+        history_summary: car.history ?? [],
+        history_report_public_link: null,
         body_style: car.listing.bodyStyle,
         interior_color: car.listing.interior,
         owner_count: car.listing.owners,
@@ -579,6 +589,10 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
         dealer_report_paths: privateReportPaths,
         inspection_review_status: dealer ? "accepted" : null,
         inspection_reviewed_at: dealer ? new Date(now).toISOString() : null,
+        history_report_provided: Boolean(car.history),
+        history_report_share_allowed: false,
+        history_review_status: car.history ? "accepted" : null,
+        history_reviewed_at: car.history ? new Date(now).toISOString() : null,
       });
       if (privateError) fail("Saving the reserve", privateError);
 

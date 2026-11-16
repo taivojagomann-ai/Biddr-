@@ -110,7 +110,7 @@ function readPersisted(raw: unknown, country: Country | ""): Persisted | null {
       const list =
         key === "serviceHistory"
           ? saved.filter(isServiceRow)
-          : key === "reportFiles"
+          : key === "reportFiles" || key === "historyFiles"
             ? saved.filter(isReportFile).slice(0, MAX_REPORT_FILES)
             : saved.filter((x): x is string => typeof x === "string");
       if (list.length) Object.assign(values, { [key]: list.slice(0, LIST_MAX_ITEMS) });
@@ -411,7 +411,7 @@ export function SellForm({
     });
   };
 
-  // Dealer report files still uploading (the upload component reports this).
+  // Dealer or history report files still uploading (the price step reports this).
   const reportBusy = useRef(false);
   const onReportBusy = useCallback((busy: boolean) => {
     reportBusy.current = busy;
@@ -419,7 +419,7 @@ export function SellForm({
 
   const hasPendingUploads = () =>
     photoSectionsFor(restored).some((s) => uploadsRef.current[s.key].some((i) => i.status !== "done")) ||
-    (values.dealerInspection === "yes" && reportBusy.current);
+    ((values.dealerInspection === "yes" || values.historyReport === "yes") && reportBusy.current);
 
   // ---------------------------------------------------------------------------
   // Navigation

@@ -19,7 +19,8 @@ const FORBIDDEN: [RegExp, string][] = [
   [/only (for|in) the baltics|baltics only|estonia, latvia and lithuania/i, "2: not only the Baltics"],
   [/book(ing)? an inspection|inspection booking/i, "3: no inspection booking"],
   [/seller fee|listing fee|success fee/i, "11: no seller fee"],
-  [/vehicle history report|carvertical|carfax/i, "11: no vehicle history reports"],
+  [/carfax|autodna|vin ?audit|history report included|free history report/i, "11: history reports come only from the seller's own carVertical report"],
+  [/carvertical (partner|approved|certified|verified)|partnership with carvertical|in partnership with/i, "11: nothing suggests a carVertical partnership"],
   [/\[to be confirmed\]/i, "11: no unconfirmed placeholders"],
 ];
 

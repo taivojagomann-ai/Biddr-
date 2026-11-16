@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { asServiceHistory, asTextList, toServiceRows } from "@/lib/listing-details";
 import { CommentsPanel } from "./comments-panel";
 import { DetailsForm } from "./details-form";
+import { HistoryPanel } from "./history-panel";
 import { InspectionPanel, type DealerReportView } from "./inspection-panel";
 import { WithdrawalRequest } from "./withdrawal-request";
 import { ListingForm } from "./listing-form";
@@ -354,6 +355,31 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             reportUrl={a.inspection_report_url}
             sellerIsDealer={a.seller_type === "dealer"}
             initialInspectedBySeller={priv?.inspected_by_seller ?? false}
+          />
+        </Section>
+
+        <Section
+          id="history"
+          title="History report"
+          intro="The seller's carVertical vehicle history report. Accepting adds the History report badge and your summary to the listing."
+        >
+          <HistoryPanel
+            auctionId={a.id}
+            status={a.status}
+            report={{
+              provided: priv?.history_report_provided === true,
+              files: (priv?.history_report_paths ?? []).map((path, index) => ({
+                index,
+                label: `${index + 1} (${path.endsWith(".pdf") ? "PDF" : "image"})`,
+              })),
+              link: priv?.history_report_link ?? null,
+              shareAllowed: priv?.history_report_share_allowed ?? false,
+              status: priv?.history_review_status ?? null,
+              note: priv?.history_review_note ?? null,
+            }}
+            initialSummary={a.history_report_verified ? (a.history_summary ?? []) : []}
+            listingMileage={formatKm(a.mileage_km)}
+            condition={a.condition_type === "clean" ? "clean history" : "accident repaired"}
           />
         </Section>
 

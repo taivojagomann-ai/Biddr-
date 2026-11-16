@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   CircleSlash,
   Eye,
+  FileWarning,
   FileX,
   Gavel,
   MessageCircleQuestion,
@@ -41,6 +42,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   seller_decided: Send,
   inspection_decision_reminder: AlarmClock,
   inspection_decision_expired: CircleSlash,
+  history_report_rejected: FileWarning,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

@@ -57,6 +57,12 @@ export interface Auction {
   inspection_type: InspectionType | null;
   /** The selling dealer inspected the car itself (0017): shown as "Inspected by the selling dealer". */
   inspected_by_seller: boolean;
+  /** An admin accepted the seller's carVertical vehicle history report (0020): "History report" badge and summary. */
+  history_report_verified: boolean;
+  /** The report's carVertical link, only when the seller allowed sharing and the report was accepted (0020). */
+  history_report_public_link: string | null;
+  /** 2 to 8 short lines written by the admin from the accepted report (0020). */
+  history_summary: string[];
   before_photos_urls: string[];
   gallery_urls: GalleryUrls;
   video_url: string | null;
@@ -138,6 +144,20 @@ export interface AuctionPrivate {
   seller_decision_at: string | null;
   /** The admin confirmed the inspecting dealer is the selling dealer (0017). */
   inspected_by_seller: boolean;
+  // The seller's carVertical vehicle history report and its review (0020)
+  /** true: the seller added a report; false or null: no report. */
+  history_report_provided: boolean | null;
+  /** Files in the private inspection-uploads bucket, under the seller's folder. */
+  history_report_paths: string[];
+  /** The report's carVertical share link (https, carvertical.com). */
+  history_report_link: string | null;
+  /** The seller allowed buyers to open the report itself. */
+  history_report_share_allowed: boolean;
+  history_review_status: "pending" | "accepted" | "rejected" | null;
+  /** The reason given to the seller when the report was rejected. */
+  history_review_note: string | null;
+  history_reviewed_by: string | null;
+  history_reviewed_at: string | null;
 }
 
 export type SellerInspectionDecision = "new_report" | "without_inspection";
@@ -225,7 +245,8 @@ export type NotificationType =
   | "auction_live" | "auction_ended" | "auction_won" | "listing_submitted"
   | "watch_ending_soon" | "watch_live" | "inspection_rejected"
   | "withdrawal_approved" | "withdrawal_declined"
-  | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired";
+  | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired"
+  | "history_report_rejected";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

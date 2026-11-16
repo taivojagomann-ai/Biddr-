@@ -24,6 +24,7 @@ import {
   type AdminResult,
 } from "@/lib/admin-schemas";
 import { formatDateTime, fromZonedInputs } from "@/lib/zoned-time";
+import { acceptHistorySchema, rejectHistorySchema } from "@/lib/history-report";
 import { releaseAuctionHolds } from "@/lib/holds";
 import { detailsColumns } from "@/lib/listing-details";
 import { PHOTO_BUCKET, publicBucketPrefix } from "@/lib/sell";
@@ -387,6 +388,113 @@ export async function rejectInspectionReport(input: unknown): Promise<AdminResul
     ok: true,
     message: `Report rejected. The seller has ${SELLER_DECISION_DAYS} days to upload a new report or list without an inspection.`,
   };
+}
+
+// -----------------------------------------------------------------------------
+// Vehicle history report (carVertical, 0020)
+// -----------------------------------------------------------------------------
+type HistoryReportRow = {
+  history_report_provided: boolean | null;
+  history_report_link: string | null;
+  history_report_share_allowed: boolean;
+  history_review_status: string | null;
+};
+
+async function loadHistoryReport(ctx: AdminContext, auctionId: string): Promise<HistoryReportRow | null> {
+  const { data } = await ctx.db
+    .from("auction_private")
+    .select("history_report_provided, history_report_link, history_report_share_allowed, history_review_status")
+    .eq("auction_id", auctionId)
+    .maybeSingle<HistoryReportRow>();
+  return data;
+}
+
+export async function acceptHistoryReport(input: unknown): Promise<AdminResult> {
+  const g = await guard(acceptHistorySchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  if (!REVIEWABLE.includes(a.status)) return { ok: false, error: "Reports can only be reviewed before the auction goes live." };
+  const report = await loadHistoryReport(ctx, v.auctionId);
+  if (!report?.history_report_provided) return { ok: false, error: "The seller didn't provide a vehicle history report." };
+  if (report.history_review_status === "rejected") {
+    return { ok: false, error: "This report was rejected. Wait for the seller's new report." };
+  }
+
+  const { error: privError } = await ctx.db
+    .from("auction_private")
+    .update({
+      history_review_status: "accepted",
+      history_review_note: null,
+      history_reviewed_by: ctx.adminId,
+      history_reviewed_at: new Date().toISOString(),
+    })
+    .eq("auction_id", v.auctionId);
+  if (privError) return { ok: false, error: dbMessage(privError) };
+
+  // The link is public only when the seller allowed sharing.
+  const publicFields = {
+    history_report_verified: true,
+    history_summary: v.summary,
+    history_report_public_link: report.history_report_share_allowed && report.history_report_link ? report.history_report_link : null,
+  };
+  const { data, error } = await ctx.db.from("auctions").update(publicFields).eq("id", v.auctionId).select("id");
+  if (error) return { ok: false, error: dbMessage(error) };
+  if (!data?.length) return NOT_FOUND;
+
+  await logAdminAction(ctx, v.auctionId, "history_report.accept", { checks: v.checks, ...publicFields });
+  refresh(v.auctionId);
+  return {
+    ok: true,
+    message: publicFields.history_report_public_link
+      ? "Report accepted. The listing shows the History report badge, your summary and the link to the report."
+      : "Report accepted. The listing shows the History report badge and your summary.",
+  };
+}
+
+export async function rejectHistoryReport(input: unknown): Promise<AdminResult> {
+  const g = await guard(rejectHistorySchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const a = await loadAuction(ctx, v.auctionId);
+  if (!a) return NOT_FOUND;
+  // The seller can fix it only while the listing is in review.
+  if (a.status !== "draft") {
+    return { ok: false, error: "Move the listing back to review before rejecting its history report, so the seller can respond." };
+  }
+  const report = await loadHistoryReport(ctx, v.auctionId);
+  if (!report?.history_report_provided) return { ok: false, error: "The seller didn't provide a vehicle history report." };
+  if (report.history_review_status === "rejected") return { ok: false, error: "This report has already been rejected." };
+
+  const { error: privError } = await ctx.db
+    .from("auction_private")
+    .update({
+      history_review_status: "rejected",
+      history_review_note: v.reason,
+      history_reviewed_by: ctx.adminId,
+      history_reviewed_at: new Date().toISOString(),
+    })
+    .eq("auction_id", v.auctionId);
+  if (privError) return { ok: false, error: dbMessage(privError) };
+
+  // Nothing about the report stays public.
+  const { data, error } = await ctx.db
+    .from("auctions")
+    .update({ history_report_verified: false, history_summary: [], history_report_public_link: null })
+    .eq("id", v.auctionId)
+    .select("id");
+  if (error) return { ok: false, error: dbMessage(error) };
+  if (!data?.length) return NOT_FOUND;
+
+  const { error: notifyError } = await ctx.db
+    .from("notifications")
+    .insert({ user_id: a.seller_id, type: "history_report_rejected", auction_id: v.auctionId, data: { reason: v.reason } });
+  if (notifyError) console.error("history_report_rejected notification failed", notifyError);
+
+  await logAdminAction(ctx, v.auctionId, "history_report.reject", { reason: v.reason });
+  refresh(v.auctionId);
+  return { ok: true, message: "Report rejected. The seller was told why and can upload another report or correct the description." };
 }
 
 export async function saveInspectionReport(input: unknown): Promise<AdminResult> {

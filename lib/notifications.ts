@@ -17,6 +17,7 @@ const TYPES: readonly NotificationType[] = [
   "watch_ending_soon", "watch_live", "inspection_rejected",
   "withdrawal_approved", "withdrawal_declined",
   "seller_decided", "inspection_decision_reminder", "inspection_decision_expired",
+  "history_report_rejected",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -98,6 +99,12 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
     }
     case "inspection_decision_expired":
       return withTitle("Your listing was withdrawn: no response after the inspection report was rejected.");
+    case "history_report_rejected": {
+      const reason = str(n.data.reason);
+      return withTitle(
+        `Your vehicle history report wasn't accepted${reason ? `: ${reason}` : ""}. Upload another report or correct the description.`,
+      );
+    }
   }
 }
 
@@ -120,6 +127,7 @@ export function notificationHref(n: NotificationRow): string {
     case "inspection_rejected":
     case "inspection_decision_reminder":
     case "inspection_decision_expired":
+    case "history_report_rejected":
     case "withdrawal_approved":
     case "withdrawal_declined":
       return "/account/listings";

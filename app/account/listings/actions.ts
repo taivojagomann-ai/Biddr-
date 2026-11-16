@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { checkReportPaths } from "@/lib/report-files";
 import { REPORT_BUCKET, newReportSchema } from "@/lib/sell";
+import { newHistoryReportSchema } from "@/lib/history-report";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import {
   DECISION_ERRORS,
@@ -150,4 +151,140 @@ export async function submitNewReport(input: unknown): Promise<NewReportResult> 
   revalidatePath(`/auctions/${v.auctionId}`);
   revalidatePath(`/admin/auctions/${v.auctionId}`);
   return { ok: true, message: "New report sent. We'll check it and let you know." };
+}
+
+// -----------------------------------------------------------------------------
+// After a rejected vehicle history report (0020): the seller uploads another
+// report or corrects the damage description, while the listing is in review.
+// Either sends the history report back to Biddr's team ('pending').
+// -----------------------------------------------------------------------------
+type OwnDraft = { userId: string } | { error: string };
+
+/** The signed-in seller's own listing, still waiting for review, with a rejected history report. */
+async function ownDraftWithRejectedHistory(auctionId: string): Promise<OwnDraft> {
+  const supabase = getServerSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: DECISION_ERRORS.NOT_AUTHENTICATED! };
+  const { data: auction } = await supabase
+    .from("auctions")
+    .select("id, seller_id, status")
+    .eq("id", auctionId)
+    .maybeSingle<{ id: string; seller_id: string; status: string }>();
+  if (!auction) return { error: DECISION_ERRORS.AUCTION_NOT_FOUND! };
+  if (auction.seller_id !== user.id) return { error: "You can only change your own listings." };
+  if (auction.status !== "draft") return { error: DECISION_ERRORS.NOT_DRAFT! };
+  const { data: priv } = await getAdminSupabase()
+    .from("auction_private")
+    .select("history_review_status")
+    .eq("auction_id", auctionId)
+    .maybeSingle<{ history_review_status: string | null }>();
+  if (priv?.history_review_status !== "rejected") {
+    return { error: "Your history report is already waiting for review. Reload the page to see the status." };
+  }
+  return { userId: user.id };
+}
+
+async function notifyAdminsHistoryResubmitted(auctionId: string, actor: string) {
+  const admin = getAdminSupabase();
+  const { data: admins } = await admin.from("profiles").select("id").eq("role", "admin").returns<{ id: string }[]>();
+  const rows = (admins ?? []).filter((a) => a.id !== actor).map((a) => ({ user_id: a.id, type: "listing_submitted", auction_id: auctionId, actor_id: actor, data: { history_report: true } }));
+  if (rows.length) {
+    const { error } = await admin.from("notifications").insert(rows);
+    if (error) console.error("history report resubmitted notification failed", error);
+  }
+}
+
+/** Another carVertical report: files in the seller's folder for this listing, and/or a share link. */
+export async function submitNewHistoryReport(input: unknown): Promise<NewReportResult> {
+  const parsed = newHistoryReportSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) fieldErrors[String(issue.path[0] ?? "form")] ??= issue.message;
+    return { ok: false, error: "Check the highlighted fields.", fieldErrors };
+  }
+  const v = parsed.data;
+  const own = await ownDraftWithRejectedHistory(v.auctionId);
+  if ("error" in own) return { ok: false, error: own.error };
+
+  const paths = v.historyFiles.map((f) => f.path);
+  if (paths.length && !(await checkReportPaths(paths, `${own.userId}/${v.auctionId}`))) {
+    return {
+      ok: false,
+      error: "One of the report files didn't upload correctly.",
+      fieldErrors: { historyFiles: "One of the report files didn't upload correctly. Remove it and add it again." },
+    };
+  }
+
+  const admin = getAdminSupabase();
+  const { data: before } = await admin
+    .from("auction_private")
+    .select("history_report_paths")
+    .eq("auction_id", v.auctionId)
+    .maybeSingle<{ history_report_paths: string[] | null }>();
+  const { data: updated, error } = await admin
+    .from("auction_private")
+    .update({
+      history_report_provided: true,
+      history_report_paths: paths,
+      history_report_link: v.historyLink || null,
+      history_report_share_allowed: v.historyShareAllowed,
+      // The rejection reason stays until the next review, so My listings can show what happened.
+      history_review_status: "pending",
+    })
+    .eq("auction_id", v.auctionId)
+    .eq("history_review_status", "rejected")
+    .select("auction_id");
+  if (error || !updated?.length) return { ok: false, error: FAILED };
+
+  // The rejected report's files are replaced: remove them.
+  const old = (before?.history_report_paths ?? []).filter((p) => !paths.includes(p));
+  if (old.length) {
+    const { error: removeError } = await admin.storage.from(REPORT_BUCKET).remove(old);
+    if (removeError) console.error("removing the rejected history report files failed", removeError);
+  }
+
+  await notifyAdminsHistoryResubmitted(v.auctionId, own.userId);
+  revalidatePath("/account/listings");
+  revalidatePath(`/admin/auctions/${v.auctionId}`);
+  return { ok: true, message: "New history report sent. Biddr's team will check it." };
+}
+
+const damageSummarySchema = z.object({
+  auctionId: z.string().uuid("This link is broken. Reload the page."),
+  damageSummary: z
+    .string()
+    .trim()
+    .min(40, "Describe the damage and the repair: at least 40 characters.")
+    .max(4000, "Keep the summary under 4,000 characters."),
+});
+
+/** Corrected damage description, so it matches the history report. The seller's own client writes it (RLS: own drafts only). */
+export async function updateDamageSummary(input: unknown): Promise<NewReportResult> {
+  const parsed = damageSummarySchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Check the highlighted field.", fieldErrors: { damageSummary: parsed.error.issues[0]?.message ?? FAILED } };
+  }
+  const v = parsed.data;
+  const own = await ownDraftWithRejectedHistory(v.auctionId);
+  if ("error" in own) return { ok: false, error: own.error };
+
+  const { data, error } = await getServerSupabase()
+    .from("auctions")
+    .update({ damage_history_summary: v.damageSummary })
+    .eq("id", v.auctionId)
+    .eq("status", "draft")
+    .select("id");
+  if (error || !data?.length) return { ok: false, error: FAILED };
+
+  const { error: privError } = await getAdminSupabase()
+    .from("auction_private")
+    .update({ history_review_status: "pending" })
+    .eq("auction_id", v.auctionId)
+    .eq("history_review_status", "rejected");
+  if (privError) return { ok: false, error: FAILED };
+
+  await notifyAdminsHistoryResubmitted(v.auctionId, own.userId);
+  revalidatePath("/account/listings");
+  revalidatePath(`/admin/auctions/${v.auctionId}`);
+  return { ok: true, message: "Description updated. Biddr's team will check your history report again." };
 }
