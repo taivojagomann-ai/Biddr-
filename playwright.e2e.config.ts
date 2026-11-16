@@ -25,12 +25,21 @@ export default defineConfig({
     {
       name: "desktop-berlin",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, timezoneId: "Europe/Berlin" },
+      testIgnore: [/14-demo-data/],
     },
     {
       name: "phone-tallinn",
       use: { ...devices["Pixel 7"], viewport: { width: 390, height: 844 }, timezoneId: "Europe/Tallinn" },
       // Database-only and server checks don't depend on the screen: run them once.
-      testIgnore: [/01-database-security/, /11-lifecycle/],
+      testIgnore: [/01-database-security/, /11-lifecycle/, /14-demo-data/],
+    },
+    {
+      // Tests that change data other tests rely on (removing all demo data) run
+      // alone, after everything else has finished.
+      name: "after-all",
+      testMatch: /14-demo-data/,
+      dependencies: ["desktop-berlin", "phone-tallinn"],
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, timezoneId: "Europe/Berlin" },
     },
   ],
   webServer: {

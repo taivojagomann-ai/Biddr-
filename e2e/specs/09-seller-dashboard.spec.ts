@@ -66,8 +66,4 @@ test.describe("My listings", () => {
     expect((await intruder.rpc("seller_withdraw", { p_auction_id: upcoming.id, p_reason: null })).error).not.toBeNull();
     expect((await getAuction<{ status: string }>(upcoming.id)).status).toBe("upcoming");
   });
-
-  test.fixme("My listings has tabs (Waiting for review, Live, Finished)", async () => {
-    // Not built: My listings is a single list. Needs a decision on the tab groups.
-  });
 });

@@ -145,7 +145,8 @@ test.describe("admin", () => {
     await expect.poll(async () => (await getPrivate<{ seller_decision_required: boolean }>(a.id)).seller_decision_required).toBe(true);
     const priv = await getPrivate<{ seller_decision_deadline: string }>(a.id);
     expect(Math.round((Date.parse(priv.seller_decision_deadline) - Date.now()) / DAY)).toBe(30);
-    expect((await notificationsFor(seller)).map((n) => n.type)).toContain("inspection_rejected");
+    // The notification is sent right after the review is saved.
+    await expect.poll(async () => (await notificationsFor(seller)).map((n) => n.type)).toContain("inspection_rejected");
     await page.reload();
     await expect(page.getByText(/Waiting for the seller to choose/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve and schedule", exact: true })).toBeDisabled();
@@ -158,7 +159,7 @@ test.describe("admin", () => {
     await page.getByRole("button", { name: `List without an inspection: ${a.title}` }).click();
     await page.getByRole("dialog").getByRole("button", { name: "List without an inspection" }).click();
     await expect.poll(async () => (await getPrivate<{ seller_decision: string }>(a.id)).seller_decision).toBe("without_inspection");
-    expect((await notificationsFor(seed.admin)).map((n) => n.type)).toContain("seller_decided");
+    await expect.poll(async () => (await notificationsFor(seed.admin)).map((n) => n.type)).toContain("seller_decided");
 
     await signIn(context, seed.admin);
     await page.goto(`/admin/auctions/${a.id}`);
@@ -251,27 +252,6 @@ test.describe("admin", () => {
     expect((await notificationsFor(seller, "withdrawal_declined")).map((n) => n.auction_id)).toEqual([declineMe.id]);
   });
 
-  test("demo data loads and is removed again, without touching real listings", async ({ page, context, seed }) => {
-    test.setTimeout(240_000);
-    const real = await createAuction({ seller: await createUser({ role: "seller" }) });
-    await signIn(context, seed.admin);
-    await page.goto("/admin");
-    const panel = page.locator("section[aria-labelledby='demo-heading']");
-    const label = (await panel.getByRole("button", { name: "Reset demo data" }).count()) ? "Reset demo data" : "Load demo data";
-    await panel.getByRole("button", { name: label }).click();
-    const dialog = page.getByRole("dialog").or(page.getByRole("alertdialog")).last();
-    await dialog.getByRole("button", { name: /^(Load|Reset)/ }).last().click();
-    await expect(dialog).toBeHidden({ timeout: 180_000 });
-    const count = async () => (await service().from("auctions").select("id", { count: "exact", head: true }).eq("is_demo", true)).count ?? 0;
-    expect(await count()).toBeGreaterThan(5);
-
-    await panel.getByRole("button", { name: "Remove demo data" }).click();
-    const remove = page.getByRole("dialog").or(page.getByRole("alertdialog")).last();
-    await remove.getByRole("button", { name: /^Remove/ }).last().click();
-    await expect(remove).toBeHidden({ timeout: 120_000 });
-    expect(await count()).toBe(0);
-    expect((await getAuction<{ status: string }>(real.id)).status).toBe("live");
-  });
 });
 
 test.describe("admin sign-in with two-step verification", () => {

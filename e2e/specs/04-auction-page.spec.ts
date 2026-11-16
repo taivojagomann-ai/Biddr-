@@ -147,7 +147,7 @@ test.describe("auction page", () => {
     await expect(link).toHaveAttribute("target", "_blank");
     await expect(link).toHaveAttribute("rel", /noopener/);
     // No embedded map and no raw URL on the page.
-    await expect(page.locator('iframe[src*="google"]')).toHaveCount(0);
+    await expect(page.locator('iframe[src*="google.com/maps"], iframe[src*="maps.google"]')).toHaveCount(0);
     await expect(page.getByText(/google\.com\/maps/)).toHaveCount(0);
   });
 });

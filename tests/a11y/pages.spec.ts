@@ -18,7 +18,8 @@ const MOCK = "http://127.0.0.1:54329";
 
 // Embedded YouTube/Vimeo players are third-party code we can't change (YouTube's
 // player has its own axe findings). Our <iframe> must still have a title; checked below.
-const THIRD_PARTY_FRAMES = 'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo.com"]';
+// The player loads from youtube-nocookie.com or player.vimeo.com.
+const THIRD_PARTY_FRAMES = 'iframe[src*="youtube"], iframe[src*="vimeo"]';
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** Signs the browser in as the mock's admin user by setting the Supabase auth cookie. */
