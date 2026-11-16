@@ -21,7 +21,8 @@ export async function signIn(
 
 // Embedded YouTube/Vimeo players are third-party code we can't change (YouTube's
 // player has its own axe findings). Our <iframe> must still have a title; checked below.
-const THIRD_PARTY_FRAMES = 'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo.com"]';
+// The player loads from youtube-nocookie.com or player.vimeo.com.
+const THIRD_PARTY_FRAMES = 'iframe[src*="youtube"], iframe[src*="vimeo"]';
 
 /** axe (WCAG 2.2 AA): fails on serious or critical problems. */
 export async function expectAccessible(page: Page, label: string, include?: string): Promise<void> {
