@@ -131,6 +131,15 @@ const SIGNED_IN_PAGES = [
   ["Admin auction, live", `/admin/auctions/${LIVE}`],
 ] as const;
 
+// Embedded YouTube/Vimeo players come from the internet. The tests must not
+// depend on them (a slow YouTube made a test time out), so every test gets a
+// tiny local stand-in page instead.
+test.beforeEach(async ({ context }) => {
+  await context.route(/^https:\/\/([a-z0-9-]+\.)*(youtube|youtube-nocookie|ytimg|googlevideo|vimeo|vimeocdn)\.com\//, (route) =>
+    route.fulfill({ contentType: "text/html", body: '<!doctype html><html lang="en"><title>Video</title><p>Video</p></html>' }),
+  );
+});
+
 test.describe("public pages", () => {
   for (const [label, path] of PUBLIC_PAGES) {
     test(`${label} has no serious axe violations`, async ({ page }) => {
