@@ -16,7 +16,25 @@ Use the **staging or preview site with Stripe in test mode**, never real cards o
 5. Cancel on Google's screen.
    - [ ] You're back on the Biddr sign-in page with a clear message, not an error page.
 
-## 2. Card hold with a Stripe test card
+## 2. Admin sign-in with Google and two-step verification
+
+Use a Google account whose Biddr profile has the admin role, and a phone with an authenticator app.
+
+1. On the sign-in page, choose **Sign in as an admin** (the small link at the bottom).
+   - [ ] A dialog opens with **Continue with Google** as the only option.
+2. Sign in with Google.
+   - [ ] You land on **Two-step verification**.
+   - [ ] The first time, it shows a QR code. Scan it with the authenticator app and enter the 6-digit code; you reach the admin panel.
+3. Sign out and sign in as an admin again.
+   - [ ] This time it only asks for the code (no QR code).
+4. Enter a wrong code.
+   - [ ] You get a clear message and can try again.
+5. Sign in as the admin through the normal email sign-in, then open `/admin`.
+   - [ ] You're asked for the code before the panel opens.
+6. Sign in with Google as someone who isn't an admin, via **Sign in as an admin**.
+   - [ ] You end up on the home page, signed in as a normal member, with no admin panel.
+
+## 3. Card hold with a Stripe test card
 
 Stripe must be in **test mode** (the keys start with `pk_test_` and `sk_test_`).
 
@@ -32,9 +50,9 @@ Stripe must be in **test mode** (the keys start with `pk_test_` and `sk_test_`).
 5. After an auction you lost has ended, run the release job (or wait for it, if it's scheduled).
    - [ ] In Stripe, the hold shows as **Canceled**, and the bank statement never shows a charge.
 
-## 3. 3-D Secure card
+## 4. 3-D Secure card
 
-1. Repeat step 2 with the 3-D Secure test card `4000 0027 6000 3184`.
+1. Repeat section 3 with the 3-D Secure test card `4000 0027 6000 3184`.
    - [ ] Stripe's authentication window opens.
 2. Choose **Complete**.
    - [ ] The dialog moves on to **Confirm your bid**.
@@ -44,7 +62,7 @@ Stripe must be in **test mode** (the keys start with `pk_test_` and `sk_test_`).
 4. Try the declined card `4000 0000 0000 0002`.
    - [ ] You see a clear message and can try another card.
 
-## 4. Real emails in a real inbox
+## 5. Real emails in a real inbox
 
 Use a real address you can read (Gmail, Outlook and Apple Mail if possible).
 
@@ -57,7 +75,7 @@ Use a real address you can read (Gmail, Outlook and Apple Mail if possible).
    - [ ] You get a clear "expired" message and can ask for a new one.
 3. Check that the site doesn't promise email notifications anywhere unless email sending for notifications has actually been set up.
 
-## 5. A real phone
+## 6. A real phone
 
 Use at least one iPhone (Safari) and one Android phone (Chrome).
 
@@ -80,7 +98,7 @@ Use at least one iPhone (Safari) and one Android phone (Chrome).
    - [ ] Every button is read out with a clear name.
    - [ ] "You've been outbid" is announced.
 
-## 6. Sharing a link
+## 7. Sharing a link
 
 Use a live auction with photos.
 
@@ -96,3 +114,5 @@ Use a live auction with photos.
    - [ ] The link is copied and a confirmation shows.
 5. Share a draft or rejected listing (seller's preview link) to someone who isn't signed in:
    - [ ] They get "not found", and no preview of the car appears in the chat.
+6. On the auction page, tap **View on map** next to Location:
+   - [ ] Google Maps opens (the app on a phone) and shows the city, not an exact address.

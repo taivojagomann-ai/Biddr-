@@ -89,7 +89,7 @@ Tips:
 ## How the tests are set up
 
 - **Projects.** Every test runs twice: on a desktop Chromium at 1440 × 900 in the Europe/Berlin time zone, and on a phone (Pixel 7, 390 × 844) in the Europe/Tallinn time zone. Layout checks also run at 320 px. The database-only areas (1 and 11) run on desktop only.
-- **Users.** `e2e/global-setup.ts` creates the named users through the Supabase admin API at the start of each run: an admin with a two-factor (TOTP) app, two sellers (private and dealer), three bidders and one user with an unfinished profile. Tests sign in by setting a real session cookie, so they don't have to go through the sign-in form each time. Area 2 tests the sign-in form itself with real emails from Mailpit.
+- **Users.** `e2e/global-setup.ts` creates the named users through the Supabase admin API at the start of each run: an admin with a two-factor (TOTP) app, two sellers (private and dealer), three bidders and one user with an unfinished profile. Tests sign in by setting a real session cookie, so they don't have to go through the sign-in form each time; the admin also passes two-step verification with a code generated from its authenticator secret (otplib). Area 2 tests the sign-in form itself with real emails from Mailpit.
 - **Time.** Tests don't wait for clocks. They set start and end times in the data and run the scheduled SQL jobs (`advance_auction_states`, `notify_watch_ending_soon`, `inspection_decision_job`) directly.
 - **Card holds.** stripe-mock answers the Stripe calls. A successful card check is simulated with a signed `payment_intent.amount_capturable_updated` webhook (a PaymentIntent in `requires_capture`). The real card form (Stripe Elements) is in the manual checklist. stripe-mock can't validate one field the app sends (`payment_method_types`), so the test client drops that single field. Real Stripe always gets the full request.
 - **Files.** `e2e/specs/` has one file per area. `e2e/support/` has the helpers that create users, auctions, holds and bids, read emails, and fill in the sell form.
@@ -98,14 +98,14 @@ Tips:
 
 | # | File | Covers |
 | --- | --- | --- |
-| 1 | `01-database-security` | Row-level security and column grants: private data, other people's holds, role and verification fields, seller-locked columns, direct bid inserts, draft visibility, storage folders, admin and cron routes |
+| 1 | `01-database-security` | Row-level security and column grants: private data, other people's holds, role and verification fields, seller-locked columns, direct bid inserts, draft visibility, storage folders, admin and cron routes, admin rights only after two-step verification |
 | 2 | `02-auth-profile` | Email code and magic link (from Mailpit), wrong code, unsafe redirects, profile setup and validation (27 EU countries), sign out, protected pages |
 | 3 | `03-home` | Tabs and their order, Ending next, search (codes, spaces, aliases, accents, years), suggestions by keyboard, country and history filters, New badge, two cards per row at 390 and 320 px, live price updates |
-| 4 | `04-auction-page` | Inspected and accident-repaired cars, dealer sellers, seller card (stats, no private details), info tips, sharing, Open Graph tags, watching, previews of drafts and rejected listings |
+| 4 | `04-auction-page` | Inspected and accident-repaired cars, dealer sellers, the View on map link, seller card (stats, no private details), info tips, sharing, Open Graph tags, watching, previews of drafts and rejected listings |
 | 5 | `05-bidding` | Bid dialog steps in order and skipped when done, terms (both boxes, version stored), card check through a signed webhook, every place_bid rule and error, anti-sniping, two equal bids at once, buyer's premium at €5,000/€7,000/€70,000/€100,000, live updates across two browsers, outbid notice, auto-watch |
 | 6 | `06-comments` | Who can post, questions and replies, Seller and Biddr team labels, live updates, links to a comment, database rules |
 | 7 | `07-sell-flow` | Validation on every step, draft kept on the device, preview, private and dealer sellers, accident-repaired cars, dealer inspection report (private upload), duplicate VIN |
-| 8 | `08-admin` | Queue and tabs, approve (checklist), reject, move back to review, report accept/reject, the seller's choice and the daily deadline job, pricing, extend, withdraw, withdrawal requests, activity log, demo data |
+| 8 | `08-admin` | Admin sign-in (the admin link and Google-only dialog, two-step code, first-time authenticator setup), queue and tabs, approve (checklist), reject, move back to review, report accept/reject, the seller's choice and the daily deadline job, pricing, extend, withdraw, withdrawal requests, activity log, demo data |
 | 9 | `09-seller-dashboard` | My listings statuses, withdrawing before bidding opens, requesting a withdrawal while live |
 | 10 | `10-notifications-watchlist` | Every notification type, never about your own action, none for demo listings, no duplicates, the live bell, mark as read, watchlist tabs and remove |
 | 11 | `11-lifecycle` | `advance_auction_states` (live, sold, reserve not met, ended), bids after the end, hold release against stripe-mock |
