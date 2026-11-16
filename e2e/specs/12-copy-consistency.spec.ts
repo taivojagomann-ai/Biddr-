@@ -62,6 +62,14 @@ test.describe("copy consistency", () => {
     expect(hits, hits.join("\n")).toEqual([]);
   });
 
+  test("the carVertical logo is used only in the history report section", async ({}, info) => {
+    test.skip(info.project.name !== "desktop-berlin", "Source check runs once");
+    const users = ["app", "components", "lib"]
+      .flatMap((d) => walk(d))
+      .filter((f) => /carvertical-logo/.test(readFileSync(f, "utf8")));
+    expect(users).toEqual(["components/auction/history-report.tsx"]);
+  });
+
   test("no forbidden phrase on any public page, signed out or in", async ({ page, context }) => {
     const seller = await createUser({ role: "seller" });
     const repaired = await createAuction({ seller, condition: "restored_accident", damageSummary: "Bumper replaced." });

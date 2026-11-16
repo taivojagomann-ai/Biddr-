@@ -1,9 +1,34 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CARVERTICAL_HOME, HISTORY_TEXT, OLD_CAR_YEAR } from "@/lib/history-report";
 import type { Auction } from "@/lib/types";
+
+/**
+ * carVertical's logo, exactly as provided (white on transparent, 2000 × 280 px):
+ * only scaled proportionally, never recoloured, cropped or redrawn. 21 px high
+ * (at least 16 px), 150 px wide (the same 50:7 ratio), with clear space of at least
+ * half its height (11 px) on every side, on our dark background. Used only in this
+ * section, never as a sign that carVertical endorses or partners with Biddr
+ * (DECISIONS.md point 11).
+ */
+export const CARVERTICAL_LOGO = { src: "/partners/carvertical-logo.png", width: 150, height: 21, clearSpace: 11 } as const;
+
+function CarVerticalLogo() {
+  return (
+    <span className="inline-flex shrink-0" style={{ padding: CARVERTICAL_LOGO.clearSpace }} data-testid="carvertical-logo">
+      <Image
+        src={CARVERTICAL_LOGO.src}
+        alt="carVertical"
+        width={CARVERTICAL_LOGO.width}
+        height={CARVERTICAL_LOGO.height}
+        style={{ width: CARVERTICAL_LOGO.width, height: CARVERTICAL_LOGO.height }}
+      />
+    </span>
+  );
+}
 
 const linkClass = "inline-flex min-h-11 items-center gap-1.5 font-semibold underline underline-offset-4 hover:text-signal";
 
@@ -22,9 +47,13 @@ export function HistoryReportSection({
   const verified = auction.history_report_verified;
   return (
     <section aria-labelledby="vehicle-history-heading" className="rounded-lg border border-line bg-panel p-4 sm:p-5">
-      <h2 id="vehicle-history-heading" className="text-lg font-bold">
-        {HISTORY_TEXT.heading}
-      </h2>
+      {/* The logo's clear space is its own padding; the negative top margin only overlaps the section's empty padding. */}
+      <div className={verified ? "-mt-[11px] flex flex-wrap items-center justify-between gap-x-4" : undefined}>
+        <h2 id="vehicle-history-heading" className="text-lg font-bold">
+          {HISTORY_TEXT.heading}
+        </h2>
+        {verified ? <CarVerticalLogo /> : null}
+      </div>
       {verified ? (
         <>
           <p className="mt-2 text-sm">{HISTORY_TEXT.provided}</p>
@@ -50,11 +79,14 @@ export function HistoryReportSection({
           <p className="mt-2 text-sm">{HISTORY_TEXT.none}</p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <CopyVin vin={auction.vin} />
-            <a href={CARVERTICAL_HOME} target="_blank" rel="noopener noreferrer" className={linkClass}>
-              {HISTORY_TEXT.checkLink}
-              <ExternalLink aria-hidden className="size-4" />
-              <span className="sr-only"> (opens in a new tab)</span>
-            </a>
+            <span className="inline-flex flex-wrap items-center">
+              <a href={CARVERTICAL_HOME} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                {HISTORY_TEXT.checkLink}
+                <ExternalLink aria-hidden className="size-4" />
+                <span className="sr-only"> (opens in a new tab)</span>
+              </a>
+              <CarVerticalLogo />
+            </span>
           </div>
         </>
       )}
