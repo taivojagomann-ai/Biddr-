@@ -19,10 +19,17 @@ export async function signIn(
   await context.addCookies(await sessionCookies(user.email, { totpSecret: twoFactor ? user.totpSecret : undefined }));
 }
 
+// Embedded YouTube/Vimeo players are third-party code we can't change (YouTube's
+// player has its own axe findings). Our <iframe> must still have a title; checked below.
+const THIRD_PARTY_FRAMES = 'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo.com"]';
+
 /** axe (WCAG 2.2 AA): fails on serious or critical problems. */
 export async function expectAccessible(page: Page, label: string, include?: string): Promise<void> {
-  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]);
+  let builder = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).exclude(THIRD_PARTY_FRAMES);
   if (include) builder = builder.include(include);
+  for (const frame of await page.locator(THIRD_PARTY_FRAMES).all()) {
+    expect((await frame.getAttribute("title"))?.trim(), `${label}: video frame needs a title`).toBeTruthy();
+  }
   const { violations } = await builder.analyze();
   const bad = violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(bad.map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(", ")})`), label).toEqual([]);

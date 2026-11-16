@@ -16,6 +16,9 @@ const MY_DRAFT = "10000000-0000-4000-8000-000000000005";
 const MY_REJECTED = "10000000-0000-4000-8000-000000000006";
 const MOCK = "http://127.0.0.1:54329";
 
+// Embedded YouTube/Vimeo players are third-party code we can't change (YouTube's
+// player has its own axe findings). Our <iframe> must still have a title; checked below.
+const THIRD_PARTY_FRAMES = 'iframe[src*="youtube.com"], iframe[src*="youtu.be"], iframe[src*="vimeo.com"]';
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** Signs the browser in as the mock's admin user by setting the Supabase auth cookie. */
@@ -44,8 +47,11 @@ async function signIn(context: BrowserContext) {
  * used while it's open, and axe would report those targets as "obscured".
  */
 async function expectNoSeriousViolations(page: Page, label: string, include?: string) {
-  let builder = new AxeBuilder({ page }).withTags(WCAG_TAGS);
+  let builder = new AxeBuilder({ page }).withTags(WCAG_TAGS).exclude(THIRD_PARTY_FRAMES);
   if (include) builder = builder.include(include);
+  for (const frame of await page.locator(THIRD_PARTY_FRAMES).all()) {
+    expect((await frame.getAttribute("title"))?.trim(), `${label}: video frame needs a title`).toBeTruthy();
+  }
   const results = await builder.analyze();
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   const other = results.violations.filter((v) => !serious.includes(v));
