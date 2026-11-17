@@ -246,7 +246,8 @@ export type NotificationType =
   | "watch_ending_soon" | "watch_live" | "inspection_rejected"
   | "withdrawal_approved" | "withdrawal_declined"
   | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired"
-  | "history_report_rejected";
+  | "history_report_rejected"
+  | "premium_due" | "premium_paid" | "premium_failed";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

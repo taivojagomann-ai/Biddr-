@@ -18,6 +18,7 @@ const TYPES: readonly NotificationType[] = [
   "withdrawal_approved", "withdrawal_declined",
   "seller_decided", "inspection_decision_reminder", "inspection_decision_expired",
   "history_report_rejected",
+  "premium_due", "premium_paid", "premium_failed",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -99,6 +100,23 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
     }
     case "inspection_decision_expired":
       return withTitle("Your listing was withdrawn: no response after the inspection report was rejected.");
+    case "premium_due": {
+      const due = str(n.data.due_at);
+      const by = due ? ` by ${formatDateTime(due, tz)}` : "";
+      return withTitle(
+        n.data.reason === "failed"
+          ? `Your card was declined for the buyer's premium. Please pay it on My purchases${by}.`
+          : `Your bank needs you to confirm the buyer's premium. Please complete the payment on My purchases${by}.`,
+      );
+    }
+    case "premium_paid":
+      return withTitle(
+        n.data.role === "seller"
+          ? "The buyer paid the buyer's premium. Their contact details are on My listings."
+          : "Buyer's premium paid. The seller's contact details are on My purchases.",
+      );
+    case "premium_failed":
+      return titled(`${car}: the buyer's premium charge failed${str(n.data.reason) ? ` (${str(n.data.reason)})` : ""}`);
     case "history_report_rejected": {
       const reason = str(n.data.reason);
       return withTitle(
@@ -134,6 +152,12 @@ export function notificationHref(n: NotificationRow): string {
     case "listing_submitted":
     case "seller_decided":
       return a ? `/admin/auctions/${a}` : "/admin";
+    case "premium_due":
+      return "/account/purchases";
+    case "premium_paid":
+      return n.data.role === "seller" ? "/account/listings" : "/account/purchases";
+    case "premium_failed":
+      return "/admin/payments";
   }
 }
 

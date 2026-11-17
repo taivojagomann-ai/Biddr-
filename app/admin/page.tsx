@@ -66,7 +66,12 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
   return (
     <main className="container py-8 sm:py-12">
       <h1 className="font-wide text-3xl font-extrabold tracking-tight">Admin</h1>
-      <p className="mt-1 text-sm text-mute">Review submitted cars, schedule auctions and manage live ones.</p>
+      <p className="mt-1 text-sm text-mute">
+        Review submitted cars, schedule auctions and manage live ones.{" "}
+        <Link href="/admin/payments" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+          Payments
+        </Link>
+      </p>
 
       <nav aria-label="Auction status" className="-mx-4 mt-6 overflow-x-auto px-4">
         <ul className="flex min-w-max gap-1 border-b border-line">

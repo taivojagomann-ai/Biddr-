@@ -119,3 +119,50 @@ Use a live auction with photos.
    - [ ] They get "not found", and no preview of the car appears in the chat.
 6. On the auction page, tap **View on map** next to Location:
    - [ ] Google Maps opens (the app on a phone) and shows the city, not an exact address.
+
+## 8. Winning, paying the buyer's premium and the contact exchange (Stripe test mode)
+
+Stripe must be in **test mode** (every page shows the yellow test-mode banner), migrations 0021 and 0022 must be run, and the two Vault secrets from PR "Stripe test mode: card hold flow" must be set, so the jobs run every few minutes.
+
+**Accounts:** a seller (S), a winner (W) and a second bidder (B), each with a complete profile including full name and phone, in three different browsers or private windows. Plus an admin.
+
+**Premium reminder:** 5% of the winning bid, at least €350, at most €3,500. Up to €500 comes from the winner's €500 hold; the rest is charged to the same card.
+
+### 8.1 Premium under €500 (taken from the hold)
+1. S lists a car; the admin approves it and, under Schedule, sets it to start now and end in about 10 minutes.
+2. B bids with card `4242 4242 4242 4242` (€5,000). W bids with `4242 4242 4242 4242` (€6,000). The premium is €350.
+3. Wait for the end, then up to 5 minutes for the jobs.
+   - [ ] W's **My purchases** (account menu) shows the car, winning bid €6,000, premium €350, "Taken from your card hold €350", "Charged to your card €0", status **Paid** and a **View the receipt** link.
+   - [ ] W sees S's full name, phone and email, with the note "Arrange payment for the car and the handover directly with each other."
+   - [ ] S's **My listings** shows W's full name, phone and email on the sold car.
+   - [ ] Both got a notification ("Buyer's premium paid…").
+   - [ ] **Stripe dashboard → Payments:** W's hold "Bidding security hold: …" is **Succeeded** for €350 (partially captured: the other €150 was released); B's hold is **Canceled**.
+   - [ ] **Admin → Payments:** the car is under **Paid**, with a "Card hold in Stripe" link.
+
+### 8.2 Premium over €500 (hold plus a second charge)
+1. As in 8.1, but W wins with a €12,000 bid (premium €600).
+   - [ ] My purchases: "Taken from your card hold €500", "Charged to your card €100", **Paid**.
+   - [ ] Stripe: the hold is **Succeeded** €500, and a new payment "Buyer's premium: …" is **Succeeded** €100, on the same card and customer.
+
+### 8.3 The bank asks the winner to confirm (3-D Secure)
+1. W places the hold with `4000 0027 6000 3184` (choose **Complete** in the pop-up) and wins with a €12,000 bid.
+   - [ ] After the jobs run, My purchases shows "Your bank needs you to confirm the payment.", a **Please pay by** date 72 hours away and a **Complete payment** button. No seller contact details yet. S's My listings says it's waiting for the buyer.
+   - [ ] W got a notification asking to complete the payment.
+   - [ ] Admin → Payments → **Needs the winner** lists it.
+2. W selects **Complete payment**, enters `4000 0027 6000 3184` again and chooses **Complete**.
+   - [ ] Status becomes **Paid**, and the contact details appear for both.
+   - [ ] Stripe: the "Buyer's premium" payment is **Succeeded** for €100.
+3. Repeat on another car, choosing **Fail** in the pop-up at step 2.
+   - [ ] A clear message says nothing was charged, and **Complete payment** still works afterwards.
+
+### 8.4 Admin tools
+1. On a paid car, Admin → Payments → **Refund premium** → confirm.
+   - [ ] Status **Refunded**. Stripe shows the hold payment and any "Buyer's premium" payment as **Refunded**.
+   - [ ] The auction's admin activity log shows `payment.refund`.
+2. On a car that needs the winner (8.3 before paying), choose **Mark as cancelled**, give a reason and confirm.
+   - [ ] Status **Cancelled**. Nothing more is charged, and no contact details are shown.
+3. **Retry charge** on a car that needs the winner.
+   - [ ] A message says the bank needs the winner to confirm again (the same 3-D Secure card).
+
+### Not testable with Stripe test cards
+- A hold that expired after 7 days (the whole premium is charged to the saved card) and a card declined after the hold was placed are covered by the automated tests (`e2e/specs/17-buyer-premium.spec.ts`).

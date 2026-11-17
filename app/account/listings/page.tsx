@@ -13,6 +13,8 @@ import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction, AuctionPrivate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { HistoryRejectedPanel } from "./history-panel";
+import { ContactCard } from "@/components/contact-card";
+import { contactForPaidPayment, type PartyContact } from "@/lib/contacts";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 
@@ -68,6 +70,20 @@ export default async function MyListingsPage() {
       .eq("auction.seller_id", user.id)
       .returns<PrivateRow[]>();
     for (const r of rows ?? []) privates.set(r.auction_id, r);
+  }
+
+  // Sold cars: the buyer's premium status, and the buyer's contact details once it's paid.
+  const payments = new Map<string, { status: string; contact: PartyContact | null }>();
+  if (listings.some((l) => l.status === "sold")) {
+    const { data: paymentRows } = await supabase
+      .from("buyer_payments")
+      .select("auction_id, status, winner_id, seller_id")
+      .eq("seller_id", user.id)
+      .returns<{ auction_id: string; status: string; winner_id: string; seller_id: string }[]>();
+    const admin = getAdminSupabase();
+    for (const p of paymentRows ?? []) {
+      payments.set(p.auction_id, { status: p.status, contact: await contactForPaidPayment(admin, user.id, p) });
+    }
   }
 
   return (
@@ -161,6 +177,15 @@ export default async function MyListingsPage() {
                       deadline={priv?.seller_decision_deadline ?? null}
                       choice={priv?.seller_decision ?? null}
                     />
+                  ) : null}
+                  {l.status === "sold" && payments.get(l.id)?.contact ? (
+                    <ContactCard heading="Buyer's contact details" contact={payments.get(l.id)!.contact!} idBase={`l-${l.id}`} />
+                  ) : l.status === "sold" && payments.has(l.id) ? (
+                    <p className="text-sm text-mute">
+                      {payments.get(l.id)!.status === "cancelled" || payments.get(l.id)!.status === "refunded"
+                        ? "This sale was cancelled by Biddr. Contact us if you have questions."
+                        : "Waiting for the buyer to pay the buyer's premium. Their contact details appear here once it's paid."}
+                    </p>
                   ) : null}
                   {/* Rejected, or sent again after a rejection (the reason stays until the next review). */}
                   {l.status === "draft" &&

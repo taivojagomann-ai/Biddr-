@@ -31,6 +31,7 @@ export async function SiteHeader() {
     { label: "Sell a car", href: "/sell" },
     ...(user ? [{ label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" }] : []),
     ...(user ? [{ label: "My listings", href: "/account/listings" }] : []),
+    ...(user ? [{ label: "My purchases", href: "/account/purchases" }] : []),
     ...(user ? [{ label: "Watchlist", href: "/account/watchlist" }] : []),
     ...(user ? [{ label: "Notifications", href: "/account/notifications" }] : []),
     ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),

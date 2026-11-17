@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadStripe, type Appearance } from "@stripe/stripe-js";
+import { stripeAppearance, stripePromise } from "@/lib/stripe-client";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { CheckCircle2, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,21 +13,7 @@ import { formatEur } from "@/lib/format";
 import { buyersPremium, minNextBid, PREMIUM_MAX, PREMIUM_MIN, PREMIUM_RATE, QUICK_INCREMENTS } from "@/lib/pricing";
 import type { Auction, BidderStatus, HoldResponse, PlaceBidResult } from "@/lib/types";
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
-const appearance: Appearance = {
-  theme: "night",
-  variables: {
-    colorPrimary: "#FF5500",
-    colorBackground: "#0A0A0B",
-    colorText: "#F4F4F5",
-    colorTextSecondary: "#A1A1AA",
-    colorDanger: "#FF5500",
-    borderRadius: "8px",
-    fontFamily: "Archivo, system-ui, sans-serif",
-  },
-  rules: { ".Input": { border: "1px solid #71717A" }, ".Input:focus": { border: "1px solid #FF5500", boxShadow: "none" } },
-};
+const appearance = stripeAppearance;
 
 type Step =
   | { kind: "signin" }
