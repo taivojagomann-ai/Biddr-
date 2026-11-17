@@ -49,6 +49,8 @@ export function AuctionLive({
 
   const [auction, setAuction] = useState(initialAuction);
   const [bids, setBids] = useState(initialBids);
+  // Set when the bank turned down the card check after a 3-D Secure redirect.
+  const [holdDeclined, setHoldDeclined] = useState(false);
   const [comments, setComments] = useState(initialComments);
   const [hasHold, setHasHold] = useState(initialHasHold);
   const [amount, setAmount] = useState(() => minNextBid(initialAuction));
@@ -125,20 +127,27 @@ export function AuctionLive({
     return () => { void supabase.removeChannel(channel); };
   }, [supabase, initialAuction.id, applyAuction, refetchAll, preview]);
 
-  // Returning from a 3-D Secure redirect: record the hold, then reopen the modal.
+  // Returning from a 3-D Secure redirect: record the hold, then reopen the modal at
+  // "Confirm your bid". If the bank said no, say so (nothing was held).
   useEffect(() => {
     const piId = searchParams.get("payment_intent");
     if (preview || searchParams.get("hold") !== "return" || !piId) return;
     void (async () => {
-      const res = await fetch("/api/stripe/hold/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentIntentId: piId }),
-      });
+      const res =
+        searchParams.get("redirect_status") === "failed"
+          ? null
+          : await fetch("/api/stripe/hold/confirm", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paymentIntentId: piId }),
+            }).catch(() => null);
       router.replace(`/auctions/${initialAuction.id}`, { scroll: false });
-      if (res.ok) {
+      if (res?.ok) {
+        setHoldDeclined(false);
         setHasHold(true);
         setModalOpen(true);
+      } else {
+        setHoldDeclined(true);
       }
     })();
   }, [searchParams, router, initialAuction.id, preview]);
@@ -160,6 +169,12 @@ export function AuctionLive({
 
   return (
     <>
+      {holdDeclined ? (
+        <p role="alert" className="mb-6 rounded-md border border-signal/60 bg-signal/10 px-3 py-2 text-sm">
+          Your bank didn&apos;t approve the €500 hold, so nothing was held. Select the bid button to try again, or use another
+          card.
+        </p>
+      ) : null}
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-10">
           {children}

@@ -43,12 +43,15 @@ Stripe must be in **test mode** (the keys start with `pk_test_` and `sk_test_`).
    - card `4242 4242 4242 4242`, any future expiry date, any CVC, any postcode.
    - [ ] The dialog moves on to **Confirm your bid**.
    - [ ] In the Stripe dashboard (test mode), **Payments** shows a €500 payment that is **Uncaptured**, with the description "Bidding security hold: …".
+   - [ ] Every page shows the yellow "Test mode: no real payments. Use Stripe test cards." banner.
+   - [ ] In the admin, the auction's **Payments** section lists your hold as **Held**, with a link to the payment in Stripe, and the Stripe event `payment_intent.amount_capturable_updated` as **Handled**.
 3. Place a bid.
    - [ ] It shows as the high bid.
 4. Open a second live auction and bid again.
    - [ ] You're asked for the card again: a hold is per auction.
-5. After an auction you lost has ended, run the release job (or wait for it, if it's scheduled).
+5. After an auction you lost has ended, wait up to 5 minutes for the release job.
    - [ ] In Stripe, the hold shows as **Canceled**, and the bank statement never shows a charge.
+   - [ ] In the admin's **Payments** section, the hold shows as **Released**.
 
 ## 4. 3-D Secure card
 
@@ -57,10 +60,10 @@ Stripe must be in **test mode** (the keys start with `pk_test_` and `sk_test_`).
 2. Choose **Complete**.
    - [ ] The dialog moves on to **Confirm your bid**.
 3. Try again on another auction, and this time choose **Fail** in the authentication window.
-   - [ ] You see a clear message that the card wasn't confirmed, and you can try again.
+   - [ ] You see a clear message that the card wasn't confirmed, and you can try again. (If your browser was sent to the bank's page and back, the auction page says "Your bank didn't approve the €500 hold, so nothing was held.")
    - [ ] No hold is left behind in Stripe.
 4. Try the declined card `4000 0000 0000 0002`.
-   - [ ] You see a clear message and can try another card.
+   - [ ] You see "Your card was declined. Nothing was held. Try again or use another card." and can enter another card in the same window.
 
 ## 5. Real emails in a real inbox
 

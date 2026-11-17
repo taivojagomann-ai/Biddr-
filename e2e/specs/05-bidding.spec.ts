@@ -6,6 +6,7 @@ import { test, expect, signIn, expectAccessible, realtimeReady } from "../suppor
 import { APP_URL, STRIPE_MOCK_PORT, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } from "../support/env";
 import { authorizeHold, bid, createAuction, createUser, getAuction, iso, DAY, HOUR, readyBidder, service, notificationsFor } from "../support/factory";
 import { userDb } from "../support/supabase";
+import { withStripeMockLock } from "../support/stripe";
 
 /** Opens the bid dialog from the bid box (desktop) or the sticky bar (phones). */
 async function openBidDialog(page: Page) {
@@ -37,60 +38,63 @@ test.describe("bid dialog", () => {
     const user = await createUser({ terms: false });
     await signIn(context, user);
 
-    // stripe-mock returns the same PaymentIntent id every time: clear old holds that use it.
-    const mock = new Stripe(STRIPE_SECRET_KEY, { host: "localhost", port: STRIPE_MOCK_PORT, protocol: "http" });
-    const probe = await mock.paymentIntents.create({ amount: 50_000, currency: "eur" });
-    await service().from("bid_holds").delete().eq("stripe_payment_intent_id", probe.id);
+    // stripe-mock returns the same PaymentIntent id every time: one card-check test at a time,
+    // and clear old holds that use it.
+    await withStripeMockLock(async () => {
+      const mock = new Stripe(STRIPE_SECRET_KEY, { host: "localhost", port: STRIPE_MOCK_PORT, protocol: "http" });
+      const probe = await mock.paymentIntents.create({ amount: 50_000, currency: "eur" });
+      await service().from("bid_holds").delete().eq("stripe_payment_intent_id", probe.id);
 
-    await page.goto(`/auctions/${a.id}`);
-    await openBidDialog(page);
-    const terms = page.getByRole("dialog", { name: "Before your first bid" });
-    await terms.getByRole("button", { name: "Agree and continue" }).click();
-    await expect(terms.getByRole("alert")).toBeVisible();
-    await terms.getByRole("checkbox", { name: "I have read and agree to the bidding terms" }).check();
-    await terms.getByRole("button", { name: "Agree and continue" }).click();
-    await expect(terms.getByText("Confirm that you are 18 or older.")).toBeVisible();
-    await terms.getByRole("checkbox", { name: "I am 18 or older" }).check();
-    await expectAccessible(page, "Terms step", "[role=dialog]");
-    await terms.getByRole("button", { name: "Agree and continue" }).click();
+      await page.goto(`/auctions/${a.id}`);
+      await openBidDialog(page);
+      const terms = page.getByRole("dialog", { name: "Before your first bid" });
+      await terms.getByRole("button", { name: "Agree and continue" }).click();
+      await expect(terms.getByRole("alert")).toBeVisible();
+      await terms.getByRole("checkbox", { name: "I have read and agree to the bidding terms" }).check();
+      await terms.getByRole("button", { name: "Agree and continue" }).click();
+      await expect(terms.getByText("Confirm that you are 18 or older.")).toBeVisible();
+      await terms.getByRole("checkbox", { name: "I am 18 or older" }).check();
+      await expectAccessible(page, "Terms step", "[role=dialog]");
+      await terms.getByRole("button", { name: "Agree and continue" }).click();
 
-    // Card check: the real card form is in MANUAL_TESTS.md; here the hold is authorised by a signed webhook.
-    await expect(page.getByRole("dialog", { name: "Confirm your card" })).toBeVisible();
-    const { data: me } = await service().from("profiles").select("bidding_terms_version, bidding_terms_accepted_at").eq("id", user.id).single();
-    expect(me?.bidding_terms_version).toBeTruthy();
-    expect(me?.bidding_terms_accepted_at).toBeTruthy();
-    const { data: hold } = await service().from("bid_holds").select("stripe_payment_intent_id, status").eq("auction_id", a.id).eq("user_id", user.id).single();
-    expect(hold?.status).toBe("pending");
+      // Card check: the real card form is in MANUAL_TESTS.md; here the hold is authorised by a signed webhook.
+      await expect(page.getByRole("dialog", { name: "Confirm your card" })).toBeVisible();
+      const { data: me } = await service().from("profiles").select("bidding_terms_version, bidding_terms_accepted_at").eq("id", user.id).single();
+      expect(me?.bidding_terms_version).toBeTruthy();
+      expect(me?.bidding_terms_accepted_at).toBeTruthy();
+      const { data: hold } = await service().from("bid_holds").select("stripe_payment_intent_id, status").eq("auction_id", a.id).eq("user_id", user.id).single();
+      expect(hold?.status).toBe("pending");
 
-    const payload = JSON.stringify({
-      id: "evt_e2e",
-      object: "event",
-      type: "payment_intent.amount_capturable_updated",
-      data: {
-        object: {
-          id: hold!.stripe_payment_intent_id,
-          object: "payment_intent",
-          status: "requires_capture",
-          amount_capturable: 50_000,
-          currency: "eur",
-          metadata: { kind: "bid_hold", auction_id: a.id, user_id: user.id },
+      const payload = JSON.stringify({
+        id: `evt_e2e_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+        object: "event",
+        type: "payment_intent.amount_capturable_updated",
+        data: {
+          object: {
+            id: hold!.stripe_payment_intent_id,
+            object: "payment_intent",
+            status: "requires_capture",
+            amount_capturable: 50_000,
+            currency: "eur",
+            metadata: { kind: "bid_hold", auction_id: a.id, user_id: user.id },
+          },
         },
-      },
-    });
-    const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: STRIPE_WEBHOOK_SECRET });
-    const res = await page.request.post(`${APP_URL}/api/stripe/webhook`, { data: payload, headers: { "stripe-signature": signature, "content-type": "application/json" } });
-    expect(res.status()).toBe(200);
-    const bad = await page.request.post(`${APP_URL}/api/stripe/webhook`, { data: payload, headers: { "stripe-signature": "t=1,v1=bad" } });
-    expect(bad.status()).toBe(400);
+      });
+      const signature = Stripe.webhooks.generateTestHeaderString({ payload, secret: STRIPE_WEBHOOK_SECRET });
+      const res = await page.request.post(`${APP_URL}/api/stripe/webhook`, { data: payload, headers: { "stripe-signature": signature, "content-type": "application/json" } });
+      expect(res.status()).toBe(200);
+      const bad = await page.request.post(`${APP_URL}/api/stripe/webhook`, { data: payload, headers: { "stripe-signature": "t=1,v1=bad" } });
+      expect(bad.status()).toBe(400);
 
-    // Steps already done are skipped: straight to confirm.
-    await page.reload();
-    await openBidDialog(page);
-    const confirm = page.getByRole("dialog", { name: "Confirm your bid" });
-    await expect(confirm).toBeVisible();
-    await confirm.getByRole("button", { name: "Place bid of €15,000" }).click();
-    await expect(page.getByRole("dialog", { name: "You have the high bid" })).toBeVisible();
-    expect((await getAuction<{ current_bid: number }>(a.id)).current_bid).toBe(15_000);
+      // Steps already done are skipped: straight to confirm.
+      await page.reload();
+      await openBidDialog(page);
+      const confirm = page.getByRole("dialog", { name: "Confirm your bid" });
+      await expect(confirm).toBeVisible();
+      await confirm.getByRole("button", { name: "Place bid of €15,000" }).click();
+      await expect(page.getByRole("dialog", { name: "You have the high bid" })).toBeVisible();
+      expect((await getAuction<{ current_bid: number }>(a.id)).current_bid).toBe(15_000);
+    });
   });
 
   test("the confirm step shows the buyer's premium and total", async ({ page, context }) => {
