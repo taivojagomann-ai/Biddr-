@@ -26,7 +26,8 @@ export async function GET(req: Request): Promise<Response> {
     .select("id,user_id,stripe_payment_intent_id,auction:auctions!inner(status,leading_bidder_id)")
     .eq("status", "authorized")
     .in("auction.status", ["ended", "sold", "reserve_not_met", "withdrawn"])
-    .limit(100)
+    .order("created_at", { ascending: true })
+    .limit(2000)
     .returns<HoldRow[]>();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -34,9 +35,13 @@ export async function GET(req: Request): Promise<Response> {
   let released = 0;
   const failures: string[] = [];
 
-  for (const hold of data ?? []) {
-    const isWinner = hold.auction.status === "sold" && hold.auction.leading_bidder_id === hold.user_id;
-    if (isWinner) continue;
+  // The winner's hold on a sold car stays open (it's captured toward the premium), so it's
+  // skipped before taking the batch: otherwise enough of them would fill the batch and
+  // block every other release.
+  const toRelease = (data ?? [])
+    .filter((h) => !(h.auction.status === "sold" && h.auction.leading_bidder_id === h.user_id))
+    .slice(0, 100);
+  for (const hold of toRelease) {
     // Already cancelled or expired on Stripe's side still counts as released.
     if (await releaseHold(admin, hold)) released += 1;
     else failures.push(hold.id);
