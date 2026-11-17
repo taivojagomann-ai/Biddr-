@@ -81,7 +81,7 @@ test.describe("admin", () => {
     await confirmAction(page, "Approve and schedule", "Approve and schedule");
     await expect.poll(async () => (await getAuction<{ status: string }>(a.id)).status).toBe("upcoming");
     await expect.poll(async () => (await notificationsFor(seller, "listing_approved")).length).toBe(1);
-    expect(await adminActions(a.id)).toEqual(expect.arrayContaining(["schedule.update", "status.approve"]));
+    await expect.poll(() => adminActions(a.id)).toEqual(expect.arrayContaining(["schedule.update", "status.approve"]));
     await page.reload();
     await expect(page.getByRole("region", { name: "Admin activity" }).or(page.locator("#activity"))).toContainText("status.approve");
     await expect(page.getByRole("region", { name: "Admin activity" }).or(page.locator("#activity"))).toContainText(seed.admin.username!);
@@ -131,7 +131,7 @@ test.describe("admin", () => {
     const pub = await getAuction<{ inspection_type: string; inspection_partner_name: string }>(a.id);
     expect(pub.inspection_type).toBe("authorised_dealer");
     expect(pub.inspection_partner_name).toContain("BMW Niederlassung München");
-    expect(await adminActions(a.id)).toContain("inspection.accept");
+    await expect.poll(() => adminActions(a.id)).toContain("inspection.accept");
   });
 
   test("dealer report rejected: approval waits for the seller, who can list without an inspection", async ({ page, context, seed }) => {
@@ -194,7 +194,7 @@ test.describe("admin", () => {
     await page.getByLabel("No reserve").check();
     await page.getByRole("button", { name: "Save pricing" }).click();
     await expect.poll(async () => (await getAuction<{ has_reserve: boolean }>(a.id)).has_reserve).toBe(false);
-    expect(await adminActions(a.id)).toContain("pricing.update");
+    await expect.poll(() => adminActions(a.id)).toContain("pricing.update");
   });
 
   test("live auctions: extend by an hour, and withdraw with bids", async ({ page, context, seed }) => {
@@ -207,7 +207,7 @@ test.describe("admin", () => {
     await page.reload();
     await confirmAction(page, "Withdraw auction", "Withdraw and cancel bids");
     await expect.poll(async () => (await getAuction<{ status: string }>(a.id)).status).toBe("withdrawn");
-    expect(await adminActions(a.id)).toEqual(expect.arrayContaining(["schedule.extend", "status.withdraw"]));
+    await expect.poll(() => adminActions(a.id)).toEqual(expect.arrayContaining(["schedule.extend", "status.withdraw"]));
   });
 
   test("a scheduled auction can be withdrawn before bidding opens", async ({ page, context, seed }) => {
@@ -247,7 +247,7 @@ test.describe("admin", () => {
     await confirmAction(page, "Decline", "Decline request");
     await expect.poll(async () => (await getPrivate<{ withdraw_request_status: string }>(declineMe.id)).withdraw_request_status).toBe("declined");
     expect((await getAuction<{ status: string }>(declineMe.id)).status).toBe("live");
-    expect(await adminActions(declineMe.id)).toContain("withdraw_request.decline");
+    await expect.poll(() => adminActions(declineMe.id)).toContain("withdraw_request.decline");
     expect((await notificationsFor(seller, "withdrawal_approved")).map((n) => n.auction_id)).toEqual([approveMe.id]);
     expect((await notificationsFor(seller, "withdrawal_declined")).map((n) => n.auction_id)).toEqual([declineMe.id]);
   });

@@ -115,11 +115,14 @@ test.describe("vehicle history reports", () => {
     await expectAccessible(page, "Admin history report panel", "#history");
 
     await acceptInAdmin(page, a.id, ["Mileage records consistent", "No recorded damage", "2 previous owners"]);
+    await expect.poll(async () => (await getAuction<{ history_report_verified: boolean }>(a.id)).history_report_verified).toBe(true);
     const pub = await getAuction<{ history_report_verified: boolean; history_summary: string[]; history_report_public_link: string | null }>(a.id);
-    expect(pub).toMatchObject({ history_report_verified: true, history_report_public_link: null });
+    expect(pub).toMatchObject({ history_report_public_link: null });
     expect(pub.history_summary).toEqual(["Mileage records consistent", "No recorded damage", "2 previous owners"]);
-    const { data: log } = await service().from("admin_actions").select("action").eq("auction_id", a.id);
-    expect((log ?? []).map((l) => l.action)).toContain("history_report.accept");
+    // The audit entry is written just after the listing is updated.
+    await expect
+      .poll(async () => ((await service().from("admin_actions").select("action").eq("auction_id", a.id)).data ?? []).map((l) => l.action))
+      .toContain("history_report.accept");
 
     // Public page (the seller's preview while it's a draft, then live).
     await service().from("auctions").update({ status: "live", starts_at: iso(-60_000) }).eq("id", a.id);
@@ -147,7 +150,7 @@ test.describe("vehicle history reports", () => {
     const a = await draftWithReport(await createUser({ role: "seller" }), { share: true });
     await signIn(context, seed.admin);
     await acceptInAdmin(page, a.id, ["Mileage records consistent", "First registered in Germany"]);
-    expect((await getAuction<{ history_report_public_link: string }>(a.id)).history_report_public_link).toBe(LINK);
+    await expect.poll(async () => (await getAuction<{ history_report_public_link: string }>(a.id)).history_report_public_link).toBe(LINK);
     await service().from("auctions").update({ status: "live", starts_at: iso(-60_000) }).eq("id", a.id);
     await page.goto(`/auctions/${a.id}`);
     const link = page.getByRole("region", { name: "Vehicle history report" }).getByRole("link", { name: /View the full report/ });
