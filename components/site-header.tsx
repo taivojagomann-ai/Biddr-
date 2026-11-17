@@ -27,6 +27,7 @@ export async function SiteHeader() {
   const menuLinks: MenuLink[] = [
     { label: "Auctions", href: "/" },
     { label: "How it works", href: "/how-it-works" },
+    { label: "About", href: "/about" },
     { label: "Sell a car", href: "/sell" },
     ...(user ? [{ label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" }] : []),
     ...(user ? [{ label: "My listings", href: "/account/listings" }] : []),
@@ -61,6 +62,9 @@ export async function SiteHeader() {
           </Link>
           <Link href="/how-it-works" className={`${navLink} hidden md:inline-flex`}>
             How it works
+          </Link>
+          <Link href="/about" className={`${navLink} hidden lg:inline-flex`}>
+            About
           </Link>
           <Link href="/sell" className={navLink}>
             Sell a car
