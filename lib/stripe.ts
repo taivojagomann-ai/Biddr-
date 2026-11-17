@@ -41,3 +41,9 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export const HOLD_AMOUNT_EUR = Number(process.env.BID_HOLD_AMOUNT_EUR ?? 500);
+
+/** Link to a payment in the Stripe dashboard (the test-mode dashboard while test keys are used). */
+export function stripeDashboardUrl(paymentIntentId: string): string {
+  const test = !process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_");
+  return `https://dashboard.stripe.com/${test ? "test/" : ""}payments/${encodeURIComponent(paymentIntentId)}`;
+}

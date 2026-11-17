@@ -39,7 +39,20 @@ Supabase Postgres (source of truth)
 
 - **Card authorizations expire after about 7 days.** Keep auctions at 7 days or less, or re-authorize before expiry. The PaymentIntent uses `setup_future_usage: "off_session"`, so the saved card can also be charged off-session for the premium if the hold has lapsed.
 - The winner's hold is kept by the release job. Charging the buyer's premium (capture the €500 and charge the rest, or cancel and charge the full premium) is phase 2.
-- Webhook events to enable: `payment_intent.amount_capturable_updated`, `payment_intent.canceled`, `payment_intent.payment_failed`, `payment_intent.succeeded`.
+- Webhook events to enable: `payment_intent.amount_capturable_updated`, `payment_intent.canceled`, `payment_intent.payment_failed`, `payment_intent.succeeded`. Every event is stored by id in `stripe_events` and handled once; failures are kept there with the error and shown in the admin's **Payments** section on each auction.
+- **Test mode:** while `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` starts with `pk_test_`, every page shows a yellow "Test mode: no real payments. Use Stripe test cards." banner. It never shows with live keys.
+
+### Scheduled jobs
+
+- Auction state changes (live, sold, ended…) run inside the database every minute (`pg_cron`: `advance_auction_states`).
+- Card-hold releases run every 5 minutes: `pg_cron` calls `/api/stripe/release` through `pg_net` with the `CRON_SECRET` header (`public.call_app_job`, migration 0021). It needs two Supabase Vault secrets, set once in the SQL Editor:
+
+  ```sql
+  select vault.create_secret('https://YOUR-SITE.vercel.app', 'biddr_site_url');
+  select vault.create_secret('THE SAME VALUE AS CRON_SECRET IN VERCEL', 'biddr_cron_secret');
+  ```
+
+  Until both exist the job does nothing. The daily Vercel cron in `vercel.json` stays as a backup. Check that it works in Supabase: `select status_code, content from net._http_response order by id desc limit 5;` should show `200` and `{"released":…}`.
 
 ## Folder structure
 
@@ -193,6 +206,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
 | `0017_inspected_by_seller.sql` | `inspected_by_seller` on `auction_private` and `auctions`: the admin confirms a dealer seller inspected its own car, and the listing says "Inspected by the selling dealer" | Run before deploying this version (the admin review and auction page read it) |
 | `0018_eu_countries.sql` | All 27 EU countries: adds them to the country type used by profiles and car locations, and widens the registration-country check (old `other_eu` values stay valid) | Run before deploying this version (profile, sell form and filters offer every EU country) |
+| `0021_payments_scheduling.sql` | Stripe webhook event log (`stripe_events`, service role only) and `call_app_job()`, which lets `pg_cron` call the site's protected job routes through `pg_net`; the card-hold release runs every 5 minutes | Run before deploying this version, then add the two Vault secrets (see "Scheduled jobs") |
 | `0020_history_reports.sql` | Vehicle history reports (carVertical): the seller's files, share link, sharing permission and Biddr's review on `auction_private`; `history_report_verified`, `history_summary` (2–8 lines, 200 characters each) and `history_report_public_link` (only when sharing is allowed) on `auctions`; the `history_report_rejected` notification type | Run before deploying this version (the sell form, admin review and auction page use it) |
 | `0019_admin_two_factor.sql` | `is_admin()` is true only after two-step verification (`aal2`), so admin rights in the database need the authenticator code too | Run when deploying this version (admins then sign in with Google and a code) |
 

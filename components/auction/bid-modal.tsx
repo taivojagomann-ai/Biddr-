@@ -249,7 +249,12 @@ function HoldForm({ amountEur, auctionId, onAuthorized }: { amountEur: number; a
 
     if (stripeError) {
       setBusy(false);
-      setError(stripeError.message ?? "Your card was declined. Try another card.");
+      // Card errors (declined, insufficient funds, wrong CVC…) come with Stripe's own plain message.
+      setError(
+        stripeError.type === "card_error" || stripeError.type === "validation_error"
+          ? `${stripeError.message ?? "Your card was declined."} Nothing was held. Try again or use another card.`
+          : "The card check didn't go through. Check your connection and try again.",
+      );
       return;
     }
 

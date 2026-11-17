@@ -13,6 +13,8 @@ import { asServiceHistory, asTextList, toServiceRows } from "@/lib/listing-detai
 import { CommentsPanel } from "./comments-panel";
 import { DetailsForm } from "./details-form";
 import { HistoryPanel } from "./history-panel";
+import { PaymentsPanel, type EventRow, type HoldRow } from "./payments-panel";
+import { stripeDashboardUrl } from "@/lib/stripe";
 import { InspectionPanel, type DealerReportView } from "./inspection-panel";
 import { WithdrawalRequest } from "./withdrawal-request";
 import { ListingForm } from "./listing-form";
@@ -124,6 +126,24 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
   ]);
 
   const priv = privRes.data;
+
+  // Payments: the card holds and the Stripe events for them (0021).
+  const { data: holdRows } = await ctx.db
+    .from("bid_holds")
+    .select("id, amount, status, stripe_payment_intent_id, created_at, updated_at, user:profiles!bid_holds_user_id_fkey(username)")
+    .eq("auction_id", a.id)
+    .order("created_at", { ascending: false })
+    .returns<HoldRow[]>();
+  const holds = (holdRows ?? []).map((h) => ({ ...h, dashboardUrl: stripeDashboardUrl(h.stripe_payment_intent_id) }));
+  const piIds = holds.map((h) => h.stripe_payment_intent_id);
+  const { data: eventRows } = await ctx.db
+    .from("stripe_events")
+    .select("id, type, status, error, received_at, payment_intent_id")
+    .or([`auction_id.eq.${a.id}`, piIds.length ? `payment_intent_id.in.(${piIds.join(",")})` : null].filter(Boolean).join(","))
+    .order("received_at", { ascending: false })
+    .limit(50)
+    .returns<EventRow[]>();
+  const events = eventRows ?? [];
   // null: submitted before sellers could choose (0013).
   const report = dealerReportView(priv, a.mileage_km, a.starts_at);
   const inspectionLabel =
@@ -426,6 +446,10 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
               ))}
             </ol>
           )}
+        </Section>
+
+        <Section id="payments" title="Payments" intro="Card holds on this auction and what Stripe reported. Links open the payment in Stripe's dashboard.">
+          <PaymentsPanel holds={holds} events={events} />
         </Section>
 
         <Section id="comments" title={`Comments (${comments.length})`} intro="Delete spam, abuse or posts that share contact details.">

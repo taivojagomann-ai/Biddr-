@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { authenticator } from "otplib";
 import { assertLocal, SUPABASE_URL } from "./support/env";
 import { createUser, testPhotoUrl, type TestUser } from "./support/factory";
@@ -46,5 +46,7 @@ export default async function globalSetup() {
     incomplete: await createUser({ complete: false }),
   };
   mkdirSync("e2e/.state", { recursive: true });
+  // A lock left behind by an interrupted run (see withStripeMockLock).
+  rmSync("e2e/.state/stripe-mock.lock", { recursive: true, force: true });
   writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
