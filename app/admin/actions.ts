@@ -1,4 +1,5 @@
 "use server";
+import { findMake } from "@/lib/data/car-makes";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
 import { logAdminAction, requireAdmin, type AdminContext } from "@/lib/admin";
@@ -122,8 +123,14 @@ export async function updateListing(input: unknown): Promise<AdminResult> {
     return { ok: false, error: "Accident-repaired cars need a damage and repair summary.", fieldErrors: { damageSummary: "Accident-repaired cars need a damage and repair summary." } };
   }
 
+  // A make from the list, written the way the list writes it ("skoda" → "Škoda"); otherwise
+  // the admin kept the seller's own make, which stays marked as a suggestion.
+  const knownMake = findMake(v.make);
   const changes = {
     title: v.title,
+    make: knownMake ?? v.make,
+    make_other: knownMake === null,
+    model: v.model,
     variant: v.variant,
     engine: v.engine,
     transmission: v.transmission,

@@ -1,4 +1,5 @@
 "use client";
+import { findMake } from "@/lib/data/car-makes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, RotateCcw } from "lucide-react";
@@ -117,6 +118,14 @@ function readPersisted(raw: unknown, country: Country | ""): Persisted | null {
     } else if (typeof saved === typeof fallback) {
       Object.assign(values, { [key]: saved });
     }
+  }
+
+  // Drafts from before the full make list: make "Other" plus the typed make in makeOther.
+  if (savedValues.make === "Other" && typeof savedValues.makeOther === "string") {
+    const typed = savedValues.makeOther.trim().slice(0, 40);
+    const known = findMake(typed);
+    values.make = known ?? typed;
+    values.makeOther = !known && typed.length > 0;
   }
 
   // A v1 draft saved step 3+ as Photos/Price/Review: shift them one along, and send

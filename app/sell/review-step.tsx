@@ -89,7 +89,7 @@ export function ReviewStep({
   onPreview: () => void;
 }) {
   const restored = values.hadDamage === "yes";
-  const make = values.make === "Other" ? values.makeOther : values.make;
+  const make = values.make;
   const year = num(values.year);
   const mileage = num(values.mileageKm);
   const start = num(values.startingBid);

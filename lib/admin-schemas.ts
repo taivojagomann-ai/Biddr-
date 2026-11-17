@@ -1,5 +1,6 @@
 // Admin panel: zod schemas, labels and limits shared by server actions and client forms.
 // No "use client" here; server code imports this.
+import { findMake } from "@/lib/data/car-makes";
 import { z } from "zod";
 import { EU_CODES } from "@/lib/countries";
 import { fromZonedInputs, isValidTimeZone } from "@/lib/zoned-time";
@@ -86,6 +87,9 @@ export const approveSchema = z.object({ auctionId: id, tz: timeZone.optional() }
 export const listingSchema = z.object({
   auctionId: id,
   title: text("title", 5, 140),
+  make: text("make", 1, 40),
+  makeOther: z.boolean(),
+  model: text("model", 1, 60),
   variant: optionalText(40, "variant"),
   engine: text("engine", 3, 120),
   transmission: text("transmission", 2, 60),
@@ -115,6 +119,9 @@ export const listingSchema = z.object({
   registrationCountry: z.union([registrationSchema, z.literal("")]).transform((v) => (v === "" ? null : v)),
   isRegistered: z.enum(["", "yes", "no"]).transform((v) => (v === "" ? null : v === "yes")),
 }).superRefine((v, ctx) => {
+  if (!v.makeOther && !findMake(v.make)) {
+    ctx.addIssue({ code: "custom", path: ["make"], message: `Choose a make from the list, or choose “Other: ${v.make}”.` });
+  }
   if (v.sellerType === "dealer") {
     if (!v.dealerName) ctx.addIssue({ code: "custom", path: ["dealerName"], message: "Enter the dealer's company name." });
     if (!v.dealerRegistryCode) ctx.addIssue({ code: "custom", path: ["dealerRegistryCode"], message: "Enter the dealer's registry code." });

@@ -18,7 +18,7 @@ const TYPES: readonly NotificationType[] = [
   "withdrawal_approved", "withdrawal_declined",
   "seller_decided", "inspection_decision_reminder", "inspection_decision_expired",
   "history_report_rejected",
-  "premium_due", "premium_paid", "premium_failed",
+  "premium_due", "premium_paid", "premium_failed", "make_suggested",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -115,6 +115,8 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
           ? "The buyer paid the buyer's premium. Their contact details are on My listings."
           : "Buyer's premium paid. The seller's contact details are on My purchases.",
       );
+    case "make_suggested":
+      return withTitle(`New make suggested: ${str(n.data.make) ?? "unknown"}`);
     case "premium_failed":
       return titled(`${car}: the buyer's premium charge failed${str(n.data.reason) ? ` (${str(n.data.reason)})` : ""}`);
     case "history_report_rejected": {
@@ -151,6 +153,7 @@ export function notificationHref(n: NotificationRow): string {
       return "/account/listings";
     case "listing_submitted":
     case "seller_decided":
+    case "make_suggested":
       return a ? `/admin/auctions/${a}` : "/admin";
     case "premium_due":
       return "/account/purchases";
