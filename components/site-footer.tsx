@@ -1,28 +1,24 @@
 import Link from "next/link";
-import { COMPANY_DETAILS, FOOTER_LINKS } from "@/lib/site";
+import { FooterLinks } from "@/components/footer-links";
+import { COMPANY_DETAILS } from "@/lib/site";
 
+/**
+ * Left: the Biddr wordmark (as in the header) linking home, with the company line
+ * under it. Right: the footer links. Side by side and vertically centred on wider
+ * screens; stacked on phones (logo and company line first, then the links).
+ */
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t border-line bg-panel/40">
-      <div className="container flex flex-col gap-4 py-8 text-sm md:flex-row md:items-center md:justify-between">
-        <nav aria-label="Help and information">
-          <ul className="flex flex-wrap gap-x-2 gap-y-1">
-            {FOOTER_LINKS.map((l) => (
-              <li key={l.label}>
-                {l.href.startsWith("mailto:") ? (
-                  <a href={l.href} className="inline-flex min-h-11 items-center px-2 text-chalk underline-offset-4 hover:underline">
-                    {l.label}
-                  </a>
-                ) : (
-                  <Link href={l.href} className="inline-flex min-h-11 items-center px-2 text-chalk underline-offset-4 hover:underline">
-                    {l.label}
-                  </Link>
-                )}
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <p className="px-2 text-mute">{COMPANY_DETAILS}</p>
+      <div className="container flex flex-col gap-4 py-8 text-sm md:flex-row md:items-center md:justify-between md:gap-8">
+        <div>
+          <Link href="/" className="inline-block font-wide text-lg font-extrabold leading-7 tracking-tight">
+            Biddr<span className="text-signal">.</span>
+            <span className="sr-only">, home</span>
+          </Link>
+          <p className="mt-1.5 text-mute">{COMPANY_DETAILS}</p>
+        </div>
+        <FooterLinks />
       </div>
     </footer>
   );

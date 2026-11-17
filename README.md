@@ -48,6 +48,7 @@ app/
   layout.tsx                    Archivo variable font (wdth axis), skip link, header, footer
   not-found.tsx                 site 404 (Next's default forces black text)
   how-it-works/page.tsx         bidding, card hold, premium, reserve, extensions, badges, selling
+  about/page.tsx                what Biddr is (linked from the menu and the footer)
   terms/, privacy/              placeholders until the legal text is ready
   terms/bidding/page.tsx        bidding terms placeholder, shows the current version
   globals.css                   palette tokens, shadcn variables, .font-wide

@@ -111,6 +111,7 @@ const PUBLIC_PAGES = [
   ["Sign in", "/login"],
   ["Sign in, expired link", "/login?error=link"],
   ["How it works", "/how-it-works"],
+  ["About", "/about"],
   ["Terms", "/terms"],
   ["Privacy", "/privacy"],
   ["Bidding terms", "/terms/bidding"],
@@ -452,10 +453,13 @@ test.describe("newly listed", () => {
 });
 
 test.describe("contextual help", () => {
-  test("home page has no how-it-works strip", async ({ page }) => {
+  test("home page has no how-it-works strip", async ({ page, isMobile }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "How buying works" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "How it works", exact: true }).first()).toBeAttached(); // menu link stays
+    // "How it works" is in the menu only (DECISIONS.md point 8): on phones, inside the Menu.
+    if (isMobile) await page.getByRole("button", { name: "Menu" }).click();
+    await expect(page.getByRole("banner").getByRole("link", { name: "How it works", exact: true }).first()).toBeAttached(); // menu link stays
+    await expect(page.getByRole("contentinfo").getByRole("link", { name: "How it works" })).toHaveCount(0);
   });
 
   test("info tip opens by keyboard, focus moves in, Escape returns focus", async ({ page }) => {
