@@ -210,7 +210,10 @@ test.describe("large photo viewer: phone", () => {
       for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) {
         document.addEventListener(type, (e) => {
           const p = e as PointerEvent;
-          log.push(`${type} ${p.pointerType} ${Math.round(p.clientX)},${Math.round(p.clientY)} ${(p.target as HTMLElement).tagName}`);
+          const t = p.target as HTMLElement;
+          if (type === "pointermove") return;
+          const stack = document.elementsFromPoint(p.clientX, p.clientY).slice(0, 4).map((el) => `${el.tagName}[${el.getAttribute("aria-label") ?? el.className.toString().slice(0, 40)}]`);
+          log.push(`${type} ${p.pointerType} ${Math.round(p.clientX)},${Math.round(p.clientY)} target=${t.tagName}[${t.getAttribute("aria-label")}] inViewer=${Boolean(t.closest("[data-photo-viewer]"))} stack=${stack.join(" > ")}`);
         }, true);
       }
     });
