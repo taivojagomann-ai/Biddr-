@@ -2,6 +2,7 @@ import type Stripe from "stripe";
 import { getAdminSupabase } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
 import { markHoldAuthorized } from "@/lib/holds";
+import { finishWithPaymentIntent } from "@/lib/settlement";
 
 export const runtime = "nodejs";
 
@@ -79,7 +80,13 @@ async function handle(admin: ReturnType<typeof getAdminSupabase>, event: Stripe.
       );
       break;
     case "payment_intent.succeeded":
-      check((await admin.from("bid_holds").update({ status: "captured" }).eq("stripe_payment_intent_id", event.data.object.id)).error);
+      if (event.data.object.metadata?.kind === "buyer_premium") {
+        // The winner paid the premium (on the site or off-session): mark it paid.
+        const pi = await stripe.paymentIntents.retrieve(event.data.object.id, { expand: ["latest_charge"] });
+        await finishWithPaymentIntent(admin, pi);
+      } else {
+        check((await admin.from("bid_holds").update({ status: "captured" }).eq("stripe_payment_intent_id", event.data.object.id)).error);
+      }
       break;
     default:
       break;

@@ -38,9 +38,19 @@ Supabase Postgres (source of truth)
 ### Stripe hold: things to know before launch
 
 - **Card authorizations expire after about 7 days.** Keep auctions at 7 days or less, or re-authorize before expiry. The PaymentIntent uses `setup_future_usage: "off_session"`, so the saved card can also be charged off-session for the premium if the hold has lapsed.
-- The winner's hold is kept by the release job. Charging the buyer's premium (capture the €500 and charge the rest, or cancel and charge the full premium) is phase 2.
+- The winner's hold is kept by the release job and used for the buyer's premium (see "Paying for a won car").
 - Webhook events to enable: `payment_intent.amount_capturable_updated`, `payment_intent.canceled`, `payment_intent.payment_failed`, `payment_intent.succeeded`. Every event is stored by id in `stripe_events` and handled once; failures are kept there with the error and shown in the admin's **Payments** section on each auction.
 - **Test mode:** while `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` starts with `pk_test_`, every page shows a yellow "Test mode: no real payments. Use Stripe test cards." banner. It never shows with live keys.
+
+### Paying for a won car
+
+DECISIONS.md point 12. The car is paid to the seller outside Biddr; the buyer's premium (5%, €350–€3,500, `buyers_premium()`) is the only payment to Biddr.
+
+- **Settlement** (`lib/settlement.ts`, `/api/stripe/settle`, called when an auction is sold and every 5 minutes): captures min(premium, €500) from the winner's hold (partial capture), then charges any rest off-session to the card saved with the hold (`setup_future_usage: "off_session"`). If the hold expired or was released, the whole premium is charged to that card. Each attempt claims the row first and Stripe calls carry idempotency keys, so nothing is charged twice.
+- **Outcomes:** `paid` (receipt stored; winner and seller notified), `action_required` (the bank wants the winner to confirm: 72 hours, `premium_due` notification), `failed` (reason stored; winner and admins notified). The winner pays `action_required` and `failed` premiums on **My purchases** → Complete payment (Stripe Payment Element, 3-D Secure; `/api/stripe/premium/intent` and `/confirm`, plus the `payment_intent.succeeded` webhook as backstop).
+- **Contact exchange:** after `paid`, My purchases shows the seller's full name, phone and email and My listings shows the winner's (`lib/contacts.ts`, read on the server for the two parties only).
+- **Admin → Payments** (`/admin/payments`): every premium with status filters, Stripe links, **Retry charge**, **Mark as cancelled** (with a reason) and **Refund premium** (Stripe refund of both parts, after a confirmation). All logged in `admin_actions`.
+- **Tests:** stripe-mock can't act out captures or declines, so with `E2E_STRIPE_MOCK=true` (test keys only) `lib/stripe-sim.ts` answers for the test's own `pi_e2e_…`/`pm_e2e_…` ids. It is never used with real Stripe.
 
 ### Scheduled jobs
 
@@ -206,6 +216,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0016_seller_inspection_decision.sql` | The seller's choice after a rejected dealer report: `seller_decision_required`, `seller_decision_deadline`, `seller_decision` and `seller_decision_at` on `auction_private`, the `seller_inspection_decision` function (signed-in users only), a daily `pg_cron` job (`inspection-decision-deadlines`, 06:41 UTC) that reminds the seller 7 days before the deadline and withdraws the listing once it passes, and three notification types | Run before deploying this version (Reject report, My listings and the daily job use it) |
 | `0017_inspected_by_seller.sql` | `inspected_by_seller` on `auction_private` and `auctions`: the admin confirms a dealer seller inspected its own car, and the listing says "Inspected by the selling dealer" | Run before deploying this version (the admin review and auction page read it) |
 | `0018_eu_countries.sql` | All 27 EU countries: adds them to the country type used by profiles and car locations, and widens the registration-country check (old `other_eu` values stay valid) | Run before deploying this version (profile, sell form and filters offer every EU country) |
+| `0022_buyer_payments.sql` | `buyer_payments` (one row per sold auction: winning bid, premium, what came from the hold, the rest, status, due date, receipt; winner and seller read their own row, no browser writes), a trigger that creates the row when an auction is sold and calls the settlement job, a `pg_cron` job retrying it every 5 minutes, and the `premium_due`, `premium_paid` and `premium_failed` notification types | Run before deploying this version (needs 0021 and its Vault secrets) |
 | `0021_payments_scheduling.sql` | Stripe webhook event log (`stripe_events`, service role only) and `call_app_job()`, which lets `pg_cron` call the site's protected job routes through `pg_net`; the card-hold release runs every 5 minutes | Run before deploying this version, then add the two Vault secrets (see "Scheduled jobs") |
 | `0020_history_reports.sql` | Vehicle history reports (carVertical): the seller's files, share link, sharing permission and Biddr's review on `auction_private`; `history_report_verified`, `history_summary` (2–8 lines, 200 characters each) and `history_report_public_link` (only when sharing is allowed) on `auctions`; the `history_report_rejected` notification type | Run before deploying this version (the sell form, admin review and auction page use it) |
 | `0019_admin_two_factor.sql` | `is_admin()` is true only after two-step verification (`aal2`), so admin rights in the database need the authenticator code too | Run when deploying this version (admins then sign in with Google and a code) |
