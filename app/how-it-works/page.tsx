@@ -195,9 +195,14 @@ export default function HowItWorksPage() {
         <section aria-labelledby="after-you-win">
           <H2 id="after-you-win">After you win</H2>
           <p>
-            When the clock runs out with your bid on top and the reserve met, the auction shows <strong>Sold</strong>. We put
-            you in touch with the seller: you pay for the car directly to the seller and arrange the handover with them.
-            Biddr only charges the buyer&apos;s premium, and your {formatEur(HOLD_EUR)} hold goes toward it.
+            When the clock runs out with your bid on top and the reserve met, the auction shows <strong>Sold</strong>. Biddr
+            then charges the buyer&apos;s premium: up to {formatEur(HOLD_EUR)} comes from your card hold, and any rest is
+            charged to the same card. If your bank asks you to confirm the payment, you have 72 hours to do it on{" "}
+            <strong>My purchases</strong>.
+          </p>
+          <p>
+            Once the premium is paid, you and the seller see each other&apos;s name, phone and email. You pay for the car
+            directly to the seller and arrange the handover with them.
           </p>
           <p>If the reserve isn&apos;t met, the car doesn&apos;t sell and your hold is released.</p>
         </section>

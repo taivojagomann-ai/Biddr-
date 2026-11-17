@@ -7,6 +7,7 @@ import { ChevronDown, LogOut } from "lucide-react";
 export const ACCOUNT_LINKS = [
   { label: "Profile", href: "/account/setup" },
   { label: "My listings", href: "/account/listings" },
+  { label: "My purchases", href: "/account/purchases" },
   { label: "Watchlist", href: "/account/watchlist" },
   { label: "Notifications", href: "/account/notifications" },
 ] as const;

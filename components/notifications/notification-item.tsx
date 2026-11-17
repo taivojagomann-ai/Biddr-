@@ -4,6 +4,7 @@ import {
   AlarmClock,
   CheckCircle2,
   CircleSlash,
+  CreditCard,
   Eye,
   FileWarning,
   FileX,
@@ -43,6 +44,9 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   inspection_decision_reminder: AlarmClock,
   inspection_decision_expired: CircleSlash,
   history_report_rejected: FileWarning,
+  premium_due: CreditCard,
+  premium_paid: CheckCircle2,
+  premium_failed: CreditCard,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { simulateStripe } from "./stripe-sim";
 
 /**
  * End-to-end tests only: E2E_STRIPE_MOCK=true points the client at the local
@@ -16,7 +17,11 @@ if (useStripeMock && !process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) {
  * PaymentIntent create (a stripe-mock limitation, not a Stripe one), so the mock
  * client leaves that one field out. Real Stripe always gets the full request.
  */
-const mockFetch: typeof fetch = (input, init) => {
+const mockFetch: typeof fetch = async (input, init) => {
+  // Test-only cases stripe-mock can't act out (captures, declines, 3-D Secure): lib/stripe-sim.ts.
+  const url = new URL(String(input));
+  const simulated = simulateStripe(init?.method ?? "GET", url, new URLSearchParams(typeof init?.body === "string" ? init.body : ""));
+  if (simulated) return simulated;
   if (typeof init?.body === "string" && String(input).endsWith("/v1/payment_intents")) {
     const params = new URLSearchParams(init.body);
     for (const key of Array.from(params.keys())) if (key.startsWith("payment_method_types")) params.delete(key);
@@ -41,3 +46,9 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export const HOLD_AMOUNT_EUR = Number(process.env.BID_HOLD_AMOUNT_EUR ?? 500);
+
+/** Link to a payment in the Stripe dashboard (the test-mode dashboard while test keys are used). */
+export function stripeDashboardUrl(paymentIntentId: string): string {
+  const test = !process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_");
+  return `https://dashboard.stripe.com/${test ? "test/" : ""}payments/${encodeURIComponent(paymentIntentId)}`;
+}

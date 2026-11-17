@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { TestModeBanner } from "@/components/test-mode-banner";
 import { siteUrl, SITE_INTRO } from "@/lib/site";
 import "./globals.css";
 
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to main content
         </a>
+        <TestModeBanner />
         <SiteHeader />
         <div id="content" tabIndex={-1} className="flex-1 outline-none">
           {children}

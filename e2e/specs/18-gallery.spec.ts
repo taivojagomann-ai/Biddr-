@@ -200,11 +200,28 @@ test.describe("large photo viewer: phone", () => {
     expect(close.x + close.width).toBeGreaterThan(page.viewportSize()!.width - 60);
     expect(close.y).toBeLessThan(60);
 
-    // Swipe left: next photo.
+    // Swipe left: next photo. (Once the photo has loaded and the viewer has settled.)
+    await expect(page.locator("[data-viewer-stage] img")).toHaveAttribute("data-loaded", "");
+    await page.waitForTimeout(300);
     const st = await centre(page, "[data-viewer-stage]");
     const swipeLeft = [[{ x: st.x + 120, y: st.y }, { x: st.x - 120, y: st.y }]];
+    await page.evaluate(() => {
+      const log: string[] = ((window as unknown as { __pointerLog: string[] }).__pointerLog = []);
+      for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) {
+        document.addEventListener(type, (e) => {
+          const p = e as PointerEvent;
+          log.push(`${type} ${p.pointerType} ${Math.round(p.clientX)},${Math.round(p.clientY)} ${(p.target as HTMLElement).tagName}`);
+        }, true);
+      }
+    });
     await touchPath(cdp, swipeLeft);
-    await expect(dialog.locator("header")).toContainText("Exterior 3 / 3");
+    try {
+      await expect(dialog.locator("header")).toContainText("Exterior 3 / 3");
+    } catch (e) {
+      // What the page received, to tell a missed swipe from a slow one.
+      console.log(await page.evaluate(() => (window as unknown as { __pointerLog: string[] }).__pointerLog.join("\n")));
+      throw e;
+    }
 
     // Pinch out: zooms in. Swiping while zoomed pans and keeps the photo.
     await touchPath(cdp, [

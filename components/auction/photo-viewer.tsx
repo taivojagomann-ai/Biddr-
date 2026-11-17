@@ -150,7 +150,7 @@ export function PhotoViewer({
 
   // Touch, pen and mouse: swipe, pinch, double-tap, drag to pan.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const drag = useRef<{ start: { x: number; y: number }; from: View; moved: number; type: string; pinched: boolean } | null>(null);
+  const drag = useRef<{ start: { x: number; y: number }; last: { x: number; y: number }; from: View; moved: number; type: string; pinched: boolean } | null>(null);
   const pinch = useRef<{ dist: number; mid: { x: number; y: number }; from: View } | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
 
@@ -171,7 +171,7 @@ export function PhotoViewer({
       if (drag.current) drag.current.pinched = true;
       setSwipe({ dx: 0, dy: 0 });
     } else if (pointers.current.size === 1) {
-      drag.current = { start: point(e), from: viewRef.current, moved: 0, type: e.pointerType, pinched: false };
+      drag.current = { start: point(e), last: point(e), from: viewRef.current, moved: 0, type: e.pointerType, pinched: false };
     }
   }
 
@@ -200,6 +200,7 @@ export function PhotoViewer({
     }
     const d = drag.current;
     if (!d) return;
+    d.last = p;
     const dx = p.x - d.start.x;
     const dy = p.y - d.start.y;
     d.moved = Math.max(d.moved, Math.hypot(dx, dy));
@@ -219,7 +220,7 @@ export function PhotoViewer({
       // One finger lifted from a pinch: the other one carries on panning.
       pinch.current = null;
       const [rest] = [...pointers.current.values()];
-      if (drag.current) drag.current = { ...drag.current, start: rest!, from: viewRef.current };
+      if (drag.current) drag.current = { ...drag.current, start: rest!, last: rest!, from: viewRef.current };
       return;
     }
     if (pointers.current.size > 0) return;
@@ -231,8 +232,10 @@ export function PhotoViewer({
     if (!d) return;
     if (viewRef.current.s < 1.02 && viewRef.current.s !== 1) setView(FIT);
     if (d.pinched) return;
-    const dx = p.x - d.start.x;
-    const dy = p.y - d.start.y;
+    // Where the finger last moved to: a lifted touch can report a stale position.
+    const end = d.moved > 10 ? d.last : p;
+    const dx = end.x - d.start.x;
+    const dy = end.y - d.start.y;
 
     if (d.from.s <= 1.01 && d.type !== "mouse") {
       if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) return go(dx < 0 ? 1 : -1);
@@ -352,6 +355,7 @@ export function PhotoViewer({
               alt={photo.alt}
               draggable={false}
               data-scale={view.s.toFixed(2)}
+              data-loaded={natural ? "" : undefined}
               onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               className={cn(
                 "absolute inset-0 h-full w-full object-contain",
