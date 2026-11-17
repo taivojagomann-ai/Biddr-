@@ -1,5 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { INSPECTION_BUCKET } from "@/lib/admin-schemas";
 import { addDays, fromZonedInputs, toZonedInputs } from "@/lib/zoned-time";
@@ -49,10 +51,19 @@ const BIDDERS: DemoPerson[] = [
 // -----------------------------------------------------------------------------
 // Cars and scenarios
 // -----------------------------------------------------------------------------
-type Scenario = "closing_soon" | "reserve_not_met_yet" | "no_reserve_no_bids" | "upcoming" | "sold" | "ended_below_reserve";
+type Scenario =
+  | "closing_soon"
+  | "reserve_not_met_yet"
+  | "no_reserve_no_bids"
+  | "live_reserve_met"
+  | "upcoming"
+  | "sold"
+  | "ended_below_reserve";
 
 interface CarSpec {
   scenario: Scenario;
+  /** Real photo of this car in lib/demo/photos/ (WebP, no metadata): the cover, i.e. the first exterior photo. */
+  cover: string;
   make: string;
   model: string;
   variant: string;
@@ -118,7 +129,7 @@ const DEMO_MERCEDES_SELLER = { name: "Demo Mercedes-Benz Centre (demo)", code: "
 
 const CARS: CarSpec[] = [
   {
-    scenario: "closing_soon", make: "BMW", model: "M2", variant: "Competition", year: 2020, wmi: "WBS",
+    scenario: "closing_soon", cover: "bmw-m2-competition.webp", make: "BMW", model: "M2", variant: "Competition", year: 2020, wmi: "WBS",
     mileageKm: 42_800, engine: "3.0 inline-6 twin-turbo, 410 hp", transmission: "6-speed manual", drivetrain: "RWD",
     color: "Hockenheim Silver", city: "Tallinn", country: "EE", dealer: DEMO_BMW_TALLINN, condition: "clean",
     damageSummary: null, startingBid: 38_000, bids: 21,
@@ -154,16 +165,16 @@ const CARS: CarSpec[] = [
     },
   },
   {
-    scenario: "reserve_not_met_yet", make: "Audi", model: "RS6", variant: "Avant", year: 2021, wmi: "WUA",
+    scenario: "reserve_not_met_yet", cover: "audi-rs6-avant.webp", make: "Audi", model: "RS6", variant: "Avant", year: 2021, wmi: "WUA",
     mileageKm: 31_500, engine: "4.0 V8 twin-turbo, 600 hp", transmission: "8-speed automatic", drivetrain: "AWD",
-    color: "Nardo Grey", city: "Riga", country: "LV", dealer: DEMO_AUDI_RIGA, condition: "clean",
+    color: "Mythos Black", city: "Riga", country: "LV", dealer: DEMO_AUDI_RIGA, condition: "clean",
     damageSummary: null, startingBid: 88_000, bids: 6,
     highlights: ["Full Audi service history", "Brake discs and pads at 70%", "Air suspension holds height overnight"],
     listing: {
       bodyStyle: "estate", interior: "Black Valcona leather with honeycomb stitching", owners: 1, dealer: null,
       registration: "LV", registered: true,
-      highlights: ["One owner from new", "Dynamic package with the 280 km/h limit", "Full Audi service history", "Panoramic roof and Bang & Olufsen sound"],
-      equipment: ["Bang & Olufsen 3D sound", "Panoramic glass roof", "Head-up display", "Matrix LED headlights", "Four-zone climate control", "Tow bar, electric"],
+      highlights: ["One owner from new", "Dynamic package with the 280 km/h limit", "Black optic package with 22-inch wheels", "Full Audi service history"],
+      equipment: ["Black optic package", "22-inch 5-V-spoke wheels", "Bang & Olufsen 3D sound", "Panoramic glass roof", "Head-up display", "HD Matrix LED headlights with laser light", "Four-zone climate control", "Tow bar, electric"],
       modifications: "none",
       flaws: ["Small scratch on the rear bumper from loading"],
       service: [
@@ -177,9 +188,9 @@ const CARS: CarSpec[] = [
     },
   },
   {
-    scenario: "no_reserve_no_bids", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
+    scenario: "no_reserve_no_bids", cover: "porsche-911-carrera-s.webp", make: "Porsche", model: "911", variant: "Carrera S", year: 2019, wmi: "WP0",
     mileageKm: 24_900, engine: "3.0 flat-6 twin-turbo, 450 hp", transmission: "8-speed PDK", drivetrain: "RWD",
-    color: "Gentian Blue", city: "Vilnius", country: "LT", dealer: null, condition: "restored_accident",
+    color: "Jet Black Metallic", city: "Vilnius", country: "LT", dealer: null, condition: "restored_accident",
     // Shows an accident-repaired car listed without an inspection.
     damageSummary:
       "Rear-right impact while parked in 2022. Rear bumper and right rear quarter panel repaired and repainted at an independent body shop in Vilnius. No structural damage according to the shop. Airbags did not deploy.",
@@ -189,7 +200,7 @@ const CARS: CarSpec[] = [
       bodyStyle: "coupe", interior: "Black leather with Chalk stitching", owners: 2, dealer: null,
       registration: "LT", registered: true,
       highlights: ["No reserve", "Sport Chrono package and sports exhaust", "Rear-axle steering", "PDK serviced at 20,000 km"],
-      equipment: ["Sport Chrono package", "Sports exhaust", "Rear-axle steering", "BOSE sound", "Front axle lift", "Adaptive sports seats Plus", "LED Matrix headlights"],
+      equipment: ["Sport Chrono package", "Sports exhaust", "Rear-axle steering", "20/21-inch RS Spyder Design wheels in Platinum", "BOSE sound", "Front axle lift", "Adaptive sports seats Plus", "LED Matrix headlights"],
       modifications: "none",
       flaws: ["Slight orange peel on the repainted rear quarter panel"],
       service: [
@@ -203,19 +214,19 @@ const CARS: CarSpec[] = [
     },
   },
   {
-    scenario: "upcoming", make: "Mercedes-AMG", model: "C63 S", variant: "Coupe", year: 2018, wmi: "WDD",
-    mileageKm: 58_700, engine: "4.0 V8 twin-turbo, 510 hp", transmission: "9-speed automatic", drivetrain: "RWD",
-    color: "Selenite Grey", city: "Tartu", country: "EE", dealer: DEMO_MERCEDES_TARTU, condition: "clean",
+    scenario: "upcoming", cover: "mercedes-amg-c63-s.webp", make: "Mercedes-AMG", model: "C63 S", variant: "Saloon", year: 2017, wmi: "WDD",
+    mileageKm: 58_700, engine: "4.0 V8 biturbo, 510 hp", transmission: "7-speed AMG Speedshift MCT", drivetrain: "RWD",
+    color: "designo Hyacinth Red Metallic", city: "Tartu", country: "EE", dealer: DEMO_MERCEDES_TARTU, condition: "clean",
     // Shows a dealer seller that inspected its own car.
     inspectedBySeller: true,
     damageSummary: null, startingBid: 52_000, bids: 0,
     highlights: ["Spark plugs and coils replaced at 55,000 km", "Rear tyres new in 2026", "No oil leaks found"],
     listing: {
-      bodyStyle: "coupe", interior: "Black Nappa leather with red stitching", owners: 3, dealer: DEMO_MERCEDES_SELLER,
+      bodyStyle: "sedan", interior: "Black Nappa leather with red stitching", owners: 3, dealer: DEMO_MERCEDES_SELLER,
       registration: "EE", registered: true,
-      highlights: ["510 hp twin-turbo V8", "AMG Performance seats", "Panoramic roof", "Spark plugs and coils done at 55,000 km"],
-      equipment: ["AMG Performance seats", "Burmester sound", "Panoramic roof", "AMG Ride Control", "Keyless entry", "360-degree camera"],
-      modifications: ["Remus valved exhaust", "Tinted rear windows"],
+      highlights: ["510 hp V8 biturbo in the four-door body", "AMG Performance seats", "Red AMG brake callipers and 19-inch forged wheels", "Spark plugs and coils done at 55,000 km"],
+      equipment: ["AMG Performance seats", "AMG forged cross-spoke wheels in matt black", "AMG brakes with red callipers", "Burmester sound", "Panoramic roof", "AMG Ride Control", "Keyless entry", "360-degree camera"],
+      modifications: ["Remus valved exhaust", "Carbon fibre front splitter and side skirt trims", "Tinted rear windows"],
       flaws: ["Rear tyres new, front tyres at about 4 mm", "Light scratches on the centre console trim"],
       service: [
         ["2019-04", 14_500, "Service A", "Mercedes-Benz Tallinn"],
@@ -229,9 +240,9 @@ const CARS: CarSpec[] = [
     },
   },
   {
-    scenario: "sold", make: "BMW", model: "M3", variant: "Competition", year: 2022, wmi: "WBS",
+    scenario: "sold", cover: "bmw-m3-competition.webp", make: "BMW", model: "M3", variant: "Competition", year: 2022, wmi: "WBS",
     mileageKm: 19_800, engine: "3.0 inline-6 twin-turbo, 510 hp", transmission: "8-speed automatic", drivetrain: "RWD",
-    color: "Isle of Man Green", city: "Kaunas", country: "LT", dealer: DEMO_BMW_VILNIUS, condition: "restored_accident",
+    color: "Brooklyn Grey", city: "Kaunas", country: "LT", dealer: DEMO_BMW_VILNIUS, condition: "restored_accident",
     damageSummary:
       "Front-left impact at low speed in 2024. Bonnet, left wing, headlight and radiator replaced with new BMW parts at a main-dealer body shop. Airbags did not deploy. Wheel alignment checked after the repair.",
     startingBid: 62_000, bids: 17,
@@ -254,9 +265,38 @@ const CARS: CarSpec[] = [
     },
   },
   {
-    scenario: "ended_below_reserve", make: "Audi", model: "RS3", variant: "Sportback", year: 2017, wmi: "WUA",
+    scenario: "live_reserve_met", cover: "audi-a5-coupe.webp", make: "Audi", model: "A5", variant: "Coupe 2.0 TFSI quattro", year: 2014, wmi: "WAU",
+    mileageKm: 96_300, engine: "2.0 inline-4 turbo, 225 hp", transmission: "7-speed S tronic", drivetrain: "AWD",
+    color: "Phantom Black", city: "Espoo", country: "FI", dealer: null, condition: "clean",
+    damageSummary: null, startingBid: 12_000, bids: 8,
+    highlights: [],
+    listing: {
+      bodyStyle: "coupe", interior: "Black Alcantara and leather sports seats", owners: 2, dealer: null,
+      registration: "FI", registered: true,
+      highlights: [
+        "S line Black Edition with 19-inch rotor wheels",
+        "quattro all-wheel drive with the 7-speed S tronic",
+        "Timing chain and tensioner replaced at 88,000 km",
+        "Two owners, full service history",
+      ],
+      equipment: ["S line Black Edition styling", "19-inch rotor-design wheels", "Xenon plus headlights with LED daytime lights", "Sports seats in Alcantara and leather", "Bang & Olufsen sound", "Parking sensors front and rear", "Cruise control"],
+      modifications: "none",
+      flaws: ["Light swirl marks in the black paint", "Small scuff on the front left wheel", "Driver's seat bolster slightly worn"],
+      service: [
+        ["2016-05", 31_200, "Oil service", "Audi Espoo"],
+        ["2018-05", 52_800, "Oil service, S tronic fluid", "Audi Espoo"],
+        ["2020-06", 70_400, "Oil service, spark plugs"],
+        ["2022-09", 88_100, "Timing chain and tensioner, oil service", "Audi Espoo"],
+        ["2025-04", 95_700, "Oil service, front brake pads, brake fluid"],
+      ],
+      included: ["Two keys", "Winter tyres on 18-inch wheels", "Service book and invoices"],
+      notes: "A well-kept everyday coupe. Winter tyres on separate wheels come with it.",
+    },
+  },
+  {
+    scenario: "ended_below_reserve", cover: "audi-rs3-sportback.webp", make: "Audi", model: "RS3", variant: "Sportback", year: 2017, wmi: "WUA",
     mileageKm: 67_400, engine: "2.5 inline-5 turbo, 400 hp", transmission: "7-speed S tronic", drivetrain: "AWD",
-    color: "Catalunya Red", city: "Pärnu", country: "EE", dealer: DEMO_AUDI_HELSINKI, condition: "clean",
+    color: "Ara Blue Crystal", city: "Pärnu", country: "EE", dealer: DEMO_AUDI_HELSINKI, condition: "clean",
     damageSummary: null, startingBid: 29_000, bids: 9,
     highlights: ["S tronic oil changed at 60,000 km", "Haldex serviced", "Small stone chips on the bonnet"],
     listing: {
@@ -281,6 +321,13 @@ const CARS: CarSpec[] = [
     },
   },
 ];
+
+/**
+ * Real cover photos, one per demo car (WebP, longest edge 2000 px, no metadata).
+ * Read at load time, so next.config.mjs includes this folder in the admin's server
+ * bundle (outputFileTracingIncludes).
+ */
+const DEMO_PHOTOS_DIR = join(process.cwd(), "lib", "demo", "photos");
 
 const PHOTO_SET = [
   ...[1, 2, 3, 4, 5, 6].map((n) => ({ section: "exterior", n, caption: `EXTERIOR ${n}` })),
@@ -334,6 +381,10 @@ function scheduleFor(scenario: Scenario, now: number): Schedule {
       const endsAt = now + 3 * DAY;
       return { status: "live", startsAt: endsAt - week, endsAt };
     }
+    case "live_reserve_met": {
+      const endsAt = now + 4 * DAY + 6 * HOUR;
+      return { status: "live", startsAt: endsAt - week, endsAt };
+    }
     case "upcoming":
       // Tomorrow 12:00 to 20:00 seven days from today: the same shape as the admin
       // preset, and within the 7-day card-hold limit.
@@ -353,6 +404,7 @@ function scheduleFor(scenario: Scenario, now: number): Schedule {
 function reserveFor(scenario: Scenario, startingBid: number, finalBid: number | null): number | null {
   switch (scenario) {
     case "closing_soon":
+    case "live_reserve_met":
     case "sold":
       return Math.max(startingBid, floorTo((finalBid ?? startingBid) * 0.9, 500)); // met
     case "reserve_not_met_yet":
@@ -461,10 +513,11 @@ export async function loadDemoData(db: SupabaseClient): Promise<DemoSummary> {
       const set = PHOTO_SET.filter((p) => p.section !== "before" || restored);
       const urls: Record<string, string[]> = { exterior: [], interior: [], mechanical: [], before: [] };
       const uploads = set.map((p) => ({ ...p, path: `${DEMO_FOLDER}/${id}/${p.section}/${p.n}.webp` }));
+      // The car's real photo is the cover (first exterior photo); the rest are placeholders.
+      const cover = await readFile(join(DEMO_PHOTOS_DIR, car.cover));
       await inBatches(uploads, 8, async (u) => {
-        const { error } = await db.storage
-          .from(PHOTO_BUCKET)
-          .upload(u.path, photos.get(`${u.section}-${u.n}`)!, { contentType: "image/webp", upsert: true });
+        const body = u.section === "exterior" && u.n === 1 ? cover : photos.get(`${u.section}-${u.n}`)!;
+        const { error } = await db.storage.from(PHOTO_BUCKET).upload(u.path, body, { contentType: "image/webp", upsert: true });
         if (error) fail(`Uploading ${u.path}`, error);
       });
       for (const u of uploads) urls[u.section]!.push(db.storage.from(PHOTO_BUCKET).getPublicUrl(u.path).data.publicUrl);

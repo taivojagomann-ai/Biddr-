@@ -108,7 +108,7 @@ lib/
   admin-schemas.ts              admin zod schemas, tabs and labels (client + server)
   zoned-time.ts                 date + time in a given time zone <-> UTC, and display with the zone abbreviation
   countries.ts                  the 27 EU countries
-  demo/                         demo data: seed/remove, placeholder photos and PDF, bid generator
+  demo/                         demo data: seed/remove, cover photos (demo/photos/), placeholder photos and PDF, bid generator
   site.ts                       footer links, support email and company placeholders
   bidder.ts                     server-only: bidder_status() check used by the hold route
   notifications.ts              notification wording, links and select columns (client + server)
@@ -389,7 +389,7 @@ The search box above the tabs replaces the old Make filter. It searches make, mo
 
 ## Demo data (for testing)
 
-The admin panel can fill the site with six example auctions, with bids, comments and placeholder photos, and remove them again with one click. Use it to try the site before real cars are listed.
+The admin panel can fill the site with seven example auctions, with bids, comments and photos, and remove them again with one click. Each car's cover (its first exterior photo) is a real photo of that model from `lib/demo/photos/` (WebP, no metadata); the other photos are generated "Demo photo" placeholders. Use it to try the site before real cars are listed.
 
 ### Turn it on
 1. Run `supabase/migrations/0006_demo_data.sql` in the Supabase SQL Editor (once).
@@ -397,15 +397,16 @@ The admin panel can fill the site with six example auctions, with bids, comments
 3. Sign in as an admin and open **Admin**. The **Demo data** panel is at the bottom of the page.
 
 ### Use it
-- **Load demo data** creates 1 demo seller and 5 demo bidders, and six auctions marked "Demo":
-  - live and closing in 12 minutes, 21 bids, reserve met;
-  - live, ending in 26 hours, 6 bids, reserve not met yet;
-  - live with no reserve and no bids (a restored car listed without an inspection, so the "Not inspected" state is visible);
-  - scheduled for tomorrow 12:00 (sold by a fictional Mercedes-Benz dealer that inspected the car itself, so "Inspected by the selling dealer" is visible);
-  - sold yesterday (a restored car with an accepted dealer inspection, before photos and a public demo report PDF);
-  - ended 3 days ago below its reserve.
+- **Load demo data** creates 1 demo seller and 5 demo bidders, and seven auctions marked "Demo":
+  - live and closing in 12 minutes, 21 bids, reserve met (BMW M2 Competition);
+  - live, ending in 26 hours, 6 bids, reserve not met yet (Audi RS6 Avant);
+  - live with no reserve and no bids (Porsche 911 Carrera S: a restored car listed without an inspection, so the "Not inspected" state is visible);
+  - live, ending in about 4 days, 8 bids, reserve met (Audi A5 Coupe, listed without an inspection);
+  - scheduled for tomorrow 12:00 (Mercedes-AMG C63 S, sold by a fictional Mercedes-Benz dealer that inspected the car itself, so "Inspected by the selling dealer" is visible);
+  - sold yesterday (BMW M3 Competition, a restored car with an accepted dealer inspection, before photos and a public demo report PDF);
+  - ended 3 days ago below its reserve (Audi RS3 Sportback).
 
-  Every car except the restored Porsche has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre", "Demo Audi Centre" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
+  Every car except the restored Porsche and the A5 has an accepted inspection from a clearly fictional dealer ("Demo BMW Centre", "Demo Audi Centre" and so on), with a placeholder report in the private bucket so the admin review panel can be tried.
 
   The demo users have `@biddr.invalid` emails and no passwords, so nobody can sign in as them.
 - **Reset demo data** (shown once demo data exists) removes it and creates it again with times relative to now. Demo auctions close on their own like real ones (the 12-minute one closes first), so reset whenever you need the live states back.
