@@ -251,6 +251,7 @@ Signed-in members with a complete profile (username and country) submit a car in
   - The Details step collects highlights (3 to 10), equipment, modifications (or "factory specification"), known flaws (or "not aware of any flaws"), service history rows (month, mileage, work, workshop), items included and seller notes.
   - Every list allows at most 40 items of 300 characters each; the database enforces the same limits (`0007`).
   - Drafts saved before the Details step existed open on that step.
+- **Full-screen photos** (`components/auction/photo-viewer.tsx`): clicking or tapping a gallery photo, or its "Click to enlarge" button, opens it full screen at full resolution. It goes through every section in order, zooms (click, wheel, pinch, double-tap or the buttons), and the back button closes it (it adds `#photo-<n>` to the address). No database changes.
 - **The auction page** shows, under the gallery: highlights, the inspection, specifications, equipment, modifications, known flaws, service history (a table, newest first), items included, seller notes, then the video. Empty optional sections are hidden, and lists longer than 8 items get a "Show all" button.
 - `/account/listings` shows the member's own listings with their status. The header links to it as "My listings".
 
