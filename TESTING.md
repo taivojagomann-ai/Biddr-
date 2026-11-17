@@ -113,5 +113,6 @@ Tips:
 | 13 | `13-accessibility` | axe (WCAG 2.2 AA) on every page at desktop and phone size, and the bid and sell flows done with the keyboard only |
 | 14 | `14-demo-data` | Loading and removing demo data in the admin. It removes every demo listing, so it runs alone after all other tests (the `after-all` project) |
 | 15 | `15-history-reports` | Vehicle history reports (carVertical): the optional sell-form question, file and link rules, admin accept (checklist and summary) and reject, the badge, tip and summary, the share link only with permission, the seller's response to a rejection, the no-report notice with Copy VIN, the older-car note, database rules |
+| 18 | `18-gallery` | The photo gallery and the large photo viewer: arrows, thumbnails and keys, counter and thumbnail sync, tabs starting at the first photo; the viewer by click, tap and Enter, through every section, zoom by click, wheel, pinch, double-tap and buttons, panning while zoomed, closing with Close, Escape, swipe down and the back button, focus returning to the photo; nothing overflowing at 390 and 320 px |
 
 No tests are marked `test.fixme` today. When a test finds a gap that needs a product decision or a feature that isn't built yet, mark it `test.fixme` with a comment saying why.

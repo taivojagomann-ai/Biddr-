@@ -49,6 +49,7 @@ The automated suite (`npm run test:a11y`) runs 110 checks, desktop and phone. Al
 | 1.4.1 Use of colour | The highest bid in the history was marked only by colour | A "Highest" tag. |
 | 2.4.1 Bypass blocks | No skip link | "Skip to main content" is the first focusable element. |
 | 1.1.1 Text alternatives | Card photos repeated the title next to them | `alt=""` on those. Gallery photos keep descriptive alt text. |
+| 2.5.1 / 2.5.7 Pointer gestures and dragging | The new photo gallery and viewer use swipes, pinches and drags | Each has a single-click or key alternative: Previous/Next buttons and ←/→ for swipes; Zoom in/out buttons, +/− and a click or double-tap for pinch and wheel; Close and Escape for swipe down. A zoomed photo follows the mouse, or zoom in at the point you want, so panning needs no dragging; ←↑→↓ move around it from the keyboard. |
 | Other | Next's built-in 404 page forced black text; the countdown's `aria-label` hid the time from screen readers | A custom 404 page; the label is removed. |
 
 ## Known gaps

@@ -83,7 +83,10 @@ Use at least one iPhone (Safari) and one Android phone (Chrome).
    - [ ] Two cards per row, no sideways scrolling.
    - [ ] The tabs scroll sideways if they don't fit.
 2. Auction page:
-   - [ ] Photos swipe.
+   - [ ] Photos swipe sideways with the finger, and scrolling the page up and down over a photo still works.
+   - [ ] Tapping a photo opens the large viewer. Swipe between photos, pinch and double-tap to zoom, move around a zoomed photo with one finger, swipe down to close.
+   - [ ] The phone's back button (Android) or back swipe (iPhone) closes the viewer and stays on the car.
+   - [ ] The viewer's close button isn't under the notch or the status bar.
    - [ ] The sticky **Place bid** bar doesn't cover the last part of the page.
    - [ ] The countdown ticks.
 3. Bid dialog:
