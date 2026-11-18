@@ -117,8 +117,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: { f
                   {rows.map((r) => (
                     <tr key={r.id} className="border-t border-line align-top">
                       <td className="py-2 pr-4">
-                        <a href={`/api/invoices/${r.id}`} download className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:text-signal">
+                        <a href={`/api/invoices/${r.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:text-signal">
                           {r.number}
+                          <span className="sr-only"> (PDF, opens in a new tab)</span>
                         </a>
                         {r.kind === "credit_note" ? (
                           <span className="block text-xs text-mute">Credit note for {r.details.credits?.number}</span>

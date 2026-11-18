@@ -123,9 +123,9 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                     </a>
                   ) : null}
                   {(docs.get(r.id) ?? []).map((d) => (
-                    <a key={d.id} href={`/api/invoices/${d.id}`} download className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal">
-                      {d.kind === "credit_note" ? "Credit note" : "Invoice"} {d.number} (PDF)
-                      <span className="sr-only"> for {title}</span>
+                    <a key={d.id} href={`/api/invoices/${d.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal">
+                      {d.kind === "credit_note" ? "Credit note" : "Invoice"} {d.number} (PDF) <ExternalLink aria-hidden className="size-3.5" />
+                      <span className="sr-only"> for {title} (opens in a new tab)</span>
                     </a>
                   ))}
                 </p>
