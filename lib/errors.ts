@@ -2,7 +2,7 @@
 export type BidErrorCode =
   | "NOT_AUTHENTICATED" | "NOT_VERIFIED" | "HOLD_REQUIRED" | "AUCTION_NOT_FOUND" | "AUCTION_NOT_LIVE"
   | "AUCTION_ENDED" | "OWN_AUCTION" | "ALREADY_LEADING" | "BID_TOO_LOW" | "INVALID_AMOUNT" | "DEMO_AUCTION"
-  | "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED" | "TERMS_VERSION_MISMATCH";
+  | "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED" | "TERMS_VERSION_MISMATCH" | "BIDDING_BLOCKED";
 
 const MESSAGES: Record<BidErrorCode, string> = {
   NOT_AUTHENTICATED: "Sign in to place a bid.",
@@ -19,6 +19,7 @@ const MESSAGES: Record<BidErrorCode, string> = {
   PROFILE_INCOMPLETE: "Finish your profile before you bid: add your username, full name, country and phone.",
   TERMS_NOT_ACCEPTED: "Accept the bidding terms before you bid.",
   TERMS_VERSION_MISMATCH: "The bidding terms have just been updated. Read the new version and accept it to continue.",
+  BIDDING_BLOCKED: "Your bidding is blocked because a buyer's premium wasn't paid in time. Contact Biddr if you think this is a mistake.",
 };
 
 export function isBidErrorCode(v: string): v is BidErrorCode {

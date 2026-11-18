@@ -249,7 +249,9 @@ export type NotificationType =
   | "withdrawal_approved" | "withdrawal_declined"
   | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired"
   | "history_report_rejected"
-  | "premium_due" | "premium_paid" | "premium_failed" | "make_suggested";
+  | "premium_due" | "premium_paid" | "premium_failed" | "make_suggested"
+  | "premium_reminder" | "premium_unpaid" | "buyer_did_not_pay" | "second_chance_offer" | "second_chance_closed"
+  | "bidding_unblocked";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {
@@ -269,10 +271,13 @@ export interface BidderStatus {
   profile_complete: boolean;
   terms_accepted: boolean;
   current_version: string;
+  /** Didn't pay a buyer's premium in time (0025): can't place holds or bids until an admin lifts it. */
+  blocked?: boolean;
+  blocked_reason?: string | null;
 }
 
 /** Error codes for bidder requirements, from the database or /api/stripe/hold. */
-export type BidderRequirementCode = "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED";
+export type BidderRequirementCode = "PROFILE_INCOMPLETE" | "TERMS_NOT_ACCEPTED" | "BIDDING_BLOCKED";
 
 export interface HoldResponse {
   status: "authorized" | "requires_payment";

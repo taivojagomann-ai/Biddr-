@@ -66,7 +66,7 @@ export async function cancelPayment(input: unknown): Promise<AdminResult> {
   const row = await load(ctx, parsed.data.paymentId);
   if (!row) return { ok: false, error: "This payment no longer exists. Reload the page." };
   if (row.status === "paid") return { ok: false, error: "This premium is already paid. Refund it instead." };
-  if (row.status === "cancelled" || row.status === "refunded") return { ok: false, error: "This payment is already closed." };
+  if (row.status === "cancelled" || row.status === "refunded" || row.status === "unpaid") return { ok: false, error: "This payment is already closed." };
 
   // Best effort: nothing left half-open in Stripe.
   if (row.remainder_payment_intent_id) {

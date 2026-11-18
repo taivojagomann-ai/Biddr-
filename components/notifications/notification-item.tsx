@@ -49,6 +49,12 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   premium_paid: CheckCircle2,
   premium_failed: CreditCard,
   make_suggested: Tag,
+  premium_reminder: AlarmClock,
+  premium_unpaid: CircleSlash,
+  buyer_did_not_pay: CircleSlash,
+  second_chance_offer: Trophy,
+  second_chance_closed: XCircle,
+  bidding_unblocked: CheckCircle2,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

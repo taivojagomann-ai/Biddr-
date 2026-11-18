@@ -19,6 +19,7 @@ const TYPES: readonly NotificationType[] = [
   "seller_decided", "inspection_decision_reminder", "inspection_decision_expired",
   "history_report_rejected",
   "premium_due", "premium_paid", "premium_failed", "make_suggested",
+  "premium_reminder", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer", "second_chance_closed", "bidding_unblocked",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -117,6 +118,33 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
       );
     case "make_suggested":
       return withTitle(`New make suggested: ${str(n.data.make) ?? "unknown"}`);
+    case "premium_reminder": {
+      const due = str(n.data.due_at);
+      return withTitle(
+        `Reminder: please pay the buyer's premium on My purchases${due ? ` by ${formatDateTime(due, tz)}` : ""}. Otherwise the sale is cancelled and your bidding is blocked.`,
+      );
+    }
+    case "premium_unpaid":
+      return withTitle("The buyer's premium wasn't paid in time, so the sale is cancelled and your bidding is blocked.");
+    case "buyer_did_not_pay":
+      return n.data.role === "admin"
+        ? titled(`${car}: the buyer didn't pay the buyer's premium in time`)
+        : withTitle("The buyer didn't pay the buyer's premium in time. Choose what to do next on My listings.");
+    case "second_chance_offer": {
+      const amount = num(n.data.amount);
+      const until = str(n.data.expires_at);
+      return withTitle(
+        `Second chance: you can buy this car${amount !== null ? ` for ${formatEur(amount)}` : ""}. Answer on My purchases${until ? ` by ${formatDateTime(until, tz)}` : ""}.`,
+      );
+    }
+    case "second_chance_closed":
+      return withTitle(
+        n.data.outcome === "declined"
+          ? "The next bidder declined your offer. You can relist the car on My listings."
+          : "The next bidder didn't accept and pay in time. You can relist the car on My listings.",
+      );
+    case "bidding_unblocked":
+      return titled("Your bidding is unblocked. You can bid again.");
     case "premium_failed":
       return titled(`${car}: the buyer's premium charge failed${str(n.data.reason) ? ` (${str(n.data.reason)})` : ""}`);
     case "history_report_rejected": {
@@ -156,7 +184,16 @@ export function notificationHref(n: NotificationRow): string {
     case "make_suggested":
       return a ? `/admin/auctions/${a}` : "/admin";
     case "premium_due":
+    case "premium_reminder":
+    case "premium_unpaid":
+    case "second_chance_offer":
       return "/account/purchases";
+    case "buyer_did_not_pay":
+      return n.data.role === "admin" ? "/admin/payments?status=unpaid" : "/account/listings";
+    case "second_chance_closed":
+      return "/account/listings";
+    case "bidding_unblocked":
+      return "/";
     case "premium_paid":
       return n.data.role === "seller" ? "/account/listings" : "/account/purchases";
     case "premium_failed":

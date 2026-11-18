@@ -20,6 +20,7 @@ const FILTERS: { key: BuyerPaymentStatus | "all"; label: string }[] = [
   { key: "failed", label: "Failed" },
   { key: "paid", label: "Paid" },
   { key: "refunded", label: "Refunded" },
+  { key: "unpaid", label: "Buyer didn't pay" },
   { key: "cancelled", label: "Cancelled" },
 ];
 const LABEL = Object.fromEntries(FILTERS.map((f) => [f.key, f.label])) as Record<string, string>;

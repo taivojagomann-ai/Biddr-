@@ -170,5 +170,20 @@ Stripe must be in **test mode** (every page shows the yellow test-mode banner), 
 3. **Retry charge** on a car that needs the winner.
    - [ ] A message says the bank needs the winner to confirm again (the same 3-D Secure card).
 
+### 8.5 The winner doesn't pay
+Use a sale from 8.3 (3-D Secure card), with a second bidder (B) who bid less. Don't complete the payment. Instead of waiting 72 hours, move the deadline in the Supabase SQL Editor (test data only):
+`update buyer_payments set due_at = now() - interval '1 minute' where auction_id = '<the car's id>';`
+1. Wait up to 5 minutes for the job.
+   - [ ] W's My purchases: "Not paid in time: the sale was cancelled", the €500 taken from the hold isn't refunded, an invoice for €500, and "Your bidding is blocked". The profile page says the same.
+   - [ ] W can't bid: on another car, **Place bid** shows "Your bidding is blocked" with the reason.
+   - [ ] S's My listings: "The buyer didn't pay", with **Offer to the next bidder (€…)** and **Relist this car**. S and the admins got a notification.
+2. S chooses **Offer to the next bidder**.
+   - [ ] B gets "Second chance: you can buy this car for €…" and sees it on My purchases under **Second-chance offers**, with 48 hours to answer.
+3. B chooses **Accept and pay**, then **Complete payment** with `4242 4242 4242 4242`.
+   - [ ] Paid; B and S see each other's contact details; B sees "Pay the seller for the car by" (7 days); B gets an invoice.
+   - [ ] S chooses **Sale completed**; B's purchase shows "Sale completed (confirmed by the seller)".
+4. On another such sale, B chooses **Decline**: S is told and can **Relist this car**; a new draft with the same details appears in My listings and in the admin's review queue.
+5. **Admin → Users** lists W as blocked with the reason; **Lift block** (with a reason) lets W bid again, and W is notified.
+
 ### Not testable with Stripe test cards
 - A hold that expired after 7 days (the whole premium is charged to the saved card) and a card declined after the hold was placed are covered by the automated tests (`e2e/specs/17-buyer-premium.spec.ts`).

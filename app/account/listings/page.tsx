@@ -13,8 +13,10 @@ import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction, AuctionPrivate } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { HistoryRejectedPanel } from "./history-panel";
-import { ContactCard } from "@/components/contact-card";
-import { contactForPaidPayment, type PartyContact } from "@/lib/contacts";
+import { nextBidder, type SecondChanceOffer } from "@/lib/after-sale";
+import { contactForPaidPayment } from "@/lib/contacts";
+import type { BuyerPaymentRow } from "@/lib/settlement";
+import { SalePanel, type SaleState } from "./sale-panel";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 
@@ -24,7 +26,7 @@ export const dynamic = "force-dynamic";
 type ListingRow = Pick<
   Auction,
   "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "damage_history_summary"
->;
+> & { relisted_from: string | null };
 
 type PrivateRow = Pick<
   AuctionPrivate,
@@ -51,7 +53,7 @@ export default async function MyListingsPage() {
 
   const { data } = await supabase
     .from("auctions")
-    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, damage_history_summary")
+    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, damage_history_summary, relisted_from")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
@@ -72,17 +74,43 @@ export default async function MyListingsPage() {
     for (const r of rows ?? []) privates.set(r.auction_id, r);
   }
 
-  // Sold cars: the buyer's premium status, and the buyer's contact details once it's paid.
-  const payments = new Map<string, { status: string; contact: PartyContact | null }>();
-  if (listings.some((l) => l.status === "sold")) {
-    const { data: paymentRows } = await supabase
-      .from("buyer_payments")
-      .select("auction_id, status, winner_id, seller_id")
-      .eq("seller_id", user.id)
-      .returns<{ auction_id: string; status: string; winner_id: string; seller_id: string }[]>();
+  // Sold cars: the buyer's premium, the buyer's contact details once it's paid, and what
+  // the seller can do when the buyer didn't pay (DECISIONS.md point 12).
+  const sales = new Map<string, SaleState>();
+  const sold = listings.filter((l) => l.status === "sold");
+  if (sold.length) {
+    const ids = sold.map((l) => l.id);
+    const [{ data: paymentRows }, { data: offerRows }] = await Promise.all([
+      supabase.from("buyer_payments").select("*").in("auction_id", ids).eq("seller_id", user.id).order("created_at", { ascending: false }).returns<BuyerPaymentRow[]>(),
+      supabase.from("second_chance_offers").select("*").in("auction_id", ids).eq("seller_id", user.id).order("created_at", { ascending: false }).returns<SecondChanceOffer[]>(),
+    ]);
     const admin = getAdminSupabase();
-    for (const p of paymentRows ?? []) {
-      payments.set(p.auction_id, { status: p.status, contact: await contactForPaidPayment(admin, user.id, p) });
+    for (const l of sold) {
+      const payments = (paymentRows ?? []).filter((p) => p.auction_id === l.id);
+      const offers = (offerRows ?? []).filter((o) => o.auction_id === l.id);
+      const active = payments.find((p) => p.status !== "unpaid" && p.status !== "cancelled");
+      const relist = listings.find((x) => x.relisted_from === l.id);
+      const openOffer = offers.find((o) => o.status === "pending" || o.status === "accepted");
+      let state: SaleState | null = null;
+      if (active?.status === "paid") {
+        state = { kind: "paid", paymentId: active.id, contact: await contactForPaidPayment(admin, user.id, active), completedAt: active.sale_completed_at ?? null };
+      } else if (active?.status === "refunded") {
+        state = { kind: "cancelled" };
+      } else if (active) {
+        state = { kind: "waiting", secondChance: Boolean(active.second_chance_offer_id) };
+      } else if (relist) {
+        state = { kind: "relisted", href: `/auctions/${relist.id}` };
+      } else if (openOffer) {
+        const payment = payments.find((p) => p.second_chance_offer_id === openOffer.id);
+        state = { kind: "offered", amount: openOffer.amount, expiresAt: payment?.due_at ?? openOffer.expires_at, accepted: openOffer.status === "accepted" };
+      } else if (payments.some((p) => p.status === "unpaid")) {
+        const exclude = [user.id, ...payments.map((p) => p.winner_id), ...offers.map((o) => o.bidder_id)];
+        const next = await nextBidder(admin, l.id, exclude);
+        state = { kind: "unpaid", next: next ? { amount: next.amount, username: next.username } : null };
+      } else if (payments.length) {
+        state = { kind: "cancelled" };
+      }
+      if (state) sales.set(l.id, state);
     }
   }
 
@@ -178,15 +206,7 @@ export default async function MyListingsPage() {
                       choice={priv?.seller_decision ?? null}
                     />
                   ) : null}
-                  {l.status === "sold" && payments.get(l.id)?.contact ? (
-                    <ContactCard heading="Buyer's contact details" contact={payments.get(l.id)!.contact!} idBase={`l-${l.id}`} />
-                  ) : l.status === "sold" && payments.has(l.id) ? (
-                    <p className="text-sm text-mute">
-                      {payments.get(l.id)!.status === "cancelled" || payments.get(l.id)!.status === "refunded"
-                        ? "This sale was cancelled by Biddr. Contact us if you have questions."
-                        : "Waiting for the buyer to pay the buyer's premium. Their contact details appear here once it's paid."}
-                    </p>
-                  ) : null}
+                  {l.status === "sold" && sales.has(l.id) ? <SalePanel auctionId={l.id} title={l.title} state={sales.get(l.id)!} /> : null}
                   {/* Rejected, or sent again after a rejection (the reason stays until the next review). */}
                   {l.status === "draft" &&
                   (priv?.history_review_status === "rejected" || (priv?.history_review_status === "pending" && priv.history_review_note)) ? (

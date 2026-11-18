@@ -23,7 +23,7 @@ type Step =
   | { kind: "hold"; clientSecret: string; amountEur: number }
   | { kind: "confirm" }
   | { kind: "success"; result: PlaceBidResult }
-  | { kind: "error"; title: string; message: string };
+  | { kind: "error"; title: string; message: string; final?: boolean };
 
 function isBidderStatus(v: unknown): v is BidderStatus {
   return (
@@ -69,7 +69,7 @@ export function BidModal(props: BidModalProps) {
         body: JSON.stringify({ auctionId: auction.id }),
       });
       const body = (await res.json()) as HoldResponse | { error: string; code?: string };
-      if (res.status === 403 && "code" in body && (body.code === "PROFILE_INCOMPLETE" || body.code === "TERMS_NOT_ACCEPTED")) {
+      if (res.status === 403 && "code" in body && (body.code === "PROFILE_INCOMPLETE" || body.code === "TERMS_NOT_ACCEPTED" || body.code === "BIDDING_BLOCKED")) {
         // The server is the final word: send the user to the step they still need.
         await checkRequirementsRef.current();
         return;
@@ -100,7 +100,15 @@ export function BidModal(props: BidModalProps) {
     }
     if (!data.profile_complete) setStep({ kind: "profile" });
     else if (!data.terms_accepted) setStep({ kind: "terms", version: data.current_version });
-    else if (hasHold) setStep({ kind: "confirm" });
+    else if (data.blocked) {
+      // A buyer's premium wasn't paid in time (DECISIONS.md point 12): only an admin can lift this.
+      setStep({
+        kind: "error",
+        title: "Your bidding is blocked",
+        message: `${data.blocked_reason ? `${data.blocked_reason} ` : ""}You can't bid until Biddr lifts the block. Contact us if you think this is a mistake.`,
+        final: true,
+      });
+    } else if (hasHold) setStep({ kind: "confirm" });
     else void startHold();
   }, [hasHold, startHold]);
   const checkRequirementsRef = useRef(checkRequirements);
@@ -203,7 +211,11 @@ export function BidModal(props: BidModalProps) {
           <div className="flex flex-col gap-4">
             <DialogTitle>{step.title}</DialogTitle>
             <DialogDescription id="bid-modal-desc">{step.message}</DialogDescription>
-            <Button autoFocus onClick={() => void checkRequirements()}>Try again</Button>
+            {step.final ? (
+              <Button autoFocus onClick={() => onOpenChange(false)}>Back to the car</Button>
+            ) : (
+              <Button autoFocus onClick={() => void checkRequirements()}>Try again</Button>
+            )}
           </div>
         )}
 
