@@ -45,14 +45,8 @@ export interface BuyerPaymentRow {
   second_chance_offer_id?: string | null;
 }
 
-/** How long the winner has to complete a payment that needs them. */
-export const PAYMENT_DUE_HOURS = 72;
-/** The reminder goes this long before the deadline. */
-export const REMINDER_HOURS = 24;
-/** How long the next bidder has to accept a second-chance offer and pay. */
-export const SECOND_CHANCE_HOURS = 48;
-/** How long the buyer has to pay the seller for the car after the premium is paid. */
-export const SELLER_PAYMENT_DAYS = 7;
+import { PAYMENT_DUE_HOURS, REMINDER_HOURS, SECOND_CHANCE_HOURS } from "@/lib/settlement-constants";
+export { PAYMENT_DUE_HOURS, REMINDER_HOURS, SECOND_CHANCE_HOURS, SELLER_PAYMENT_DAYS } from "@/lib/settlement-constants";
 /** A claimed attempt older than this is considered abandoned and can be retried. */
 const CLAIM_MS = 2 * 60 * 1000;
 

@@ -251,7 +251,7 @@ export type NotificationType =
   | "history_report_rejected"
   | "premium_due" | "premium_paid" | "premium_failed" | "make_suggested"
   | "premium_reminder" | "premium_unpaid" | "buyer_did_not_pay" | "second_chance_offer" | "second_chance_closed"
-  | "bidding_unblocked";
+  | "bidding_unblocked" | "new_message" | "report_opened" | "report_resolved" | "account_blocked" | "selling_unblocked";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

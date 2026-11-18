@@ -185,5 +185,20 @@ Use a sale from 8.3 (3-D Secure card), with a second bidder (B) who bid less. Do
 4. On another such sale, B chooses **Decline**: S is told and can **Relist this car**; a new draft with the same details appears in My listings and in the admin's review queue.
 5. **Admin → Users** lists W as blocked with the reason; **Lift block** (with a reason) lets W bid again, and W is notified.
 
+### 8.6 Messages and Report a problem
+Use a paid sale from 8.1, with W and S in two browsers.
+1. W: My purchases → **Message the seller**. S: My listings → **Message the buyer**.
+   - [ ] Both see the warning "Biddr never asks you to pay through messages…".
+   - [ ] W writes; S sees it appear without reloading, and gets one notification (not one per message). Ctrl+Enter sends; Enter starts a new line.
+   - [ ] A link in a message isn't clickable.
+2. W: **Report a problem** → "The car isn't as described", with a description.
+   - [ ] W sees "Your report: … Status: Open" on the conversation and "Your report: Open" on My purchases. S doesn't see the report.
+   - [ ] Admins get "the buyer reported a problem".
+3. Admin → **Reports** → the report.
+   - [ ] The conversation is shown, with "Your view is logged"; the auction's admin activity shows `conversation.view`.
+   - [ ] **Send as Biddr support**: W and S both see it in the conversation, marked "Biddr support".
+   - [ ] **Resolve** with a decision: W is told, the decision appears in the conversation, and the conversation is no longer shown to the admin.
+4. With a phone: the conversation page reads well, and the message box isn't hidden by the keyboard.
+
 ### Not testable with Stripe test cards
 - A hold that expired after 7 days (the whole premium is charged to the saved card) and a card declined after the hold was placed are covered by the automated tests (`e2e/specs/17-buyer-premium.spec.ts`).

@@ -161,8 +161,10 @@ test.describe("admin: Payments page", () => {
     await dialog.getByLabel("Reason (kept in the admin log)").fill("Buyer and seller agreed to cancel the sale.");
     await dialog.getByRole("button", { name: "Mark as cancelled" }).click();
     await expect.poll(async () => (await payment(s.paymentId)).status).toBe("cancelled");
-    const { data: log } = await service().from("admin_actions").select("action").eq("auction_id", s.auctionId);
-    expect((log ?? []).map((l) => l.action)).toEqual(expect.arrayContaining(["payment.retry", "payment.cancel"]));
+    // The log line is written right after the status changes.
+    await expect
+      .poll(async () => ((await service().from("admin_actions").select("action").eq("auction_id", s.auctionId)).data ?? []).map((l) => l.action))
+      .toEqual(expect.arrayContaining(["payment.retry", "payment.cancel"]));
   });
 
   test("Refund premium after a confirmation", async ({ page, context, seed, request }) => {

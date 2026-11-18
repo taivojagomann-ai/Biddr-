@@ -79,6 +79,10 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
         <Link href="/admin/users" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
           Users
         </Link>
+        {" · "}
+        <Link href="/admin/reports" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+          Reports
+        </Link>
       </p>
 
       <nav aria-label="Auction status" className="-mx-4 mt-6 overflow-x-auto px-4">

@@ -136,7 +136,7 @@ test.describe("copy consistency", () => {
     test.skip(isMobile, "The account menu is in the phone menu; covered on desktop");
     await page.getByRole("button", { name: new RegExp(user.username!) }).first().click();
     const items = page.locator("header li").filter({ visible: true });
-    await expect(items).toHaveText(["Profile", "My listings", "My purchases", "Watchlist", "Notifications", "Sign out"]);
+    await expect(items).toHaveText(["Profile", "My listings", "My purchases", "Messages", "Watchlist", "Notifications", "Sign out"]);
     await expect(page.getByText("Selling", { exact: true })).toHaveCount(0);
   });
 

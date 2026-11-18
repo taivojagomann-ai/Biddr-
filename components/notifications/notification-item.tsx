@@ -55,6 +55,11 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   second_chance_offer: Trophy,
   second_chance_closed: XCircle,
   bidding_unblocked: CheckCircle2,
+  new_message: MessageSquareReply,
+  report_opened: FileWarning,
+  report_resolved: CheckCircle2,
+  account_blocked: CircleSlash,
+  selling_unblocked: CheckCircle2,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

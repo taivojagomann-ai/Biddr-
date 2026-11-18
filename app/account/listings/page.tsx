@@ -17,6 +17,7 @@ import { nextBidder, type SecondChanceOffer } from "@/lib/after-sale";
 import { contactForPaidPayment } from "@/lib/contacts";
 import type { BuyerPaymentRow } from "@/lib/settlement";
 import { SalePanel, type SaleState } from "./sale-panel";
+import type { ReportStatus } from "@/lib/reports";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 
@@ -85,6 +86,16 @@ export default async function MyListingsPage() {
       supabase.from("second_chance_offers").select("*").in("auction_id", ids).eq("seller_id", user.id).order("created_at", { ascending: false }).returns<SecondChanceOffer[]>(),
     ]);
     const admin = getAdminSupabase();
+    const paidIds = (paymentRows ?? []).filter((p) => p.status === "paid").map((p) => p.id);
+    const { data: convRows } = paidIds.length
+      ? await supabase.from("conversations").select("id, buyer_payment_id").in("buyer_payment_id", paidIds).returns<{ id: string; buyer_payment_id: string }[]>()
+      : { data: [] };
+    const conversationOf = new Map((convRows ?? []).map((c) => [c.buyer_payment_id, c.id]));
+    const { data: reportRows } = paidIds.length
+      ? await supabase.from("sale_reports").select("buyer_payment_id, status").in("buyer_payment_id", paidIds).order("created_at", { ascending: false }).returns<{ buyer_payment_id: string; status: ReportStatus }[]>()
+      : { data: [] };
+    const reportOf = new Map<string, ReportStatus>();
+    for (const r of reportRows ?? []) if (!reportOf.has(r.buyer_payment_id)) reportOf.set(r.buyer_payment_id, r.status);
     for (const l of sold) {
       const payments = (paymentRows ?? []).filter((p) => p.auction_id === l.id);
       const offers = (offerRows ?? []).filter((o) => o.auction_id === l.id);
@@ -93,7 +104,7 @@ export default async function MyListingsPage() {
       const openOffer = offers.find((o) => o.status === "pending" || o.status === "accepted");
       let state: SaleState | null = null;
       if (active?.status === "paid") {
-        state = { kind: "paid", paymentId: active.id, contact: await contactForPaidPayment(admin, user.id, active), completedAt: active.sale_completed_at ?? null };
+        state = { kind: "paid", paymentId: active.id, contact: await contactForPaidPayment(admin, user.id, active), completedAt: active.sale_completed_at ?? null, conversationId: conversationOf.get(active.id) ?? null, report: reportOf.get(active.id) ?? null };
       } else if (active?.status === "refunded") {
         state = { kind: "cancelled" };
       } else if (active) {
