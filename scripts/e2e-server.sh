@@ -13,6 +13,11 @@ export STRIPE_SECRET_KEY=sk_test_e2eonly
 export STRIPE_WEBHOOK_SECRET=whsec_e2e_only
 export E2E_STRIPE_MOCK=true
 export CRON_SECRET=e2e-cron-secret
+# Emails go to the local mail catcher (Mailpit's SMTP port, see supabase/config.toml).
+export SMTP_HOST=${E2E_SMTP_HOST:-127.0.0.1}
+export SMTP_PORT=${E2E_SMTP_PORT:-54325}
+export SMTP_SECURE=false
+export EMAIL_FROM="Biddr <noreply@biddr.test>"
 export ENABLE_DEMO_DATA=true
 export BID_HOLD_AMOUNT_EUR=500
 export NEXT_TELEMETRY_DISABLED=1

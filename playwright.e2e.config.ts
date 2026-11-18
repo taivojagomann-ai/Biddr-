@@ -59,6 +59,11 @@ export default defineConfig({
       E2E_STRIPE_MOCK: "true",
       E2E_STRIPE_MOCK_PORT: String(STRIPE_MOCK_PORT),
       CRON_SECRET,
+      // Emails go to the local mail catcher (Mailpit's SMTP port, see supabase/config.toml).
+      SMTP_HOST: process.env.E2E_SMTP_HOST ?? "127.0.0.1",
+      SMTP_PORT: process.env.E2E_SMTP_PORT ?? "54325",
+      SMTP_SECURE: "false",
+      EMAIL_FROM: "Biddr <noreply@biddr.test>",
       ENABLE_DEMO_DATA: "true",
       BID_HOLD_AMOUNT_EUR: "500",
       NEXT_TELEMETRY_DISABLED: "1",
