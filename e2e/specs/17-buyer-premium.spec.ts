@@ -110,7 +110,7 @@ test.describe("the winner", () => {
     await expect(card).toContainText(s.seller.email);
     await expect(card).toContainText("Arrange payment for the car and the handover directly with each other.");
     // The invoice for the whole premium replaces Stripe's receipt (spec 20 checks the PDF).
-    await expect(item.getByRole("link", { name: /^Download invoice BID-\d{4}-\d{5} \(PDF\)/ })).toHaveAttribute("href", /^\/api\/invoices\//);
+    await expect(item.getByRole("link", { name: /^View invoice BID-\d{4}-\d{5} \(PDF\)/ })).toHaveAttribute("href", /^\/api\/invoices\//);
     await sellerPage.reload();
     const buyer = sellerPage.getByRole("region", { name: "Buyer's contact details" });
     await expect(buyer).toContainText("Wynn Winner");

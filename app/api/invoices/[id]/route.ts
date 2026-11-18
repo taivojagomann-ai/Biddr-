@@ -31,7 +31,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return new Response(Buffer.from(pdf), {
     headers: {
       "content-type": "application/pdf",
-      "content-disposition": `attachment; filename="${invoiceFileName(invoice)}"`,
+      // Shown in the browser's PDF viewer (a new tab); its Save button uses this file name.
+      "content-disposition": `inline; filename="${invoiceFileName(invoice)}"`,
       "cache-control": "private, no-store",
     },
   });

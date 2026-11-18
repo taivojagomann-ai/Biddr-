@@ -110,7 +110,7 @@ test.describe("issuing", () => {
 });
 
 test.describe("the winner's invoice", () => {
-  test("My purchases: Download invoice gives the PDF; other members and signed-out visitors can't open it", async ({ page, context, request }) => {
+  test("My purchases: View invoice opens the PDF in a new tab, where it can be saved; other members and signed-out visitors can't open it", async ({ page, context, request }) => {
     const s = await soldAuction(12_000, "ok"); // premium €600
     await settle(request);
     const [inv] = await invoicesFor(s.paymentId);
@@ -118,14 +118,21 @@ test.describe("the winner's invoice", () => {
     await signIn(context, s.winner);
     await page.goto("/account/purchases");
     const item = page.getByRole("article", { name: s.title });
-    const link = item.getByRole("link", { name: `Download invoice ${inv!.number} (PDF) for ${s.title}` });
+    const link = item.getByRole("link", { name: `View invoice ${inv!.number} (PDF) for ${s.title} (opens in a new tab)` });
     await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("target", "_blank");
     await expect(item.getByRole("link", { name: /View the receipt/ })).toHaveCount(0);
     await expectAccessible(page, "My purchases with an invoice");
 
-    const [download] = await Promise.all([page.waitForEvent("download"), link.click()]);
-    expect(download.suggestedFilename()).toBe(`Biddr-invoice-${inv!.number}.pdf`);
-    const pdf = await PDFDocument.load(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c as Buffer[])));
+    // Opens in a new tab (the test browser has no PDF viewer, so the tab itself isn't checked).
+    await expect(link).toHaveAttribute("href", `/api/invoices/${inv!.id}`);
+    const [tab] = await Promise.all([page.waitForEvent("popup"), link.click()]);
+    await tab.close();
+    // Shown inline by the browser's PDF viewer; its Save button uses the invoice's file name.
+    const res = await page.request.get(`/api/invoices/${inv!.id}`);
+    expect(res.headers()["content-type"]).toBe("application/pdf");
+    expect(res.headers()["content-disposition"]).toBe(`inline; filename="Biddr-invoice-${inv!.number}.pdf"`);
+    const pdf = await PDFDocument.load(await res.body());
     expect(pdf.getTitle()).toBe(`Invoice ${inv!.number}`);
     expect(pdf.getAuthor()).toBe("Biddr OÜ");
     expect(pdf.getPageCount()).toBe(1);
@@ -156,7 +163,7 @@ test.describe("admin", () => {
     await signIn(context, seed.admin);
     await page.goto("/admin/payments?status=paid");
     const row = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: s.title }) });
-    await expect(row.getByRole("link", { name: `Invoice ${inv!.number} (PDF) for ${s.title}` })).toBeVisible();
+    await expect(row.getByRole("link", { name: `Invoice ${inv!.number} (PDF) for ${s.title} (opens in a new tab)` })).toHaveAttribute("target", "_blank");
     await row.getByRole("button", { name: `Refund premium: ${s.title}` }).click();
     await page.getByRole("dialog", { name: "Refund €600 to the winner?" }).getByRole("button", { name: "Refund premium" }).click();
     await expect.poll(async () => (await payment(s.paymentId)).status).toBe("refunded");
@@ -174,8 +181,8 @@ test.describe("admin", () => {
     // The admin's invoice list for this month: both documents, VAT totals, CSV.
     await page.goto("/admin/invoices");
     await expect(page.getByRole("heading", { level: 1, name: "Invoices" })).toBeVisible();
-    await expect(page.getByRole("link", { name: inv!.number, exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: credit.number, exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: `${inv!.number} (PDF, opens in a new tab)`, exact: true })).toHaveAttribute("target", "_blank");
+    await expect(page.getByRole("link", { name: `${credit.number} (PDF, opens in a new tab)`, exact: true })).toBeVisible();
     await expect(page.getByText(`Credit note for ${inv!.number}`)).toBeVisible();
     await expect(page.getByRole("region", { name: "VAT totals" }).getByRole("cell", { name: "Estonia" })).toBeVisible();
     await expectAccessible(page, "Admin invoices");
@@ -191,8 +198,8 @@ test.describe("admin", () => {
     await signIn(context, s.winner);
     await page.goto("/account/purchases");
     const item = page.getByRole("article", { name: s.title });
-    await expect(item.getByRole("link", { name: `Download invoice ${inv!.number} (PDF) for ${s.title}` })).toBeVisible();
-    await expect(item.getByRole("link", { name: `Download credit note ${credit.number} (PDF) for ${s.title}` })).toBeVisible();
+    await expect(item.getByRole("link", { name: `View invoice ${inv!.number} (PDF) for ${s.title}` })).toBeVisible();
+    await expect(item.getByRole("link", { name: `View credit note ${credit.number} (PDF) for ${s.title}` })).toHaveAttribute("target", "_blank");
     const res = await page.request.get(`/api/invoices/${credit.id}`);
     expect(res.status()).toBe(200);
     expect((await PDFDocument.load(await res.body())).getTitle()).toBe(`Credit note ${credit.number}`);

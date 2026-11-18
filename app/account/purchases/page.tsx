@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ExternalLink } from "lucide-react";
 import { ContactCard } from "@/components/contact-card";
 import { LocalDateTime } from "@/components/local-date-time";
 import { contactForPaidPayment, type PartyContact } from "@/lib/contacts";
@@ -157,7 +158,7 @@ export default async function PurchasesPage() {
   );
 }
 
-/** Download links for the invoice (and the credit note after a refund). */
+/** The invoice (and the credit note after a refund), each opening in a new tab; the browser's viewer can save it. */
 function InvoiceLinks({ docs, title }: { docs: { id: string; number: string; kind: InvoiceKind }[]; title: string }) {
   const sorted = [...docs].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "invoice" ? -1 : 1));
   if (!sorted.length) {
@@ -169,11 +170,13 @@ function InvoiceLinks({ docs, title }: { docs: { id: string; number: string; kin
         <li key={d.id}>
           <a
             href={`/api/invoices/${d.id}`}
-            download
-            className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal"
           >
-            {d.kind === "credit_note" ? "Download credit note" : "Download invoice"} {d.number} (PDF)
-            <span className="sr-only"> for {title}</span>
+            {d.kind === "credit_note" ? "View credit note" : "View invoice"} {d.number} (PDF)
+            <ExternalLink aria-hidden className="size-3.5" />
+            <span className="sr-only"> for {title} (opens in a new tab)</span>
           </a>
         </li>
       ))}
