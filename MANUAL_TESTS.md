@@ -191,6 +191,8 @@ Use a paid sale from 8.1, with W and S in two browsers.
    - [ ] Both see the warning "Biddr never asks you to pay through messages…".
    - [ ] W writes; S sees it appear without reloading, and gets one notification (not one per message). Ctrl+Enter sends; Enter starts a new line.
    - [ ] A link in a message isn't clickable.
+   - [ ] While S types, W sees three orange dots; they go away when S sends or stops typing.
+   - [ ] Under W's last message it says "Sent", and "Seen" once S has the conversation open (not while S's tab is in the background).
 2. W: **Report a problem** → "The car isn't as described", with a description.
    - [ ] W sees "Your report: … Status: Open" on the conversation and "Your report: Open" on My purchases. S doesn't see the report.
    - [ ] Admins get "the buyer reported a problem".

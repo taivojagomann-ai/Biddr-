@@ -136,6 +136,97 @@ test.describe("conversation", () => {
   });
 });
 
+/** Resolves once the page has joined a broadcast channel (Realtime replies "ok" to the join). */
+function joined(page: Page, topic: string, timeout = 30_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Channel "${topic}" wasn't joined in ${timeout} ms`)), timeout);
+    page.on("websocket", (ws) => {
+      ws.on("framereceived", (frame) => {
+        const text = String(frame.payload);
+        if (text.includes(`"realtime:${topic}"`) && text.includes("phx_reply") && text.includes('"status":"ok"')) {
+          clearTimeout(timer);
+          resolve();
+        }
+      });
+    });
+  });
+}
+
+test.describe("typing and seen", () => {
+  test.describe.configure({ timeout: 150_000 });
+
+  test("Sent becomes Seen when the other party reads; three dots while they type; a Biddr decision refreshes the report status", async ({ page, context, request, browser }) => {
+    const s = await paidSale(request);
+    await signIn(context, s.winner);
+    const buyerLive = realtimeReady(page, `messages:${s.conversationId}`);
+    const buyerTyping = joined(page, `conversation:${s.conversationId}`);
+    await page.goto(`/account/messages/${s.conversationId}`);
+    await Promise.all([buyerLive, buyerTyping]);
+
+    // The seller hasn't opened it: "Sent".
+    await send(page, "Is the car still available?");
+    const receipt = log(page).locator("[data-receipt]");
+    await expect(receipt).toHaveText("Sent");
+    await expect(receipt).toHaveCount(1);
+
+    // The seller opens the conversation: the buyer sees "Seen" without reloading.
+    const seller = await as(browser, s.seller);
+    const sellerLive = realtimeReady(seller, `messages:${s.conversationId}`);
+    const sellerTyping = joined(seller, `conversation:${s.conversationId}`);
+    await seller.goto(`/account/messages/${s.conversationId}`);
+    await Promise.all([sellerLive, sellerTyping]);
+    await expect(receipt).toHaveText("Seen");
+
+    // The buyer types: the seller sees three dots and a status for screen readers.
+    await page.getByLabel("Message", { exact: true }).pressSequentially("When can I come", { delay: 30 });
+    await expect(seller.locator("[data-typing]")).toBeVisible();
+    await expect(seller.getByRole("status").filter({ hasText: "The buyer is typing…" })).toBeAttached();
+    await expect(seller.locator("[data-typing] > span")).toHaveCount(3);
+    // Sent: the dots go away, and the message is there.
+    await page.getByLabel("Message", { exact: true }).press("Control+Enter");
+    await expect(log(seller)).toContainText("When can I come");
+    await expect(seller.locator("[data-typing]")).toHaveCount(0);
+    // Nobody types: no dots on the buyer's side.
+    await expect(page.locator("[data-typing]")).toHaveCount(0);
+
+    // A report the buyer made; Biddr resolves it with a support message while the page is open.
+    const { data: report } = await service()
+      .from("sale_reports")
+      .insert({
+        buyer_payment_id: s.paymentId, auction_id: s.auctionId, conversation_id: s.conversationId, reporter_id: s.winner.id,
+        reporter_role: "buyer", reason: "other", description: "Testing that the status refreshes by itself.",
+      })
+      .select("id")
+      .single();
+    await page.reload();
+    await expect(page.getByText("Status: Open: Biddr will look at it soon")).toBeVisible();
+    await service().from("sale_reports").update({ status: "resolved", outcome: "resolved", resolution: "All sorted.", resolved_at: new Date().toISOString() }).eq("id", report!.id);
+    await service().from("messages").insert({ conversation_id: s.conversationId, sender_role: "support", body: "Biddr's decision on the reported problem: All sorted." });
+    await expect(log(page)).toContainText("Biddr's decision on the reported problem: All sorted.");
+    await expect(page.getByText("Status: Resolved")).toBeVisible();
+    await seller.close();
+  });
+
+  test("the typing channel is private: only the two parties can join it", async ({ request }) => {
+    test.skip(test.info().project.name !== "desktop-berlin", "runs once");
+    const s = await paidSale(request);
+    const join = async (email: string) => {
+      const db = await userDb(email);
+      const { data } = await db.auth.getSession();
+      db.realtime.setAuth(data.session!.access_token);
+      const status = await new Promise<string>((resolve) => {
+        db.channel(`conversation:${s.conversationId}`, { config: { private: true } }).subscribe((st) => {
+          if (st === "SUBSCRIBED" || st === "CHANNEL_ERROR" || st === "TIMED_OUT") resolve(st);
+        });
+      });
+      await db.removeAllChannels();
+      return status;
+    };
+    expect(await join(s.winner.email)).toBe("SUBSCRIBED");
+    expect(await join((await createUser()).email)).toBe("CHANNEL_ERROR");
+  });
+});
+
 test.describe("report a problem", () => {
   test.describe.configure({ timeout: 150_000 });
 

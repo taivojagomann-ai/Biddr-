@@ -67,7 +67,13 @@ export default async function ConversationPage({ params }: { params: { id: strin
       </p>
 
       <div className="mt-6">
-        <Thread conversationId={conv.id} viewerRole={role} initial={messages ?? []} readOnly={readOnly} />
+        <Thread
+          conversationId={conv.id}
+          viewerRole={role}
+          initial={messages ?? []}
+          readOnly={readOnly}
+          otherLastReadAt={role === "buyer" ? conv.seller_last_read_at : conv.buyer_last_read_at}
+        />
       </div>
 
       <section aria-labelledby="report-heading" className="mt-10 border-t border-line pt-6">
