@@ -5,6 +5,9 @@ import { expect } from "@playwright/test";
 import { randomVin } from "./factory";
 
 export interface SellOptions {
+  /** A make from the list (default BMW), or with `otherMake`, one typed and chosen as "Other". */
+  make?: string;
+  otherMake?: boolean;
   model?: string;
   vin?: string;
   dealer?: { name: string; registryCode: string };
@@ -32,7 +35,9 @@ export async function testJpeg(page: Page): Promise<Buffer> {
 export const continueButton = (page: Page) => page.getByRole("button", { name: "Continue" });
 
 export async function fillCarStep(page: Page, o: SellOptions = {}) {
-  await page.getByLabel("Make").selectOption("BMW");
+  const make = o.make ?? "BMW";
+  await page.getByRole("combobox", { name: "Make" }).fill(make);
+  await page.getByRole("option", { name: o.otherMake ? `Other: ${make}` : make, exact: true }).click();
   await page.getByLabel("Model").fill(o.model ?? "M2");
   await page.getByLabel("Variant").fill("Competition");
   await page.getByLabel("Year").fill("2019");

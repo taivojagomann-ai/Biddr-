@@ -34,7 +34,7 @@ test.describe("sell flow", () => {
     await continueButton(page).click();
     await expect(page.getByText("Choose the make.")).toBeVisible();
     await expect(page.getByText("Enter the VIN.")).toBeVisible();
-    await expect(page.getByLabel("Make")).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByRole("combobox", { name: "Make" })).toHaveAttribute("aria-invalid", "true");
     await page.getByLabel("VIN").fill("WBS-IO0Q");
     await continueButton(page).click();
     await expect(page.getByText(/A VIN has exactly 17 characters/)).toBeVisible();

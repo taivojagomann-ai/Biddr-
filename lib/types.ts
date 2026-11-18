@@ -68,6 +68,8 @@ export interface Auction {
   video_url: string | null;
   starting_bid: number;
   has_reserve: boolean;
+  /** The seller chose "Other": the make isn't in lib/data/car-makes.ts (0023). */
+  make_other?: boolean;
   reserve_met: boolean;
   current_bid: number | null;
   leading_bidder_id: string | null;
@@ -247,7 +249,7 @@ export type NotificationType =
   | "withdrawal_approved" | "withdrawal_declined"
   | "seller_decided" | "inspection_decision_reminder" | "inspection_decision_expired"
   | "history_report_rejected"
-  | "premium_due" | "premium_paid" | "premium_failed";
+  | "premium_due" | "premium_paid" | "premium_failed" | "make_suggested";
 
 /** A row of public.notifications (0009) with the car title joined in. */
 export interface NotificationRow {

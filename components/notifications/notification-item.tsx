@@ -17,6 +17,7 @@ import {
   Trophy,
   XCircle,
   type LucideIcon,
+  Tag,
 } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTimeZone } from "@/hooks/use-time-zone";
@@ -47,6 +48,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   premium_due: CreditCard,
   premium_paid: CheckCircle2,
   premium_failed: CreditCard,
+  make_suggested: Tag,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

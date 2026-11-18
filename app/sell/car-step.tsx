@@ -1,11 +1,13 @@
 import { Input } from "@/components/ui/input";
+import { MakeCombobox } from "@/components/ui/make-combobox";
 import { NativeSelect } from "@/components/ui/native-select";
 import { COUNTRY_NAMES } from "@/lib/format";
 import { BODY_STYLES, REGISTRATION_OPTIONS, SELLER_TYPES } from "@/lib/listing-details";
-import { COUNTRIES, DRIVETRAINS, MAKES, type Drivetrain, type MakeOption } from "@/lib/sell";
+import { COUNTRIES, DRIVETRAINS, type Drivetrain } from "@/lib/sell";
 import type { BodyStyle, Country, RegistrationCountry } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Field, FieldError, StepHeading, fieldId, fieldProps } from "./field";
+import { useModelSuggestions } from "@/hooks/use-model-suggestions";
 import type { StepProps } from "./types";
 
 const DRIVETRAIN_LABELS: Record<Drivetrain, string> = {
@@ -16,38 +18,33 @@ const DRIVETRAIN_LABELS: Record<Drivetrain, string> = {
 
 export function CarStep({ values, errors, set }: StepProps) {
   const maxYear = new Date().getFullYear() + 1;
+  const models = useModelSuggestions(values.makeOther ? "" : values.make);
+  const makeProps = fieldProps("make", errors.make, true);
   return (
     <section>
       <StepHeading title="The car" intro="Copy the details from the registration document where you can." />
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field field="make" label="Make" error={errors.make}>
-          <NativeSelect
-            {...fieldProps("make", errors.make)}
-            value={values.make}
-            onChange={(e) => set("make", e.target.value as MakeOption | "")}
-          >
-            <option value="" disabled>
-              Choose a make
-            </option>
-            {MAKES.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </NativeSelect>
+        <Field
+          field="make"
+          label="Make"
+          error={errors.make}
+          hint={
+            values.makeOther
+              ? `“${values.make}” isn't in our list yet. We'll check it when we review your car.`
+              : "Not in the list? Type the make and choose “Other”."
+          }
+        >
+          <MakeCombobox
+            id={makeProps.id}
+            invalid={Boolean(errors.make)}
+            describedBy={makeProps["aria-describedby"]}
+            value={{ make: values.make, other: values.makeOther }}
+            onChange={(v) => {
+              set("make", v.make);
+              set("makeOther", v.other);
+            }}
+          />
         </Field>
-
-        {values.make === "Other" ? (
-          <Field field="makeOther" label="Which make?" error={errors.makeOther}>
-            <Input
-              {...fieldProps("makeOther", errors.makeOther)}
-              value={values.makeOther}
-              onChange={(e) => set("makeOther", e.target.value)}
-              placeholder="e.g. Lotus"
-              maxLength={40}
-            />
-          </Field>
-        ) : null}
 
         <Field field="model" label="Model" error={errors.model}>
           <Input
@@ -56,7 +53,15 @@ export function CarStep({ values, errors, set }: StepProps) {
             onChange={(e) => set("model", e.target.value)}
             placeholder="e.g. M3"
             maxLength={60}
+            list={models.length ? "sell-model-suggestions" : undefined}
+            autoComplete="off"
           />
+          {/* Models already listed on Biddr for this make: suggestions only, any model can be typed. */}
+          <datalist id="sell-model-suggestions">
+            {models.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
         </Field>
 
         <Field field="variant" label="Variant" optional error={errors.variant} hint="e.g. Competition, Touring, GTS">

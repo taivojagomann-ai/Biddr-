@@ -97,12 +97,12 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
     history_review_status: history ? "pending" : null,
   });
 
-  // has_reserve is server-owned (not in the seller's column grant).
+  // has_reserve and make_other are server-owned (not in the seller's column grant).
   const { error: reserveError } = privateError
     ? { error: null }
     : await admin
         .from("auctions")
-        .update({ has_reserve: v.reserve !== null })
+        .update({ has_reserve: v.reserve !== null, make_other: v.makeOther })
         .eq("id", auction.id)
         .eq("seller_id", user.id)
         .eq("status", "draft");
@@ -114,6 +114,20 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
     return { ok: false, error: "We couldn't save your listing. Check your connection and try again." };
   }
 
+  // A make that isn't in lib/data/car-makes.ts: tell the admins, who may add it later.
+  if (v.makeOther) await notifyMakeSuggested(admin, auction.id, user.id, v.make);
+
   revalidatePath("/account/listings");
   return { ok: true, id: auction.id };
+}
+
+async function notifyMakeSuggested(admin: ReturnType<typeof getAdminSupabase>, auctionId: string, sellerId: string, make: string) {
+  const { data: admins } = await admin.from("profiles").select("id").eq("role", "admin").returns<{ id: string }[]>();
+  const rows = (admins ?? [])
+    .filter((a) => a.id !== sellerId)
+    .map((a) => ({ user_id: a.id, type: "make_suggested", auction_id: auctionId, actor_id: sellerId, data: { make } }));
+  if (!rows.length) return;
+  const { error } = await admin.from("notifications").insert(rows);
+  // The listing is saved either way; admins still see the suggestion on the listing.
+  if (error) console.error("sell: make suggestion notification failed", error);
 }

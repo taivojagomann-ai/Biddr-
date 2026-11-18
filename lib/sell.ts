@@ -1,6 +1,7 @@
 // Shared by /sell (client form), its server action and /account/listings.
 // Keep this file free of "use client" so server code can import it.
 import { z } from "zod";
+import { findMake, isCarMake } from "@/lib/data/car-makes";
 import {
   HIGHLIGHTS_MIN,
   detailsColumns,
@@ -20,8 +21,6 @@ const EU_COUNTRIES_SORTED = [...EU_LIST].sort((a, b) => a.name.localeCompare(b.n
 
 export const PHOTO_BUCKET = "auction-photos";
 
-export const MAKES = ["BMW", "Audi", "Mercedes-AMG", "Porsche", "Other"] as const;
-export type MakeOption = (typeof MAKES)[number];
 
 export const DRIVETRAINS = ["RWD", "AWD", "FWD"] as const;
 export type Drivetrain = (typeof DRIVETRAINS)[number];
@@ -108,8 +107,10 @@ export type SellPhotos = Record<PhotoSection, string[]>;
 
 export interface SellInput extends OwnershipInput, DetailsInput, HistoryReportValues {
   draftId: string;
-  make: MakeOption | "";
-  makeOther: string;
+  /** A make from lib/data/car-makes.ts, or the seller's own when makeOther is true. */
+  make: string;
+  /** The seller chose "Other: <make>": a make that isn't in the list. */
+  makeOther: boolean;
   model: string;
   variant: string;
   year: string;
@@ -160,7 +161,7 @@ export const FIELD_STEP: Record<SellField, StepId> = {
 export function emptySellInput(draftId: string, country: Country | ""): SellInput {
   return {
     draftId,
-    make: "", makeOther: "", model: "", variant: "", year: "", vin: "", mileageKm: "", engine: "",
+    make: "", makeOther: false, model: "", variant: "", year: "", vin: "", mileageKm: "", engine: "",
     transmission: "", drivetrain: "", exteriorColor: "", city: "", country,
     bodyStyle: "", interiorColor: "", ownerCount: "", sellerType: "private", dealerName: "", dealerRegistryCode: "",
     registrationCountry: country, isRegistered: "",
@@ -257,28 +258,46 @@ export function normalizeVideoUrl(raw: string): string | null {
 // -----------------------------------------------------------------------------
 // Step schemas. Each one validates a slice of SellInput; the server runs all.
 // -----------------------------------------------------------------------------
-export const carSchema = z
+/** Make and "Other": checked on their own, so the message shows even while other fields are missing. */
+const makeSchema = z
   .object({
-    make: z.enum(MAKES, { errorMap: () => ({ message: "Choose the make." }) }),
-    makeOther: z.string().trim().max(40, "Keep the make under 40 characters."),
-    model: text("model", 1, 60),
-    variant: optionalText("variant", 40),
-    year: wholeNumber("Enter the year.", 1950, currentYear() + 1, `Enter a year from 1950 to ${currentYear() + 1}.`),
-    vin: vinSchema,
-    mileageKm: wholeNumber("Enter the mileage.", 0, 1_000_000, "Enter the mileage in km, from 0 to 1,000,000."),
-    engine: text("engine description", 3, 120),
-    transmission: text("transmission", 2, 60),
-    drivetrain: z.enum(DRIVETRAINS, { errorMap: () => ({ message: "Choose the drivetrain." }) }),
-    exteriorColor: text("exterior colour", 2, 40),
-    city: text("city", 2, 60),
-    country: z.enum(EU_CODES, { errorMap: () => ({ message: "Choose the country." }) }),
+    make: z.string().trim().max(40, "Keep the make under 40 characters."),
+    makeOther: z.boolean(),
   })
   .superRefine((v, ctx) => {
-    if (v.make === "Other" && v.makeOther.length < 2) {
-      ctx.addIssue({ code: "custom", path: ["makeOther"], message: "Enter the make." });
+    if (!v.make) {
+      ctx.addIssue({ code: "custom", path: ["make"], message: "Choose the make." });
+    } else if (v.makeOther ? v.make.length < 2 : !isCarMake(v.make) && !findMake(v.make)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["make"],
+        message: v.makeOther ? "Enter the make." : `Choose a make from the list, or choose “Other: ${v.make}”.`,
+      });
     }
-  })
-  .transform(({ makeOther, ...v }) => ({ ...v, make: v.make === "Other" ? makeOther : v.make }));
+  });
+
+export const carSchema = z
+  .intersection(
+    makeSchema,
+    z.object({
+      model: text("model", 1, 60),
+      variant: optionalText("variant", 40),
+      year: wholeNumber("Enter the year.", 1950, currentYear() + 1, `Enter a year from 1950 to ${currentYear() + 1}.`),
+      vin: vinSchema,
+      mileageKm: wholeNumber("Enter the mileage.", 0, 1_000_000, "Enter the mileage in km, from 0 to 1,000,000."),
+      engine: text("engine description", 3, 120),
+      transmission: text("transmission", 2, 60),
+      drivetrain: z.enum(DRIVETRAINS, { errorMap: () => ({ message: "Choose the drivetrain." }) }),
+      exteriorColor: text("exterior colour", 2, 40),
+      city: text("city", 2, 60),
+      country: z.enum(EU_CODES, { errorMap: () => ({ message: "Choose the country." }) }),
+    }),
+  )
+  // A make typed as "Other" that is in the list after all ("skoda") becomes the listed one.
+  .transform(({ makeOther, ...v }) => {
+    const known = findMake(v.make);
+    return { ...v, make: known ?? v.make, makeOther: known ? false : makeOther };
+  });
 
 export const historySchema = z
   .object({

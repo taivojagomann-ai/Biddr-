@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MakeCombobox } from "@/components/ui/make-combobox";
+import { useModelSuggestions } from "@/hooks/use-model-suggestions";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import type { ListingInput } from "@/lib/admin-schemas";
@@ -28,6 +30,7 @@ export function ListingForm({
   const [v, setV] = useState<Values>(initial);
   const { run, pending, result, fieldErrors: fe } = useAdminAction();
   const set = <K extends keyof Values>(k: K, value: Values[K]) => setV((p) => ({ ...p, [k]: value }));
+  const models = useModelSuggestions(v.makeOther ? "" : v.make);
 
   const text = (key: "title" | "variant" | "engine" | "transmission" | "exteriorColor" | "city" | "mileageKm" | "videoUrl" | "interiorColor" | "ownerCount" | "dealerName" | "dealerRegistryCode", label: string, opts: { optional?: boolean; wide?: boolean; inputMode?: "numeric" | "url" } = {}) => (
     <div className={opts.wide ? "sm:col-span-2" : undefined}>
@@ -54,6 +57,39 @@ export function ListingForm({
       }}
     >
       {text("title", "Title", { wide: true })}
+      <div>
+        <Label htmlFor="listing-make">Make</Label>
+        <MakeCombobox
+          id="listing-make"
+          invalid={Boolean(fe.make)}
+          describedBy="listing-make-note"
+          value={{ make: v.make, other: v.makeOther }}
+          onChange={(m) => setV((p) => ({ ...p, make: m.make, makeOther: m.other }))}
+        />
+        <div id="listing-make-note">
+          <FieldNote
+            error={fe.make}
+            hint={v.makeOther ? "Not in the make list: kept as typed. Add it to lib/data/car-makes.ts in a future update." : "Type to search the make list."}
+          />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="listing-model">Model</Label>
+        <Input
+          id="listing-model"
+          value={v.model}
+          onChange={(e) => set("model", e.target.value)}
+          list={models.length ? "listing-model-suggestions" : undefined}
+          autoComplete="off"
+          aria-invalid={fe.model ? true : undefined}
+        />
+        <datalist id="listing-model-suggestions">
+          {models.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+        <FieldNote error={fe.model} />
+      </div>
       <div>
         <p className="mb-1.5 text-sm font-semibold">VIN</p>
         <p className="flex h-10 items-center rounded-md border border-line bg-asphalt/50 px-3 font-mono text-sm tracking-wider text-mute">{vin}</p>

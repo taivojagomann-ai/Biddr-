@@ -41,7 +41,7 @@ export function PriceStep({
 }: StepProps & { userId: string; draftId: string; onReportBusy: (busy: boolean) => void }) {
   const questionErrId = `${fieldId("dealerInspection")}-error`;
   const restored = values.hadDamage === "yes";
-  const make = (values.make === "Other" ? values.makeOther : values.make).trim();
+  const make = values.make.trim();
   const today = new Date().toISOString().slice(0, 10);
   // Two uploaders on this step: tell the form while either is still uploading.
   const [dealerBusy, setDealerBusy] = useState(false);

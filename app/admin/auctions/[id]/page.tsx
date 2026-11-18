@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { findMake } from "@/lib/data/car-makes";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardCheck, ExternalLink, Mail, Phone } from "lucide-react";
@@ -253,6 +254,18 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
 
       <div className="mt-6 space-y-6">
         <Section id="status" title="Status" className="border-mute">
+          {a.make_other ? (
+            <div role="note" aria-label="Suggested make" className="mb-4 rounded-md border border-line bg-asphalt/50 p-3 text-sm">
+              <p>
+                <span className="font-semibold">Suggested make: {a.make}.</span> The seller chose “Other” because it isn&apos;t in
+                the make list.
+              </p>
+              <p className="mt-1 text-mute">
+                Add it to <code>lib/data/car-makes.ts</code> in a future update. The listing can still be approved; correct the
+                make under Listing if it&apos;s misspelt.
+              </p>
+            </div>
+          ) : null}
           <StatusActions
             auctionId={a.id}
             status={a.status}
@@ -306,6 +319,9 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             restored={restored}
             initial={{
               title: a.title,
+              make: a.make,
+              makeOther: Boolean(a.make_other) || !findMake(a.make),
+              model: a.model,
               variant: a.variant ?? "",
               engine: a.engine ?? "",
               transmission: a.transmission ?? "",
