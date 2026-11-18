@@ -10,7 +10,11 @@ const nextConfig = {
   experimental: {
     // The demo data loader (run from /admin) reads the real cover photos from disk,
     // so they must be shipped with that page's server code on Vercel.
-    outputFileTracingIncludes: { "/admin": ["./lib/demo/photos/**/*"] },
+    // The invoice PDF embeds its fonts, read from disk at runtime.
+    outputFileTracingIncludes: {
+      "/admin": ["./lib/demo/photos/**/*"],
+      "/api/invoices/[id]": ["./lib/invoice/fonts/**/*"],
+    },
   },
   images: {
     remotePatterns: [{ protocol: supabaseProtocol, hostname: supabaseHost, pathname: "/storage/v1/object/public/**" }],
