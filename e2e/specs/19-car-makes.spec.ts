@@ -218,5 +218,7 @@ test.describe("home search with the new names", () => {
     await expect(page.getByRole("link", { name: new RegExp(skoda.title) }).first()).toBeVisible();
     await page.goto("/?q=citroen%20ds3");
     await expect(page.getByRole("link", { name: new RegExp(citroen.title) }).first()).toBeVisible();
+    // End them, so repeated runs don't fill the search results with test cars.
+    await service().from("auctions").update({ status: "ended" }).in("id", [skoda.id, citroen.id]);
   });
 });

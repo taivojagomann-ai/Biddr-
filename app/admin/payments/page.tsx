@@ -42,6 +42,15 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   if (filter !== "all") query = query.eq("status", filter);
   const { data } = await query.returns<Row[]>();
   const rows = data ?? [];
+  const { data: invoiceRows } = rows.length
+    ? await ctx.db
+        .from("invoices")
+        .select("id, number, kind, buyer_payment_id")
+        .in("buyer_payment_id", rows.map((r) => r.id))
+        .returns<{ id: string; number: string; kind: "invoice" | "credit_note"; buyer_payment_id: string }[]>()
+    : { data: [] };
+  const docs = new Map<string, { id: string; number: string; kind: "invoice" | "credit_note" }[]>();
+  for (const d of invoiceRows ?? []) docs.set(d.buyer_payment_id, [...(docs.get(d.buyer_payment_id) ?? []), d]);
 
   return (
     <main className="container py-8 sm:py-12">
@@ -49,7 +58,12 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
         ← All auctions
       </Link>
       <h1 className="mt-4 font-wide text-3xl font-extrabold tracking-tight">Payments</h1>
-      <p className="mt-1 text-sm text-mute">Buyer&apos;s premiums for sold cars. Links open the payment in Stripe&apos;s dashboard.</p>
+      <p className="mt-1 text-sm text-mute">
+        Buyer&apos;s premiums for sold cars. Links open the payment in Stripe&apos;s dashboard.{" "}
+        <Link href="/admin/invoices" className="font-semibold text-chalk underline underline-offset-4">
+          All invoices
+        </Link>
+      </p>
 
       <nav aria-label="Payment status" className="mt-6 flex flex-wrap gap-2 text-sm">
         {FILTERS.map((f) => (
@@ -108,6 +122,12 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                       <span className="sr-only"> for {title} (opens in a new tab)</span>
                     </a>
                   ) : null}
+                  {(docs.get(r.id) ?? []).map((d) => (
+                    <a key={d.id} href={`/api/invoices/${d.id}`} download className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal">
+                      {d.kind === "credit_note" ? "Credit note" : "Invoice"} {d.number} (PDF)
+                      <span className="sr-only"> for {title}</span>
+                    </a>
+                  ))}
                 </p>
                 <div className="mt-2">
                   <PaymentActions paymentId={r.id} status={r.status} title={title} premium={formatEur(r.premium_amount)} />

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAdminAction, requireAdmin } from "@/lib/admin";
 import type { AdminResult } from "@/lib/admin-schemas";
+import { ensureCreditNote } from "@/lib/invoice/issue";
 import { settleBuyerPayment, type BuyerPaymentRow } from "@/lib/settlement";
 import { stripe } from "@/lib/stripe";
 
@@ -119,7 +120,17 @@ export async function refundPremium(input: unknown): Promise<AdminResult> {
   }
   const { error } = await ctx.db.from("buyer_payments").update({ status: "refunded" }).eq("id", row.id);
   if (error) return { ok: false, error: "The refund went through in Stripe, but the status didn't save. Reload the page." };
-  await logAdminAction(ctx, row.auction_id, "payment.refund", { payment_id: row.id, amount: row.premium_amount, refunds });
+  // The credit note that cancels the invoice. If this fails, the settlement job issues it later.
+  const creditNote = await ensureCreditNote(ctx.db, row.id).catch((e) => {
+    console.error("invoice: credit note failed", row.id, e);
+    return null;
+  });
+  await logAdminAction(ctx, row.auction_id, "payment.refund", {
+    payment_id: row.id,
+    amount: row.premium_amount,
+    refunds,
+    credit_note: creditNote?.number ?? null,
+  });
   refresh(row.auction_id);
   return { ok: true, message: "Refunded. Stripe returns the money to the winner's card." };
 }

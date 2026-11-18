@@ -135,7 +135,8 @@ Stripe must be in **test mode** (every page shows the yellow test-mode banner), 
 1. S lists a car; the admin approves it and, under Schedule, sets it to start now and end in about 10 minutes.
 2. B bids with card `4242 4242 4242 4242` (€5,000). W bids with `4242 4242 4242 4242` (€6,000). The premium is €350.
 3. Wait for the end, then up to 5 minutes for the jobs.
-   - [ ] W's **My purchases** (account menu) shows the car, winning bid €6,000, premium €350, "Taken from your card hold €350", "Charged to your card €0", status **Paid** and a **View the receipt** link.
+   - [ ] W's **My purchases** (account menu) shows the car, winning bid €6,000, premium €350, "Taken from your card hold €350", "Charged to your card €0", status **Paid** and a **Download invoice BID-…** link.
+   - [ ] The invoice PDF opens: Biddr OÜ's details, W's name, "Buyer's premium: <car>", €350.00 including VAT 24% (Estonia), "Taken from the card hold €350.00", and the red "Test mode" line.
    - [ ] W sees S's full name, phone and email, with the note "Arrange payment for the car and the handover directly with each other."
    - [ ] S's **My listings** shows W's full name, phone and email on the sold car.
    - [ ] Both got a notification ("Buyer's premium paid…").
@@ -161,7 +162,9 @@ Stripe must be in **test mode** (every page shows the yellow test-mode banner), 
 ### 8.4 Admin tools
 1. On a paid car, Admin → Payments → **Refund premium** → confirm.
    - [ ] Status **Refunded**. Stripe shows the hold payment and any "Buyer's premium" payment as **Refunded**.
-   - [ ] The auction's admin activity log shows `payment.refund`.
+   - [ ] The auction's admin activity log shows `payment.refund`, with the credit note's number.
+   - [ ] W's My purchases shows **Download credit note BID-…** next to the invoice; the credit note shows −€… and "This credit note cancels invoice BID-…".
+   - [ ] **Admin → Invoices** lists the invoice and the credit note for this month, the VAT totals, and **Download CSV for the accountant** downloads both rows.
 2. On a car that needs the winner (8.3 before paying), choose **Mark as cancelled**, give a reason and confirm.
    - [ ] Status **Cancelled**. Nothing more is charged, and no contact details are shown.
 3. **Retry charge** on a car that needs the winner.

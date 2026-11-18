@@ -1,4 +1,5 @@
 import "server-only";
+import { ensureInvoice, issueMissingInvoices } from "@/lib/invoice/issue";
 import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { HOLD_AMOUNT_EUR, stripe } from "@/lib/stripe";
@@ -100,6 +101,8 @@ async function markPaid(admin: Admin, row: BuyerPaymentRow, receipt: string | nu
     { user_id: row.winner_id, type: "premium_paid", auction_id: row.auction_id, data: { role: "winner", amount: row.premium_amount } },
     { user_id: row.seller_id, type: "premium_paid", auction_id: row.auction_id, data: { role: "seller" } },
   ]);
+  // The invoice for the whole premium. If this fails, the settlement job issues it later.
+  await ensureInvoice(admin, row.id).catch((e) => console.error("invoice: issuing failed", row.id, e));
 }
 
 async function needsWinner(admin: Admin, row: BuyerPaymentRow, kind: "action_required" | "failed", reason: string, remainderPi: string | null) {
@@ -241,7 +244,10 @@ export async function settleBuyerPayment(admin: Admin, id: string, from: BuyerPa
 }
 
 /** Settles every pending payment (oldest first). */
-export async function settlePending(admin: Admin, limit = 25): Promise<{ attempted: number; results: Record<string, number> }> {
+export async function settlePending(
+  admin: Admin,
+  limit = 25,
+): Promise<{ attempted: number; results: Record<string, number>; invoices: number }> {
   const { data } = await admin
     .from("buyer_payments")
     .select("id")
@@ -254,7 +260,9 @@ export async function settlePending(admin: Admin, limit = 25): Promise<{ attempt
     const status = (await settleBuyerPayment(admin, r.id)) ?? "skipped";
     results[status] = (results[status] ?? 0) + 1;
   }
-  return { attempted: data?.length ?? 0, results };
+  // Invoices that couldn't be issued when the premium was paid (or refunded).
+  const invoices = await issueMissingInvoices(admin);
+  return { attempted: data?.length ?? 0, results, invoices };
 }
 
 /**

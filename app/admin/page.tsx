@@ -71,6 +71,10 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
         <Link href="/admin/payments" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
           Payments
         </Link>
+        {" · "}
+        <Link href="/admin/invoices" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+          Invoices
+        </Link>
       </p>
 
       <nav aria-label="Auction status" className="-mx-4 mt-6 overflow-x-auto px-4">

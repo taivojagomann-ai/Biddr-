@@ -8,6 +8,7 @@ import { contactForPaidPayment, type PartyContact } from "@/lib/contacts";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
 import { PREMIUM_MAX, PREMIUM_MIN, PREMIUM_RATE } from "@/lib/pricing";
+import type { InvoiceKind } from "@/lib/invoice/issue";
 import type { BuyerPaymentRow } from "@/lib/settlement";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,17 @@ export default async function PurchasesPage() {
     .order("created_at", { ascending: false })
     .returns<Row[]>();
   const rows = data ?? [];
+
+  // This winner's invoices and credit notes (RLS: their own only).
+  const { data: invoiceRows } = rows.length
+    ? await supabase
+        .from("invoices")
+        .select("id, number, kind, buyer_payment_id")
+        .in("buyer_payment_id", rows.map((r) => r.id))
+        .returns<{ id: string; number: string; kind: InvoiceKind; buyer_payment_id: string }[]>()
+    : { data: [] };
+  const docs = new Map<string, { id: string; number: string; kind: InvoiceKind }[]>();
+  for (const d of invoiceRows ?? []) docs.set(d.buyer_payment_id, [...(docs.get(d.buyer_payment_id) ?? []), d]);
 
   // Contact details only for paid purchases, read on the server for this winner only.
   const admin = getAdminSupabase();
@@ -126,12 +138,8 @@ export default async function PurchasesPage() {
                       </>
                     ) : null}
                   </dl>
-                  {r.status === "paid" && r.receipt_url ? (
-                    <p className="text-sm">
-                      <a href={r.receipt_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal">
-                        View the receipt<span className="sr-only"> for {title} (opens in a new tab)</span>
-                      </a>
-                    </p>
+                  {r.status === "paid" || r.status === "refunded" ? (
+                    <InvoiceLinks docs={docs.get(r.id) ?? []} title={title} />
                   ) : null}
                   {needsWinner ? (
                     <div className="flex flex-wrap items-center gap-3">
@@ -146,5 +154,29 @@ export default async function PurchasesPage() {
         </ul>
       )}
     </main>
+  );
+}
+
+/** Download links for the invoice (and the credit note after a refund). */
+function InvoiceLinks({ docs, title }: { docs: { id: string; number: string; kind: InvoiceKind }[]; title: string }) {
+  const sorted = [...docs].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "invoice" ? -1 : 1));
+  if (!sorted.length) {
+    return <p className="text-sm text-mute">Your invoice is being prepared. It appears here within a few minutes.</p>;
+  }
+  return (
+    <ul className="flex flex-wrap gap-x-5 text-sm">
+      {sorted.map((d) => (
+        <li key={d.id}>
+          <a
+            href={`/api/invoices/${d.id}`}
+            download
+            className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-signal"
+          >
+            {d.kind === "credit_note" ? "Download credit note" : "Download invoice"} {d.number} (PDF)
+            <span className="sr-only"> for {title}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
   );
 }
