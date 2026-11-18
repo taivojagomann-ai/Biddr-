@@ -89,8 +89,11 @@ export async function ensureInvoice(admin: Admin, paymentId: string): Promise<In
   if (found) return found;
 
   const { data: payment } = await admin.from("buyer_payments").select("*").eq("id", paymentId).maybeSingle<BuyerPaymentRow>();
-  // Only paid premiums are invoiced (a refunded one was paid first).
-  if (!payment || (payment.status !== "paid" && payment.status !== "refunded")) return null;
+  // Paid premiums are invoiced (a refunded one was paid first). When the buyer didn't pay,
+  // only what was kept from the card hold is (DECISIONS.md point 12).
+  if (!payment) return null;
+  const retained = payment.status === "unpaid";
+  if (retained ? (payment.captured_from_hold ?? 0) <= 0 : payment.status !== "paid" && payment.status !== "refunded") return null;
 
   const [{ data: auction }, buyer] = await Promise.all([
     admin.from("auctions").select("title, location_country").eq("id", payment.auction_id).maybeSingle<{ title: string; location_country: string | null }>(),
@@ -98,7 +101,7 @@ export async function ensureInvoice(admin: Admin, paymentId: string): Promise<In
   ]);
   const vat = vatRateFor(auction?.location_country);
   const fromHold = payment.captured_from_hold ?? 0;
-  const rest = payment.premium_amount - fromHold;
+  const rest = retained ? 0 : payment.premium_amount - fromHold;
 
   const payments: InvoiceDetails["payments"] = [];
   if (fromHold > 0) payments.push({ label: "Taken from the card hold", amountCents: fromHold * 100, reference: payment.hold_payment_intent_id });
@@ -108,13 +111,15 @@ export async function ensureInvoice(admin: Admin, paymentId: string): Promise<In
     kind: "invoice",
     payment,
     creditedId: null,
-    totalCents: payment.premium_amount * 100,
+    totalCents: (retained ? fromHold : payment.premium_amount) * 100,
     vat,
     details: {
       issuer: { ...COMPANY, addressLines: [...COMPANY.addressLines] },
       buyer: { name: buyer.fullName ?? "Biddr member", email: buyer.email },
       line: {
-        description: `Buyer's premium: ${auction?.title ?? "car"}`,
+        description: retained
+          ? `Buyer's premium, part kept from the card hold (the premium wasn't paid in full and the sale was cancelled): ${auction?.title ?? "car"}`
+          : `Buyer's premium: ${auction?.title ?? "car"}`,
         winningBid: payment.winning_bid,
         basis: BASIS,
         carCountry: vat.country,
@@ -157,7 +162,7 @@ export async function issueMissingInvoices(admin: Admin, limit = 50): Promise<nu
   const { data: payments } = await admin
     .from("buyer_payments")
     .select("id, status")
-    .in("status", ["paid", "refunded"])
+    .in("status", ["paid", "refunded", "unpaid"])
     .order("updated_at", { ascending: false })
     .limit(limit)
     .returns<{ id: string; status: string }[]>();

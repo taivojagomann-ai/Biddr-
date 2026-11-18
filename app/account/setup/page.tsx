@@ -42,9 +42,9 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
   const [{ data: terms }, { data: currentVersion }] = await Promise.all([
     getAdminSupabase()
       .from("profiles")
-      .select("bidding_terms_version, bidding_terms_accepted_at")
+      .select("bidding_terms_version, bidding_terms_accepted_at, bidding_blocked_at, bidding_block_reason")
       .eq("id", user.id)
-      .maybeSingle<TermsStatus>(),
+      .maybeSingle<TermsStatus & { bidding_blocked_at?: string | null; bidding_block_reason?: string | null }>(),
     supabase.rpc("current_bidding_terms_version"),
   ]);
   const acceptedCurrent = Boolean(
@@ -62,6 +62,17 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
             ? "A few details before you bid, comment or list a car. Only your username and country are shown publicly."
             : "Only your username and country are shown publicly."}
         </p>
+        {terms?.bidding_blocked_at ? (
+          <section aria-labelledby="blocked-heading" className="mt-6 rounded-lg border border-signal/50 bg-signal/10 p-4 text-sm">
+            <h2 id="blocked-heading" className="font-bold">
+              Your bidding is blocked
+            </h2>
+            <p className="mt-1">
+              {terms.bidding_block_reason ?? "A buyer's premium wasn't paid in time."} You can&apos;t bid until Biddr lifts the
+              block. Contact us if you think this is a mistake.
+            </p>
+          </section>
+        ) : null}
         <SetupForm
           isNew={isNew}
           next={next}

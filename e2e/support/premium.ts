@@ -15,13 +15,24 @@ export interface Sold {
   winner: TestUser;
   holdPi: string;
   paymentId: string;
+  /** With `runnerUp`: the second-highest bidder. */
+  runner?: TestUser;
 }
 
 /** A live auction the winner bids on with a €500 hold whose card behaves like `card`, then sold. */
-export async function soldAuction(winningBid: number, card: Card, o: { country?: string } = {}): Promise<Sold> {
+export async function soldAuction(winningBid: number, card: Card, o: { country?: string; runnerUp?: number } = {}): Promise<Sold> {
   const seller = await createUser({ role: "seller", fullName: "Sella Seller", phone: "+37255512345" });
   const winner = await createUser({ verifiedBidder: true, fullName: "Wynn Winner", phone: "+358401234567" });
-  const a = await createAuction({ seller, startingBid: winningBid, country: o.country });
+  const a = await createAuction({ seller, startingBid: o.runnerUp ?? winningBid, country: o.country });
+  let runner: TestUser | undefined;
+  if (o.runnerUp) {
+    // A second bidder, outbid by the winner.
+    runner = await createUser({ verifiedBidder: true, fullName: "Rhea Runner", phone: "+37155512345" });
+    await service().from("profiles").update({ stripe_customer_id: `cus_e2e${runner.id.replace(/-/g, "")}` }).eq("id", runner.id);
+    const runnerHold = `pi_e2e_hold_ok_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    await service().from("bid_holds").insert({ auction_id: a.id, user_id: runner.id, stripe_payment_intent_id: runnerHold, amount: 500, status: "authorized" });
+    expect((await bid(runner, a.id, o.runnerUp)).error).toBeNull();
+  }
   const holdPi = `pi_e2e_hold_${card}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   // Customer ids are unique per member, as in Stripe.
   const { error: customerError } = await service().from("profiles").update({ stripe_customer_id: `cus_e2e${winner.id.replace(/-/g, "")}` }).eq("id", winner.id);
@@ -32,7 +43,7 @@ export async function soldAuction(winningBid: number, card: Card, o: { country?:
   await runJob("advance_auction_states");
   expect((await getAuction<{ status: string }>(a.id)).status).toBe("sold");
   const { data } = await service().from("buyer_payments").select("id").eq("auction_id", a.id).single();
-  return { auctionId: a.id, title: a.title, seller, winner, holdPi, paymentId: data!.id as string };
+  return { auctionId: a.id, title: a.title, seller, winner, holdPi, paymentId: data!.id as string, runner };
 }
 
 export async function settle(request: APIRequestContext) {

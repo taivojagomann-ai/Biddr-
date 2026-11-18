@@ -21,13 +21,22 @@ export async function POST(req: Request): Promise<Response> {
   if (!user) return jsonError("Sign in to continue.", 401);
 
   const admin = getAdminSupabase();
-  const { data: row } = await admin
+  // This member's newest payment on the car (a car can have more than one after a
+  // second-chance offer; each buyer only ever sees their own).
+  const { data: rows } = await admin
     .from("buyer_payments")
     .select("*")
     .eq("auction_id", parsed.data.auctionId)
-    .maybeSingle<BuyerPaymentRow>();
-  if (!row || row.winner_id !== user.id) return jsonError("There's no payment for you on this car.", 404);
+    .eq("winner_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .returns<BuyerPaymentRow[]>();
+  const row = rows?.[0];
+  if (!row) return jsonError("There's no payment for you on this car.", 404);
   if (row.status === "paid") return jsonError("This premium is already paid.", 409);
+  if (row.due_at && Date.parse(row.due_at) <= Date.now()) {
+    return jsonError("The time to pay has run out, so this sale was cancelled. Reload the page.", 409);
+  }
   if (row.status !== "action_required" && row.status !== "failed") {
     return jsonError("This payment isn't waiting for you right now. Reload the page.", 409);
   }

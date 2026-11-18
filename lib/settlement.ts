@@ -17,7 +17,7 @@ import { HOLD_AMOUNT_EUR, stripe } from "@/lib/stripe";
  * idempotency keys, so a retry never charges twice.
  */
 
-export type BuyerPaymentStatus = "pending" | "paid" | "action_required" | "failed" | "refunded" | "cancelled";
+export type BuyerPaymentStatus = "pending" | "paid" | "action_required" | "failed" | "refunded" | "cancelled" | "unpaid";
 
 export interface BuyerPaymentRow {
   id: string;
@@ -37,10 +37,22 @@ export interface BuyerPaymentRow {
   attempts: number;
   last_attempt_at: string | null;
   created_at: string;
+  /** 0025: the reminder 24 hours before due_at, when it went unpaid, and the seller's "Sale completed". */
+  reminder_sent_at?: string | null;
+  unpaid_at?: string | null;
+  sale_completed_at?: string | null;
+  /** Set when this sale is a second-chance offer to the next bidder. */
+  second_chance_offer_id?: string | null;
 }
 
 /** How long the winner has to complete a payment that needs them. */
 export const PAYMENT_DUE_HOURS = 72;
+/** The reminder goes this long before the deadline. */
+export const REMINDER_HOURS = 24;
+/** How long the next bidder has to accept a second-chance offer and pay. */
+export const SECOND_CHANCE_HOURS = 48;
+/** How long the buyer has to pay the seller for the car after the premium is paid. */
+export const SELLER_PAYMENT_DAYS = 7;
 /** A claimed attempt older than this is considered abandoned and can be retried. */
 const CLAIM_MS = 2 * 60 * 1000;
 
@@ -101,6 +113,10 @@ async function markPaid(admin: Admin, row: BuyerPaymentRow, receipt: string | nu
     { user_id: row.winner_id, type: "premium_paid", auction_id: row.auction_id, data: { role: "winner", amount: row.premium_amount } },
     { user_id: row.seller_id, type: "premium_paid", auction_id: row.auction_id, data: { role: "seller" } },
   ]);
+  // A second-chance sale: the offer is done.
+  if (row.second_chance_offer_id) {
+    await admin.from("second_chance_offers").update({ status: "paid" }).eq("id", row.second_chance_offer_id);
+  }
   // The invoice for the whole premium. If this fails, the settlement job issues it later.
   await ensureInvoice(admin, row.id).catch((e) => console.error("invoice: issuing failed", row.id, e));
 }
@@ -247,7 +263,12 @@ export async function settleBuyerPayment(admin: Admin, id: string, from: BuyerPa
 export async function settlePending(
   admin: Admin,
   limit = 25,
-): Promise<{ attempted: number; results: Record<string, number>; invoices: number }> {
+): Promise<{
+  attempted: number;
+  results: Record<string, number>;
+  deadlines: { reminded: number; expired: number; offersExpired: number };
+  invoices: number;
+}> {
   const { data } = await admin
     .from("buyer_payments")
     .select("id")
@@ -260,9 +281,132 @@ export async function settlePending(
     const status = (await settleBuyerPayment(admin, r.id)) ?? "skipped";
     results[status] = (results[status] ?? 0) + 1;
   }
+  // Reminders, payments past their deadline, and expired second-chance offers.
+  const deadlines = await processDeadlines(admin);
   // Invoices that couldn't be issued when the premium was paid (or refunded).
   const invoices = await issueMissingInvoices(admin);
-  return { attempted: data?.length ?? 0, results, invoices };
+  return { attempted: data?.length ?? 0, results, deadlines, invoices };
+}
+
+/**
+ * Deadlines (DECISIONS.md point 12), run with every settlement pass (every 5 minutes):
+ * - 24 hours before a payment that needs the winner is due: one reminder.
+ * - Past due: the winner's sale is cancelled as "Buyer didn't pay" (status 'unpaid'),
+ *   what was taken from the hold is kept (and invoiced), the winner is blocked from
+ *   bidding, and the seller and admins are told. A second-chance buyer who doesn't pay
+ *   isn't blocked: their payment is just cancelled and the seller is told.
+ * - Second-chance offers not answered within 48 hours expire.
+ */
+export async function processDeadlines(admin: Admin): Promise<{ reminded: number; expired: number; offersExpired: number }> {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  let reminded = 0;
+  let expired = 0;
+  let offersExpired = 0;
+
+  const soon = new Date(now.getTime() + REMINDER_HOURS * 3600 * 1000).toISOString();
+  const { data: dueSoon } = await admin
+    .from("buyer_payments")
+    .select("*")
+    .in("status", ["action_required", "failed"])
+    .is("reminder_sent_at", null)
+    .gt("due_at", nowIso)
+    .lte("due_at", soon)
+    .limit(100)
+    .returns<BuyerPaymentRow[]>();
+  for (const row of dueSoon ?? []) {
+    const { data: claimed } = await admin
+      .from("buyer_payments")
+      .update({ reminder_sent_at: nowIso })
+      .eq("id", row.id)
+      .is("reminder_sent_at", null)
+      .select("id");
+    if (!claimed?.length) continue;
+    await notify(admin, [{ user_id: row.winner_id, type: "premium_reminder", auction_id: row.auction_id, data: { due_at: row.due_at } }]);
+    reminded += 1;
+  }
+
+  const { data: overdue } = await admin
+    .from("buyer_payments")
+    .select("*")
+    .in("status", ["action_required", "failed"])
+    .lte("due_at", nowIso)
+    .limit(50)
+    .returns<BuyerPaymentRow[]>();
+  for (const row of overdue ?? []) {
+    try {
+      if (await expirePayment(admin, row)) expired += 1;
+    } catch (e) {
+      console.error("settlement: expiring a payment failed", row.id, e);
+    }
+  }
+
+  const { data: offers } = await admin
+    .from("second_chance_offers")
+    .update({ status: "expired" })
+    .eq("status", "pending")
+    .lte("expires_at", nowIso)
+    .select("auction_id, seller_id")
+    .returns<{ auction_id: string; seller_id: string }[]>();
+  for (const o of offers ?? []) {
+    await notify(admin, [{ user_id: o.seller_id, type: "second_chance_closed", auction_id: o.auction_id, data: { outcome: "expired" } }]);
+    offersExpired += 1;
+  }
+  return { reminded, expired, offersExpired };
+}
+
+/** Closes one payment past its deadline. Returns the new status, or null if someone else already did. */
+async function expirePayment(admin: Admin, row: BuyerPaymentRow): Promise<BuyerPaymentStatus | null> {
+  // Paid at the last minute? Then it's paid. Otherwise make sure it can't be paid any more.
+  if (row.remainder_payment_intent_id) {
+    const pi = await stripe.paymentIntents.retrieve(row.remainder_payment_intent_id, { expand: ["latest_charge"] }).catch(() => null);
+    if (pi?.status === "succeeded") {
+      await markPaid(admin, row, receiptOf(pi));
+      return "paid";
+    }
+    if (pi && pi.status !== "canceled") await stripe.paymentIntents.cancel(pi.id).catch(() => undefined);
+  }
+
+  const secondChance = row.second_chance_offer_id ?? null;
+  const nowIso = new Date().toISOString();
+  const { data: done } = await admin
+    .from("buyer_payments")
+    .update({
+      status: secondChance ? "cancelled" : "unpaid",
+      unpaid_at: nowIso,
+      due_at: null,
+      failure_reason: secondChance
+        ? `Not paid within ${SECOND_CHANCE_HOURS} hours of the second-chance offer.`
+        : `Not paid within ${PAYMENT_DUE_HOURS} hours.`,
+    })
+    .eq("id", row.id)
+    .in("status", ["action_required", "failed"])
+    .select("id");
+  if (!done?.length) return null;
+
+  if (secondChance) {
+    await admin.from("second_chance_offers").update({ status: "expired" }).eq("id", secondChance).in("status", ["pending", "accepted"]);
+    await notify(admin, [{ user_id: row.seller_id, type: "second_chance_closed", auction_id: row.auction_id, data: { outcome: "expired" } }]);
+    return "cancelled";
+  }
+
+  const title = await auctionTitle(admin, row.auction_id);
+  await admin
+    .from("profiles")
+    .update({ bidding_blocked_at: nowIso, bidding_block_reason: `The buyer's premium for ${title} wasn't paid in time.` })
+    .eq("id", row.winner_id)
+    .is("bidding_blocked_at", null);
+  const admins = (await adminIds(admin)).filter((id) => id !== row.winner_id);
+  await notify(admin, [
+    { user_id: row.winner_id, type: "premium_unpaid", auction_id: row.auction_id, data: { kept: row.captured_from_hold ?? 0 } },
+    { user_id: row.seller_id, type: "buyer_did_not_pay", auction_id: row.auction_id, data: { role: "seller" } },
+    ...admins.map((id) => ({ user_id: id, type: "buyer_did_not_pay", auction_id: row.auction_id, data: { role: "admin" } })),
+  ]);
+  // What was taken from the hold is kept: it gets an invoice.
+  if ((row.captured_from_hold ?? 0) > 0) {
+    await ensureInvoice(admin, row.id).catch((e) => console.error("invoice: issuing failed", row.id, e));
+  }
+  return "unpaid";
 }
 
 /**

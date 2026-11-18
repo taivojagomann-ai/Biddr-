@@ -28,5 +28,6 @@ export async function getBidderStatus(supabase: SupabaseClient): Promise<BidderS
 export function unmetRequirement(status: BidderStatus): BidderRequirementCode | null {
   if (!status.profile_complete) return "PROFILE_INCOMPLETE";
   if (!status.terms_accepted) return "TERMS_NOT_ACCEPTED";
+  if (status.blocked) return "BIDDING_BLOCKED";
   return null;
 }

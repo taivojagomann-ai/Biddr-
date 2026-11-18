@@ -149,8 +149,14 @@ test.describe("sell form: Make", () => {
 
     // The admin's notification and the review page.
     await signIn(context, seed.admin);
-    await page.goto("/account/notifications");
-    await expect(page.getByText("New make suggested: Zenvo").first()).toBeVisible();
+    // Other tests running at the same time also notify the shared test admin, so the
+    // notification may be on a later page of the list: look through the first few.
+    let shown = false;
+    for (let n = 1; n <= 5 && !shown; n++) {
+      await page.goto(`/account/notifications?page=${n}`);
+      shown = (await page.locator("main").getByText("New make suggested: Zenvo").count()) > 0;
+    }
+    expect(shown, "New make suggested: Zenvo on the notifications page").toBe(true);
     await page.goto(`/admin/auctions/${auction!.id}`);
     const note = page.getByRole("note", { name: "Suggested make" });
     await expect(note).toContainText("Suggested make: Zenvo.");
