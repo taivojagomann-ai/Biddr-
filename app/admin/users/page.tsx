@@ -34,6 +34,15 @@ export default async function AdminUsersPage() {
     for (const a of live ?? []) leading.set(a.leading_bidder_id, [...(leading.get(a.leading_bidder_id) ?? []), a]);
   }
 
+  const { data: sellingData } = await ctx.db
+    .from("profiles")
+    .select("id, username, full_name, selling_blocked_at, selling_block_reason")
+    .not("selling_blocked_at", "is", null)
+    .order("selling_blocked_at", { ascending: false })
+    .limit(200)
+    .returns<{ id: string; username: string | null; full_name: string | null; selling_blocked_at: string; selling_block_reason: string | null }[]>();
+  const sellers = sellingData ?? [];
+
   return (
     <main className="container max-w-4xl py-8 sm:py-12">
       <Link href="/admin" className="text-sm text-mute hover:text-chalk">
@@ -41,7 +50,8 @@ export default async function AdminUsersPage() {
       </Link>
       <h1 className="mt-4 font-wide text-3xl font-extrabold tracking-tight">Users</h1>
       <p className="mt-1 text-sm text-mute">
-        Members blocked from bidding because a buyer&apos;s premium wasn&apos;t paid in time. Only an admin can lift a block.
+        Members blocked from bidding (a buyer&apos;s premium not paid in time, or after a report) or from selling (after a
+        report). Only an admin can lift a block.
       </p>
       <h2 className="mt-8 text-lg font-bold">Blocked from bidding ({rows.length})</h2>
       {rows.length === 0 ? (
@@ -77,6 +87,32 @@ export default async function AdminUsersPage() {
                   ) : null}
                   <div className="mt-3">
                     <LiftBlock userId={r.id} name={name} />
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <h2 className="mt-10 text-lg font-bold">Blocked from selling ({sellers.length})</h2>
+      {sellers.length === 0 ? (
+        <p className="mt-3 text-sm text-mute">Nobody is blocked from selling.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {sellers.map((r) => {
+            const name = r.username ?? r.full_name ?? "Member";
+            return (
+              <li key={r.id} className="rounded-lg border border-line bg-panel p-4">
+                <article aria-labelledby={`seller-${r.id}`}>
+                  <h3 id={`seller-${r.id}`} className="font-bold">
+                    {name} (selling)
+                  </h3>
+                  <p className="mt-1 text-sm">{r.selling_block_reason ?? "Blocked from selling."}</p>
+                  <p className="mt-1 text-xs text-mute">
+                    Blocked <LocalDateTime iso={r.selling_blocked_at} />
+                  </p>
+                  <div className="mt-3">
+                    <LiftBlock userId={r.id} name={name} kind="selling" />
                   </div>
                 </article>
               </li>

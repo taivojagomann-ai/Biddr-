@@ -3,12 +3,13 @@ import { ContactCard } from "@/components/contact-card";
 import { LocalDateTime } from "@/components/local-date-time";
 import type { PartyContact } from "@/lib/contacts";
 import { formatEur } from "@/lib/format";
+import { STATUS_LABELS as REPORT_STATUS, type ReportStatus } from "@/lib/reports";
 import { CompleteSaleButton, SaleOptions } from "./sale-options";
 
 /** What My listings shows under a sold car (DECISIONS.md point 12). */
 export type SaleState =
   | { kind: "waiting"; secondChance: boolean }
-  | { kind: "paid"; paymentId: string; contact: PartyContact | null; completedAt: string | null }
+  | { kind: "paid"; paymentId: string; contact: PartyContact | null; completedAt: string | null; conversationId: string | null; report: ReportStatus | null }
   | { kind: "cancelled" }
   | { kind: "offered"; amount: number; expiresAt: string; accepted: boolean }
   | { kind: "relisted"; href: string }
@@ -28,6 +29,17 @@ export function SalePanel({ auctionId, title, state }: { auctionId: string; titl
       return (
         <div className="space-y-3">
           {state.contact ? <ContactCard heading="Buyer's contact details" contact={state.contact} idBase={`l-${auctionId}`} /> : null}
+          {state.conversationId ? (
+            <p className="text-sm">
+              <Link
+                href={`/account/messages/${state.conversationId}`}
+                className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:text-signal"
+              >
+                Message the buyer<span className="sr-only"> about {title}</span>
+              </Link>
+              {state.report ? <span className="ml-3 text-mute">Your report: {REPORT_STATUS[state.report]}</span> : null}
+            </p>
+          ) : null}
           {state.completedAt ? (
             <p className="text-sm text-verified">
               Sale completed on <LocalDateTime iso={state.completedAt} dateOnly />.

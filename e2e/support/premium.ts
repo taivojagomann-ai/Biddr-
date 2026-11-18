@@ -40,8 +40,13 @@ export async function soldAuction(winningBid: number, card: Card, o: { country?:
   await service().from("bid_holds").insert({ auction_id: a.id, user_id: winner.id, stripe_payment_intent_id: holdPi, amount: 500, status: "authorized" });
   expect((await bid(winner, a.id, winningBid)).error).toBeNull();
   await setAuction(a.id, { ends_at: iso(-1000) });
-  await runJob("advance_auction_states");
-  expect((await getAuction<{ status: string }>(a.id)).status).toBe("sold");
+  // The job can briefly lag a parallel test's run of it: try again until the car is sold.
+  await expect
+    .poll(async () => {
+      await runJob("advance_auction_states");
+      return (await getAuction<{ status: string }>(a.id)).status;
+    })
+    .toBe("sold");
   const { data } = await service().from("buyer_payments").select("id").eq("auction_id", a.id).single();
   return { auctionId: a.id, title: a.title, seller, winner, holdPi, paymentId: data!.id as string, runner };
 }

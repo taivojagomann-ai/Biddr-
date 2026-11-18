@@ -20,6 +20,7 @@ const TYPES: readonly NotificationType[] = [
   "history_report_rejected",
   "premium_due", "premium_paid", "premium_failed", "make_suggested",
   "premium_reminder", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer", "second_chance_closed", "bidding_unblocked",
+  "new_message", "report_opened", "report_resolved", "account_blocked", "selling_unblocked",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -145,6 +146,26 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
       );
     case "bidding_unblocked":
       return titled("Your bidding is unblocked. You can bid again.");
+    case "new_message":
+      return withTitle(
+        n.data.from === "support"
+          ? "New message from Biddr support"
+          : n.data.role === "seller"
+            ? "New message from the buyer"
+            : "New message from the seller",
+      );
+    case "report_opened":
+      return titled(`${car}: ${n.data.role === "seller" ? "the seller" : "the buyer"} reported a problem`);
+    case "report_resolved":
+      return withTitle("Biddr has reviewed the problem you reported. See the decision in your messages.");
+    case "account_blocked": {
+      const reason = str(n.data.reason);
+      return titled(
+        `${n.data.kind === "selling" ? "You can no longer list cars" : "Your bidding is blocked"}${reason ? `: ${reason}` : "."}`,
+      );
+    }
+    case "selling_unblocked":
+      return titled("You can list cars again.");
     case "premium_failed":
       return titled(`${car}: the buyer's premium charge failed${str(n.data.reason) ? ` (${str(n.data.reason)})` : ""}`);
     case "history_report_rejected": {
@@ -194,6 +215,15 @@ export function notificationHref(n: NotificationRow): string {
       return "/account/listings";
     case "bidding_unblocked":
       return "/";
+    case "new_message":
+    case "report_resolved":
+      return str(n.data.conversation_id) ? `/account/messages/${str(n.data.conversation_id)}` : "/account/messages";
+    case "report_opened":
+      return str(n.data.report_id) ? `/admin/reports/${str(n.data.report_id)}` : "/admin/reports";
+    case "account_blocked":
+      return "/account/setup";
+    case "selling_unblocked":
+      return "/sell";
     case "premium_paid":
       return n.data.role === "seller" ? "/account/listings" : "/account/purchases";
     case "premium_failed":

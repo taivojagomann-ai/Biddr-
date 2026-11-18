@@ -261,7 +261,7 @@ export async function notificationsFor(user: TestUser, type?: string) {
 }
 
 /** Runs one of the scheduled SQL jobs right now instead of waiting for pg_cron. */
-export async function runJob(name: "advance_auction_states" | "notify_watch_ending_soon" | "inspection_decision_job") {
+export async function runJob(name: "advance_auction_states" | "notify_watch_ending_soon" | "inspection_decision_job" | "purge_old_conversations") {
   const { data, error } = await db.rpc(name);
   if (error) throw error;
   return data;

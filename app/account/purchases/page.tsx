@@ -16,6 +16,7 @@ import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { CompletePayment, PaymentReturn } from "./complete-payment";
 import { OfferButtons } from "./offer-buttons";
+import { STATUS_LABELS as REPORT_STATUS, type ReportStatus } from "@/lib/reports";
 
 export const metadata: Metadata = { title: "My purchases" };
 export const dynamic = "force-dynamic";
@@ -83,6 +84,18 @@ export default async function PurchasesPage() {
     : { data: [] };
   const docs = new Map<string, { id: string; number: string; kind: InvoiceKind }[]>();
   for (const d of invoiceRows ?? []) docs.set(d.buyer_payment_id, [...(docs.get(d.buyer_payment_id) ?? []), d]);
+
+  // Conversations with the seller (opened when the premium is paid; RLS: own only).
+  const { data: convRows } = rows.length
+    ? await supabase.from("conversations").select("id, buyer_payment_id").in("buyer_payment_id", rows.map((r) => r.id)).returns<{ id: string; buyer_payment_id: string }[]>()
+    : { data: [] };
+  const conversations = new Map((convRows ?? []).map((c) => [c.buyer_payment_id, c.id]));
+  // This member's own problem reports (RLS: reporter only), newest first.
+  const { data: reportRows } = rows.length
+    ? await supabase.from("sale_reports").select("buyer_payment_id, status").in("buyer_payment_id", rows.map((r) => r.id)).order("created_at", { ascending: false }).returns<{ buyer_payment_id: string; status: ReportStatus }[]>()
+    : { data: [] };
+  const reportOf = new Map<string, ReportStatus>();
+  for (const r of reportRows ?? []) if (!reportOf.has(r.buyer_payment_id)) reportOf.set(r.buyer_payment_id, r.status);
 
   // Contact details only for paid purchases, read on the server for this winner only.
   const admin = getAdminSupabase();
@@ -240,6 +253,17 @@ export default async function PurchasesPage() {
                     </div>
                   ) : null}
                   {contact ? <ContactCard heading="Seller's contact details" contact={contact} idBase={`p-${r.id}`} /> : null}
+                  {conversations.has(r.id) ? (
+                    <p className="text-sm">
+                      <Link
+                        href={`/account/messages/${conversations.get(r.id)}`}
+                        className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:text-signal"
+                      >
+                        Message the seller<span className="sr-only"> about {title}</span>
+                      </Link>
+                      {reportOf.has(r.id) ? <span className="ml-3 text-mute">Your report: {REPORT_STATUS[reportOf.get(r.id)!]}</span> : null}
+                    </p>
+                  ) : null}
                 </article>
               </li>
             );

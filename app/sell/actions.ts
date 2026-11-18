@@ -66,6 +66,9 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
     .single<{ id: string; seller_id: string; status: string }>();
 
   if (error || !auction) {
+    if (error?.message === "SELLING_BLOCKED") {
+      return { ok: false, error: "Your account can't list cars right now. Contact Biddr if you think this is a mistake." };
+    }
     if (error?.code === "23505") {
       return { ok: false, errors: { vin: "This car is already listed or waiting for review." } };
     }

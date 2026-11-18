@@ -6,10 +6,11 @@ import type { AdminResult } from "@/lib/admin-schemas";
 
 const liftSchema = z.object({
   userId: z.string().uuid(),
+  kind: z.enum(["bidding", "selling"]).default("bidding"),
   reason: z.string().trim().min(10, "Give a reason (at least 10 characters).").max(500, "Keep the reason under 500 characters."),
 });
 
-/** Lets a member bid again. Only admins; logged with the reason. */
+/** Lets a member bid (or sell) again. Only admins; logged with the reason. */
 export async function liftBiddingBlock(input: unknown): Promise<AdminResult> {
   const ctx = await requireAdmin();
   if (!ctx) return { ok: false, error: "You don't have access to do this. Sign in as an admin." };
@@ -18,15 +19,16 @@ export async function liftBiddingBlock(input: unknown): Promise<AdminResult> {
     const issue = parsed.error.issues[0];
     return { ok: false, error: issue?.message ?? "Check the form.", fieldErrors: issue ? { [String(issue.path[0])]: issue.message } : {} };
   }
+  const selling = parsed.data.kind === "selling";
   const { data } = await ctx.db
     .from("profiles")
-    .update({ bidding_blocked_at: null, bidding_block_reason: null })
+    .update(selling ? { selling_blocked_at: null, selling_block_reason: null } : { bidding_blocked_at: null, bidding_block_reason: null })
     .eq("id", parsed.data.userId)
-    .not("bidding_blocked_at", "is", null)
-    .select("id, bidding_block_reason");
+    .not(selling ? "selling_blocked_at" : "bidding_blocked_at", "is", null)
+    .select("id");
   if (!data?.length) return { ok: false, error: "This member isn't blocked any more. Reload the page." };
-  await ctx.db.from("notifications").insert({ user_id: parsed.data.userId, type: "bidding_unblocked", data: {} });
-  await logAdminAction(ctx, null, "user.unblock", { user_id: parsed.data.userId, reason: parsed.data.reason });
+  await ctx.db.from("notifications").insert({ user_id: parsed.data.userId, type: selling ? "selling_unblocked" : "bidding_unblocked", data: {} });
+  await logAdminAction(ctx, null, selling ? "user.unblock_selling" : "user.unblock", { user_id: parsed.data.userId, reason: parsed.data.reason });
   revalidatePath("/admin/users");
-  return { ok: true, message: "Unblocked. They can bid again and have been told." };
+  return { ok: true, message: selling ? "Unblocked. They can list cars again and have been told." : "Unblocked. They can bid again and have been told." };
 }
