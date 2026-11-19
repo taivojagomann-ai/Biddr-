@@ -77,6 +77,11 @@ Use a real address you can read (Gmail, Outlook and Apple Mail if possible).
 2. Use the link twice, or use a code that is more than an hour old.
    - [ ] You get a clear "expired" message and can ask for a new one.
 3. Check that the site doesn't promise email notifications anywhere unless email sending for notifications has actually been set up.
+4. Once SMTP is set up for the app (README → Emails), run a sale as in 8.1 and 8.5 with real addresses:
+   - [ ] The winner gets "You won …" and, once paid, "Buyer's premium paid: …" with the invoice PDF attached and the seller's details.
+   - [ ] The seller gets "Your … sold for €…" and "The buyer of … paid: their contact details".
+   - [ ] With the 3-D Secure card, the winner gets "Please confirm the payment for …" with the deadline in their own time zone.
+   - [ ] Nothing lands in spam; each email arrives once; the button opens the right page.
 
 ## 6. A real phone
 

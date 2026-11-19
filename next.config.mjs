@@ -14,6 +14,8 @@ const nextConfig = {
     outputFileTracingIncludes: {
       "/admin": ["./lib/demo/photos/**/*"],
       "/api/invoices/[id]": ["./lib/invoice/fonts/**/*"],
+      // The winner's "premium paid" email attaches the invoice PDF.
+      "/api/email/send": ["./lib/invoice/fonts/**/*"],
     },
   },
   images: {
