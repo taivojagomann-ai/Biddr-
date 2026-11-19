@@ -55,7 +55,7 @@ export async function SiteHeader() {
           ) : (
             <NotificationBell userId={user.id} initialNow={now} />
           )}
-          <MobileMenu links={menuLinks} signedIn={Boolean(user)} />
+          <MobileMenu links={menuLinks} signedIn={Boolean(user)} email={user?.email ?? null} />
         </div>
 
         <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
@@ -79,7 +79,7 @@ export async function SiteHeader() {
                 </Link>
               ) : null}
               <NotificationBell userId={user.id} initialNow={now} />
-              <AccountMenu label={username ?? "Finish profile"} />
+              <AccountMenu label={username ?? "Finish profile"} email={user.email ?? null} />
             </>
           ) : (
             <Link href="/login" className="inline-flex min-h-10 items-center rounded-md border border-field px-3 hover:border-chalk">

@@ -14,7 +14,7 @@ export const ACCOUNT_LINKS = [
 ] as const;
 
 /** Desktop account menu under the username. Escape closes and returns focus. */
-export function AccountMenu({ label }: { label: string }) {
+export function AccountMenu({ label, email }: { label: string; email?: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -63,9 +63,14 @@ export function AccountMenu({ label }: { label: string }) {
       <div
         id={panelId}
         hidden={!open}
-        className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-line bg-panel p-1 shadow-2xl"
+        className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-line bg-panel p-1 shadow-2xl"
       >
-        <ul>
+        {email ? (
+          <p className="border-b border-line px-3 pb-2 pt-1.5 text-xs text-mute">
+            Signed in as <span className="block break-all text-sm text-chalk">{email}</span>
+          </p>
+        ) : null}
+        <ul className={email ? "pt-1" : undefined}>
           {ACCOUNT_LINKS.map((l, i) => (
             <li key={l.href}>
               <Link

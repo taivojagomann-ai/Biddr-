@@ -73,6 +73,19 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
             </p>
           </section>
         ) : null}
+        {user.email ? (
+          <section aria-labelledby="account-email-heading" className="mt-8 space-y-1.5">
+            <h2 id="account-email-heading" className="text-sm font-semibold">
+              Email
+            </h2>
+            <p data-account-email="" className="break-all rounded-md border border-line bg-asphalt/50 px-3 py-2 text-sm">
+              {user.email}
+            </p>
+            <p className="text-xs text-mute">
+              Private. You sign in with this address, and Biddr&apos;s emails about your sales and purchases go here.
+            </p>
+          </section>
+        ) : null}
         <SetupForm
           isNew={isNew}
           next={next}
