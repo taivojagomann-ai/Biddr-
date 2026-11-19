@@ -71,6 +71,20 @@ test.describe("sign in and profile", () => {
     });
   }
 
+  test("the profile and the account menu show the account's email", async ({ page, context, isMobile }) => {
+    const user = await createUser();
+    await signIn(context, user);
+    await page.goto("/account/setup");
+    const section = page.getByRole("region", { name: "Email" });
+    await expect(section).toContainText(user.email);
+    await expect(section).toContainText("You sign in with this address");
+    // It isn't an editable field.
+    await expect(section.getByRole("textbox")).toHaveCount(0);
+    // "Signed in as" in the menu.
+    await page.getByRole("button", { name: isMobile ? /^Menu/ : /account menu/ }).click();
+    await expect(page.getByText(`Signed in as ${user.email}`).locator("visible=true")).toBeVisible();
+  });
+
   test("profile validation: username rules, taken username, EU country and phone format", async ({ page, context }) => {
     const taken = await createUser();
     const user = await createUser({ complete: false });

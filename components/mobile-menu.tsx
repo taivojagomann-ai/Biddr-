@@ -14,7 +14,7 @@ export interface MenuLink {
  * Disclosure menu for small screens: a button that shows or hides a list of links.
  * Escape closes it and returns focus to the button; navigating closes it too.
  */
-export function MobileMenu({ links, signedIn }: { links: MenuLink[]; signedIn: boolean }) {
+export function MobileMenu({ links, signedIn, email }: { links: MenuLink[]; signedIn: boolean; email?: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -78,6 +78,11 @@ export function MobileMenu({ links, signedIn }: { links: MenuLink[]; signedIn: b
           ))}
           {signedIn ? (
             <li className="mt-1 border-t border-line pt-1">
+              {email ? (
+                <p className="px-2 pb-1 pt-2 text-xs text-mute">
+                  Signed in as <span className="break-all text-chalk">{email}</span>
+                </p>
+              ) : null}
               <form action="/auth/signout" method="post">
                 <button type="submit" className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-base hover:bg-panel">
                   <LogOut aria-hidden className="size-4" />
