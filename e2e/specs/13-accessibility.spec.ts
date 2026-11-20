@@ -120,7 +120,7 @@ test.describe("keyboard only", () => {
 
     // Each step: Tab through the form, act on the fields we know, then Enter on Continue.
     type Act = string | ((page: Page) => Promise<void>);
-    const step = async (actions: Record<string, Act>, finish = "Continue") => {
+    const step = async (actions: Record<string, Act>, finish = "Continue", ready?: () => Promise<void>) => {
       const pending = new Map(Object.entries(actions));
       for (let i = 0; i < 250 && pending.size; i++) {
         await page.keyboard.press("Tab");
@@ -136,6 +136,7 @@ test.describe("keyboard only", () => {
         else await act(page);
       }
       expect([...pending.keys()], "fields not reached by Tab").toEqual([]);
+      await ready?.();
       await tabTo(page, (e) => e.text === finish, 80);
       await page.keyboard.press("Enter");
     };
@@ -178,6 +179,10 @@ test.describe("keyboard only", () => {
       "sell-photos-exterior": addPhotos("Exterior"),
       "sell-photos-interior": addPhotos("Interior"),
       "sell-photos-mechanical": addPhotos("Engine and underside"),
+    }, "Continue", async () => {
+      // "Added" counts photos as soon as they're chosen; like a person, wait until
+      // every one has finished uploading before continuing.
+      await expect(page.getByText(/^(Uploading \d+%|Resizing…|Waiting…)$/)).toHaveCount(0, { timeout: 90_000 });
     });
     await step({ "sell-startingBid": "30000", "name:dealerInspection": second });
     await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
