@@ -92,6 +92,35 @@ test.describe("notifications", () => {
     expect(count).toBe(0);
   });
 
+  test("clicking a notification marks it read before leaving the page, even where leaving cancels requests (Safari)", async ({ page, context }) => {
+    const seller = await createUser({ role: "seller" });
+    const a = await createAuction({ seller });
+    const asker = await createUser();
+    await (await userDb(asker.email)).from("comments").insert({ auction_id: a.id, content: "Is the service history complete?" });
+    await signIn(context, seller);
+    await page.goto("/account/notifications");
+
+    // Safari cancels a page's requests once a full page load starts; Chrome lets them
+    // finish. Act like Safari: hold the "mark read" request, and drop it if a full
+    // page load started meanwhile.
+    let fullPageLoad = false;
+    page.on("request", (r) => {
+      if (r.isNavigationRequest() && r.frame() === page.mainFrame()) fullPageLoad = true;
+    });
+    await page.route("**/rest/v1/notifications**", async (route) => {
+      if (route.request().method() !== "PATCH") return route.continue();
+      await new Promise((r) => setTimeout(r, 1_000));
+      return fullPageLoad ? route.abort() : route.continue();
+    });
+
+    await page.getByRole("link", { name: new RegExp(`^New question on ${a.title}`) }).first().click();
+    await expect(page).toHaveURL(new RegExp(`/auctions/${a.id}#comment-`));
+    expect(fullPageLoad).toBe(false);
+    await expect
+      .poll(async () => (await service().from("notifications").select("read_at").eq("user_id", seller.id).eq("auction_id", a.id)).data?.every((n) => n.read_at))
+      .toBe(true);
+  });
+
   test("more than 9 unread: the badge shows 9+ and the button's name says the same", async ({ page, context }) => {
     const seller = await createUser({ role: "seller" });
     const a = await createAuction({ seller });

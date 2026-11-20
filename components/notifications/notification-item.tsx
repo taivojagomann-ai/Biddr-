@@ -98,13 +98,16 @@ export function NotificationItem({
   async function open(e: React.MouseEvent<HTMLAnchorElement>) {
     // Let new-tab clicks through; still mark the item read.
     const newTab = e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1;
+    // Stop the browser's own navigation before anything is awaited: after an await
+    // preventDefault comes too late, the page starts unloading, and Safari cancels the
+    // request that marks the item read (Chrome happens to let it finish).
+    if (!newTab) e.preventDefault();
     if (unread) {
       onRead(n.id);
       const marking = markNotificationsRead([n.id]);
       if (!newTab) await marking;
     }
     if (newTab) return;
-    e.preventDefault();
     onNavigate?.();
     const url = new URL(href, window.location.origin);
     if (url.pathname === window.location.pathname && url.hash) {
