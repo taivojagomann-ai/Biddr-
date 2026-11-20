@@ -118,11 +118,12 @@ components/
     bid-box.tsx, sticky-bid-bar.tsx, bid-modal.tsx, bid-history.tsx
     gallery.tsx, inspection-card.tsx, spec-sheet.tsx, video-player.tsx
     comments.tsx, countdown.tsx, badges.tsx
-  site-header.tsx               signed-in state, profile link, sign-out; "Menu" on small screens
-  mobile-menu.tsx               disclosure menu for small screens
+  site-header.tsx               Auctions, How it works, Sell a car (outline button), bell, account; "Menu" on small screens
+  mobile-menu.tsx               disclosure menu for small screens: Sell a car button first, then the links
+  nav-link.tsx                  header link marked aria-current on its page
   site-footer.tsx               the same help links on every page
   notifications/                header bell and the shared notification item
-  account-menu.tsx              Profile, My listings, Watchlist, Notifications, Sign out
+  account-menu.tsx              My listings (unanswered questions), My purchases, Messages, Watchlist, Profile, Admin, Sign out
   share-button.tsx              native share sheet or Copy link / Facebook / WhatsApp / X / Email
   auction/watch-button.tsx      Watch / Watching toggle and "<n> watching"
   ui/                           shadcn/ui: button, dialog, input, tabs, textarea, native-select

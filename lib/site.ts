@@ -11,7 +11,7 @@ export const COMPANY_DETAILS = "[Company name, registry code, address]";
 
 /**
  * Footer links, in the same order on every page (WCAG 3.2.6 Consistent help).
- * "How it works" is in the menu only; "About" is in the menu and here (DECISIONS.md point 8).
+ * "How it works" is in the menu only; "About" is here only (DECISIONS.md point 8).
  */
 export const FOOTER_LINKS = [
   { label: "About", href: "/about" },

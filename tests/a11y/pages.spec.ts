@@ -345,9 +345,11 @@ test.describe("watch and share", () => {
       const button = page.getByRole("button", { name: /account menu/ });
       await button.click();
       await expect(button).toHaveAttribute("aria-expanded", "true");
-      await expect(page.getByRole("link", { name: "Profile" })).toBeFocused();
+      // Same order as the phone menu (DECISIONS.md point 8); Notifications are under the bell.
+      await expect(page.getByRole("link", { name: /^My listings/ })).toBeFocused();
+      await expect(page.getByRole("link", { name: /^My listings/ })).toHaveAttribute("href", "/account/listings");
       await expect(page.getByRole("link", { name: "Watchlist" })).toBeVisible();
-      await expect(page.getByRole("link", { name: "My listings" })).toHaveAttribute("href", "/account/listings");
+      await expect(page.getByRole("link", { name: "Profile" })).toBeVisible();
       await expectNoSeriousViolations(page, "Account menu", "[aria-controls] + div:not([hidden])");
       await page.keyboard.press("Escape");
       await expect(button).toBeFocused();
@@ -551,6 +553,11 @@ test.describe("keyboard on a phone", () => {
     await page.keyboard.press("Enter");
     await expect(menu).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("link", { name: "How it works" }).first()).toBeVisible();
+    // Sell a car comes first; Tab reaches it, with a visible focus ring.
+    await page.keyboard.press("Tab");
+    const sell = page.getByRole("link", { name: "Sell a car" }).filter({ visible: true });
+    await expect(sell).toBeFocused();
+    await expect(sell).not.toHaveCSS("box-shadow", "none");
     await page.keyboard.press("Escape");
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(menu).toBeFocused();

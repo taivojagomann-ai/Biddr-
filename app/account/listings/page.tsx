@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Car, ChevronRight, Eye } from "lucide-react";
+import { Car, ChevronRight, Eye, MessageCircleQuestion } from "lucide-react";
 import { LocalDateTime } from "@/components/local-date-time";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
 import { loginPath } from "@/lib/login";
 import { STATUS_LABELS } from "@/lib/sell";
 import { withdrawOption } from "@/lib/withdraw";
+import { unansweredLabel, unansweredQuestions } from "@/lib/unanswered-questions";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Auction, AuctionPrivate } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ export default async function MyListingsPage() {
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
   const listings = data ?? [];
+  const unanswered = await unansweredQuestions(supabase, user.id);
 
   // Rejection reasons and withdrawal requests live in auction_private, which only admins
   // can read. Read them with the service role, strictly for this seller's own listings.
@@ -175,6 +177,12 @@ export default async function MyListingsPage() {
                     <p className="mt-2 rounded-md border border-line bg-asphalt/60 px-2.5 py-2 text-sm">
                       <span className="text-mute">Why: </span>
                       {reason ?? "We couldn't accept this listing. Contact us for details."}
+                    </p>
+                  ) : null}
+                  {unanswered.get(l.id) ? (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-signal">
+                      <MessageCircleQuestion aria-hidden className="size-4 shrink-0" />
+                      {unansweredLabel(unanswered.get(l.id)!)}
                     </p>
                   ) : null}
                   <p className="mt-1 text-xs text-mute">

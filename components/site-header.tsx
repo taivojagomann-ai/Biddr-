@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { AccountMenu } from "@/components/account-menu";
 import { MobileMenu, type MenuLink } from "@/components/mobile-menu";
+import { NavLink } from "@/components/nav-link";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { SELL_BUTTON } from "@/lib/nav";
 import { getServerSupabase } from "@/lib/supabase/server";
+import { totalUnanswered, unansweredQuestions } from "@/lib/unanswered-questions";
 
 const navLink =
-  "inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-3 text-mute hover:text-chalk [@media(pointer:coarse)]:min-h-11";
+  "inline-flex min-h-10 items-center whitespace-nowrap rounded-md px-3 text-mute hover:text-chalk aria-[current=page]:font-semibold aria-[current=page]:text-chalk [@media(pointer:coarse)]:min-h-11";
 
 export async function SiteHeader() {
   const supabase = getServerSupabase();
@@ -22,20 +25,24 @@ export async function SiteHeader() {
     username = data?.username ?? null;
     isAdmin = data?.role === "admin";
   }
+  const unanswered = user ? totalUnanswered(await unansweredQuestions(supabase, user.id)) : 0;
 
   const now = Date.now();
+  // The phone menu, after the "Sell a car" button (DECISIONS.md point 8). About is in
+  // the footer and Notifications under the bell, so neither is here.
   const menuLinks: MenuLink[] = [
     { label: "Auctions", href: "/" },
     { label: "How it works", href: "/how-it-works" },
-    { label: "About", href: "/about" },
-    { label: "Sell a car", href: "/sell" },
-    ...(user ? [{ label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" }] : []),
-    ...(user ? [{ label: "My listings", href: "/account/listings" }] : []),
-    ...(user ? [{ label: "My purchases", href: "/account/purchases" }] : []),
-    ...(user ? [{ label: "Messages", href: "/account/messages" }] : []),
-    ...(user ? [{ label: "Watchlist", href: "/account/watchlist" }] : []),
-    ...(user ? [{ label: "Notifications", href: "/account/notifications" }] : []),
-    ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),
+    ...(user
+      ? [
+          { label: "My listings", href: "/account/listings", count: unanswered },
+          { label: "My purchases", href: "/account/purchases" },
+          { label: "Messages", href: "/account/messages" },
+          { label: "Watchlist", href: "/account/watchlist" },
+          { label: username ? `Profile (${username})` : "Finish profile", href: "/account/setup" },
+          ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : []),
+        ]
+      : [{ label: "Sign in", href: "/login" }]),
   ];
 
   return (
@@ -59,27 +66,19 @@ export async function SiteHeader() {
         </div>
 
         <nav aria-label="Main" className="hidden items-center gap-1 text-sm sm:flex">
-          <Link href="/" className={navLink}>
+          <NavLink href="/" className={navLink}>
             Auctions
-          </Link>
-          <Link href="/how-it-works" className={`${navLink} hidden md:inline-flex`}>
+          </NavLink>
+          <NavLink href="/how-it-works" className={`${navLink} hidden md:inline-flex`}>
             How it works
-          </Link>
-          <Link href="/about" className={`${navLink} hidden lg:inline-flex`}>
-            About
-          </Link>
-          <Link href="/sell" className={navLink}>
+          </NavLink>
+          <NavLink href="/sell" className={`${SELL_BUTTON} mx-1 min-h-10 text-sm [@media(pointer:coarse)]:min-h-11`}>
             Sell a car
-          </Link>
+          </NavLink>
           {user ? (
             <>
-              {isAdmin ? (
-                <Link href="/admin" className={`${navLink} font-semibold text-signal`}>
-                  Admin
-                </Link>
-              ) : null}
               <NotificationBell userId={user.id} initialNow={now} />
-              <AccountMenu label={username ?? "Finish profile"} email={user.email ?? null} />
+              <AccountMenu label={username ?? "Finish profile"} email={user.email ?? null} isAdmin={isAdmin} unanswered={unanswered} />
             </>
           ) : (
             <Link href="/login" className="inline-flex min-h-10 items-center rounded-md border border-field px-3 hover:border-chalk">

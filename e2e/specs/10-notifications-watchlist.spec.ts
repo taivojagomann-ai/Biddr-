@@ -132,6 +132,11 @@ test.describe("notifications", () => {
     await expect(bell).toBeVisible();
     await expect(bell).toContainText("9+");
     await expectAccessible(page, "Bell with 9+ unread", "header");
+    // A long list: "See all" stays in view at the bottom of the panel.
+    await bell.click();
+    const seeAll = page.getByRole("dialog", { name: "Notifications" }).getByRole("link", { name: "See all" });
+    await expect(seeAll).toBeInViewport({ ratio: 1 });
+    await expect(seeAll).toHaveAttribute("href", "/account/notifications");
   });
 
   test("you can only read and update your own notifications", async () => {

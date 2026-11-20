@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Bell, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useFitToViewport } from "@/hooks/use-fit-to-viewport";
 import { useMinuteNow } from "@/hooks/use-minute-now";
 import { BELL_LIMIT, NOTIFICATION_COLUMNS, asNotificationRows, badgeCount, notificationCopy } from "@/lib/notifications";
 import { getBrowserSupabase } from "@/lib/supabase/client";
@@ -26,6 +27,8 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
   const buttonRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const panelId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFitToViewport(panelRef, open);
   const headingId = useId();
   // The header renders two bells (phone and desktop). Each needs its own channel
   // name: a second channel with the same topic makes Realtime close the first.
@@ -165,6 +168,7 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
       </p>
 
       <div
+        ref={panelRef}
         id={panelId}
         role="dialog"
         aria-labelledby={headingId}
@@ -204,7 +208,8 @@ export function NotificationBell({ userId, initialNow }: { userId: string; initi
           </ul>
         )}
 
-        <div className="border-t border-line p-2">
+        {/* Stays in view at the bottom of the panel however long the list is. */}
+        <div className="sticky bottom-0 z-10 border-t border-line bg-panel p-2">
           <Link
             href="/account/notifications"
             onClick={() => setOpen(false)}

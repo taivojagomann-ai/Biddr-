@@ -4,15 +4,20 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MenuCount } from "@/components/menu-count";
+import { SELL_BUTTON } from "@/lib/nav";
+import { useFitToViewport } from "@/hooks/use-fit-to-viewport";
 
 export interface MenuLink {
   label: string;
   href: string;
+  /** A count shown after the label, e.g. unanswered questions on My listings. */
+  count?: number;
 }
 
 /**
- * Disclosure menu for small screens: a button that shows or hides a list of links.
- * Escape closes it and returns focus to the button; navigating closes it too.
+ * Disclosure menu for small screens: a button that shows or hides "Sell a car" and a
+ * list of links. Escape closes it and returns focus to the button; navigating closes it too.
  */
 export function MobileMenu({ links, signedIn, email }: { links: MenuLink[]; signedIn: boolean; email?: string | null }) {
   const [open, setOpen] = useState(false);
@@ -20,6 +25,8 @@ export function MobileMenu({ links, signedIn, email }: { links: MenuLink[]; sign
   const buttonRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFitToViewport(panelRef, open);
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -59,20 +66,32 @@ export function MobileMenu({ links, signedIn, email }: { links: MenuLink[]; sign
         Menu
       </Button>
       <div
+        ref={panelRef}
         id={panelId}
         hidden={!open}
-        className="absolute inset-x-0 top-full border-b border-line bg-asphalt shadow-2xl"
+        className="absolute inset-x-0 top-full overflow-y-auto border-b border-line bg-asphalt shadow-2xl"
       >
         <ul className="container flex flex-col py-2">
+          <li className="pb-2 pt-1">
+            <Link
+              href="/sell"
+              aria-current={pathname === "/sell" ? "page" : undefined}
+              onClick={() => setOpen(false)}
+              className={`${SELL_BUTTON} min-h-12 w-full text-base`}
+            >
+              Sell a car
+            </Link>
+          </li>
           {links.map((l) => (
             <li key={l.href}>
               <Link
                 href={l.href}
                 aria-current={pathname === l.href ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className="flex min-h-11 items-center rounded-md px-2 text-base hover:bg-panel aria-[current=page]:font-semibold aria-[current=page]:text-signal"
+                className="flex min-h-11 items-center gap-2 rounded-md px-2 text-base hover:bg-panel aria-[current=page]:font-semibold aria-[current=page]:text-signal"
               >
                 {l.label}
+                {l.count ? <>{" "}<MenuCount count={l.count} /></> : null}
               </Link>
             </li>
           ))}
