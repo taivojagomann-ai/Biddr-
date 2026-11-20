@@ -120,24 +120,89 @@ test.describe("copy consistency", () => {
     }
   });
 
-  test("names and navigation: My listings, account menu items; How it works in the menu only, About in the menu and footer", async ({ page, context, isMobile }) => {
-    const user = await createUser();
-    await signIn(context, user);
-    await page.goto("/");
-    const footer = page.getByRole("contentinfo");
-    await expect(footer.getByRole("link", { name: "How it works" })).toHaveCount(0);
-    await expect(footer.getByRole("link", { name: "About", exact: true })).toHaveAttribute("href", "/about");
-    // The menu: the phone menu on small screens, the header bar on desktop (About from 1024 px).
-    if (isMobile) await page.getByRole("button", { name: "Menu" }).click();
+  test("navigation: Sell a car is a button, then the links in order; no About or Notifications in the menu; About in the footer", async ({ page, context, isMobile }) => {
+    const footer = () => page.getByRole("contentinfo");
     const header = page.getByRole("banner");
-    await expect(header.getByRole("link", { name: "How it works" }).locator("visible=true")).toHaveCount(1);
-    await expect(header.getByRole("link", { name: "About", exact: true }).locator("visible=true")).toHaveCount(1);
-    if (isMobile) await page.keyboard.press("Escape");
-    test.skip(isMobile, "The account menu is in the phone menu; covered on desktop");
-    await page.getByRole("button", { name: new RegExp(user.username!) }).first().click();
-    const items = page.locator("header li").filter({ visible: true });
-    await expect(items).toHaveText(["Profile", "My listings", "My purchases", "Messages", "Watchlist", "Notifications", "Sign out"]);
+    const sell = header.getByRole("link", { name: "Sell a car", exact: true }).locator("visible=true");
+    // An outline button: 1px #71717A border, 8px corners, centred semibold text.
+    async function expectSellButton(minHeight: number) {
+      await expect(sell).toHaveCount(1);
+      await expect(sell).toHaveCSS("border-top-width", "1px");
+      await expect(sell).toHaveCSS("border-top-color", "rgb(113, 113, 122)");
+      await expect(sell).toHaveCSS("border-top-left-radius", "8px");
+      await expect(sell).toHaveCSS("justify-content", "center");
+      await expect(sell).toHaveCSS("font-weight", "600");
+      expect((await sell.boundingBox())!.height).toBeGreaterThanOrEqual(minHeight);
+    }
+
+    // Signed out.
+    await page.goto("/how-it-works");
+    await expect(footer().getByRole("link", { name: "How it works" })).toHaveCount(0);
+    await expect(footer().getByRole("link", { name: "About", exact: true })).toHaveAttribute("href", "/about");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Menu" }).click();
+      const items = page.locator("header ul").locator("visible=true").getByRole("link");
+      await expect(items).toHaveText(["Sell a car", "Auctions", "How it works", "Sign in"]);
+      await expectSellButton(48);
+      // Full width: as wide as the links under it.
+      const [b, l] = [await sell.boundingBox(), await items.nth(1).boundingBox()];
+      expect(Math.abs(b!.width - l!.width)).toBeLessThanOrEqual(1);
+      await expect(header.getByRole("link", { name: "How it works" }).locator("visible=true")).toHaveAttribute("aria-current", "page");
+      await page.keyboard.press("Escape");
+    } else {
+      const items = header.getByRole("navigation", { name: "Main" }).getByRole("link").locator("visible=true");
+      await expect(items).toHaveText(["Auctions", "How it works", "Sell a car", "Sign in"]);
+      await expectSellButton(40);
+      await expect(header.getByRole("link", { name: "How it works" })).toHaveAttribute("aria-current", "page");
+    }
+    await expect(header.getByRole("link", { name: "About", exact: true })).toHaveCount(0);
+
+    // Signed in, with one unanswered question and one answered on a live listing.
+    const user = await createUser({ role: "seller" });
+    const a = await createAuction({ seller: user });
+    const asker = await createUser();
+    const askerDb = await userDb(asker.email);
+    await askerDb.from("comments").insert({ auction_id: a.id, content: "Any rust underneath?" });
+    const { data: answeredQ } = await askerDb.from("comments").insert({ auction_id: a.id, content: "Two keys?" }).select("id").single();
+    await (await userDb(user.email)).from("comments").insert({ auction_id: a.id, parent_id: answeredQ!.id, content: "Yes, two keys." });
+    await signIn(context, user);
+    await page.goto("/account/watchlist");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Menu" }).click();
+      const panel = page.locator("header ul").locator("visible=true");
+      await expect(panel.getByRole("link")).toHaveText(["Sell a car", "Auctions", "How it works", "My listings 1 unanswered question", "My purchases", "Messages", "Watchlist", `Profile (${user.username})`]);
+      await expect(panel.getByRole("link", { name: "My listings 1 unanswered question" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(panel.getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
+      // Every target in the phone menu is at least 44 px high.
+      for (const el of await panel.locator("a, button").all()) expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      await expectSellButton(48);
+    } else {
+      await expect(header.getByRole("navigation", { name: "Main" }).getByRole("link").locator("visible=true")).toHaveText(["Auctions", "How it works", "Sell a car"]);
+      await page.getByRole("button", { name: new RegExp(`^${user.username} 1 unanswered question, account menu$`) }).click();
+      const items = page.locator("header li").filter({ visible: true });
+      await expect(items).toHaveText(["My listings 1 unanswered question", "My purchases", "Messages", "Watchlist", "Profile", "Sign out"]);
+      await expect(page.getByRole("link", { name: "Watchlist" })).toHaveAttribute("aria-current", "page");
+    }
+    await expect(header.getByRole("link", { name: /^Notifications/ })).toHaveCount(0);
     await expect(page.getByText("Selling", { exact: true })).toHaveCount(0);
+
+    // My listings shows the count on the listing.
+    await page.goto("/account/listings");
+    await expect(page.getByRole("link", { name: new RegExp(`${a.title}.*1 unanswered question`) })).toBeVisible();
+  });
+
+  test("admins see Admin in the menu, after Profile", async ({ page, context, isMobile }) => {
+    const admin = await createUser({ role: "admin" });
+    await signIn(context, admin);
+    await page.goto("/");
+    if (isMobile) {
+      await page.getByRole("button", { name: "Menu" }).click();
+      await expect(page.locator("header ul").locator("visible=true").getByRole("link").last()).toHaveText("Admin");
+    } else {
+      await page.getByRole("button", { name: /account menu/ }).click();
+      await expect(page.locator("header li").filter({ visible: true })).toHaveText(["My listings", "My purchases", "Messages", "Watchlist", "Profile", "Admin", "Sign out"]);
+    }
   });
 
   test("footer: wordmark and company line, then the links in order; About is marked on the About page", async ({ page, isMobile }) => {

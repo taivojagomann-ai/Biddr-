@@ -3,18 +3,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, LogOut } from "lucide-react";
+import { MenuCount } from "@/components/menu-count";
+import { unansweredLabel } from "@/lib/unanswered-questions";
 
+/**
+ * The account links, in the same order as the phone menu (DECISIONS.md point 8).
+ * Notifications are under the bell, not here.
+ */
 export const ACCOUNT_LINKS = [
-  { label: "Profile", href: "/account/setup" },
   { label: "My listings", href: "/account/listings" },
   { label: "My purchases", href: "/account/purchases" },
   { label: "Messages", href: "/account/messages" },
   { label: "Watchlist", href: "/account/watchlist" },
-  { label: "Notifications", href: "/account/notifications" },
+  { label: "Profile", href: "/account/setup" },
 ] as const;
 
 /** Desktop account menu under the username. Escape closes and returns focus. */
-export function AccountMenu({ label, email }: { label: string; email?: string | null }) {
+export function AccountMenu({
+  label,
+  email,
+  isAdmin = false,
+  unanswered = 0,
+}: {
+  label: string;
+  email?: string | null;
+  isAdmin?: boolean;
+  unanswered?: number;
+}) {
+  const links: { label: string; href: string }[] = [...ACCOUNT_LINKS, ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : [])];
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -51,14 +67,15 @@ export function AccountMenu({ label, email }: { label: string; email?: string | 
       <button
         ref={buttonRef}
         type="button"
+        aria-label={`${label}${unanswered > 0 ? ` ${unansweredLabel(unanswered)}` : ""}, account menu`}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
         className="inline-flex min-h-10 max-w-[12rem] items-center gap-1.5 rounded-md border border-field px-3 text-sm hover:border-chalk"
       >
         <span className="truncate">{label}</span>
+        {unanswered > 0 ? <>{" "}<MenuCount count={unanswered} /></> : null}
         <ChevronDown aria-hidden className={`size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-        <span className="sr-only">, account menu</span>
       </button>
       <div
         id={panelId}
@@ -71,7 +88,7 @@ export function AccountMenu({ label, email }: { label: string; email?: string | 
           </p>
         ) : null}
         <ul className={email ? "pt-1" : undefined}>
-          {ACCOUNT_LINKS.map((l, i) => (
+          {links.map((l, i) => (
             <li key={l.href}>
               <Link
                 ref={i === 0 ? firstRef : undefined}
@@ -81,6 +98,7 @@ export function AccountMenu({ label, email }: { label: string; email?: string | 
                 onClick={() => setOpen(false)}
               >
                 {l.label}
+                {l.href === "/account/listings" && unanswered > 0 ? <>{" "}<MenuCount count={unanswered} /></> : null}
               </Link>
             </li>
           ))}
