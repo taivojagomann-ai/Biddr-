@@ -5,18 +5,23 @@ import { ActionMessage, useAdminAction } from "../auctions/[id]/action-feedback"
 import { ConfirmButton } from "../auctions/[id]/confirm-button";
 import { liftBiddingBlock } from "./actions";
 
-export function LiftBlock({ userId, name, kind = "bidding" }: { userId: string; name: string; kind?: "bidding" | "selling" }) {
+export function LiftBlock({ userId, name, kind = "bidding" }: { userId: string; name: string; kind?: "bidding" | "selling" | "messaging" }) {
   const { run, pending, result } = useAdminAction();
   const [reason, setReason] = useState("");
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ConfirmButton
         label="Lift block"
-        ariaLabel={kind === "selling" ? `Lift block: ${name} (selling)` : `Lift block: ${name}`}
+        ariaLabel={kind === "bidding" ? `Lift block: ${name}` : `Lift block: ${name} (${kind})`}
         size="sm"
         disabled={pending}
-        title={kind === "selling" ? `Let ${name} list cars again?` : `Let ${name} bid again?`}
-        description={<p>{kind === "selling" ? "They can submit cars again" : "They can place card holds and bids again"}, and get a notification.</p>}
+        title={kind === "selling" ? `Let ${name} list cars again?` : kind === "messaging" ? `Let ${name} send messages again?` : `Let ${name} bid again?`}
+        description={
+          <p>
+            {kind === "selling" ? "They can submit cars again" : kind === "messaging" ? "They can contact sellers and send messages again" : "They can place card holds and bids again"}
+            , and get a notification.
+          </p>
+        }
         confirmLabel="Lift block"
         confirmDisabled={reason.trim().length < 10}
         onConfirm={async () => (await run(liftBiddingBlock, { userId, reason, kind })).ok}

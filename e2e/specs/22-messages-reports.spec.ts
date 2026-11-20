@@ -198,7 +198,10 @@ test.describe("typing and seen", () => {
       })
       .select("id")
       .single();
+    // Wait for the reloaded page's live connection before Biddr writes.
+    const subscribed = realtimeReady(page, `messages:${s.conversationId}`);
     await page.reload();
+    await subscribed;
     await expect(page.getByText("Status: Open: Biddr will look at it soon")).toBeVisible();
     await service().from("sale_reports").update({ status: "resolved", outcome: "resolved", resolution: "All sorted.", resolved_at: new Date().toISOString() }).eq("id", report!.id);
     await service().from("messages").insert({ conversation_id: s.conversationId, sender_role: "support", body: "Biddr's decision on the reported problem: All sorted." });

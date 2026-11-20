@@ -42,6 +42,14 @@ export default async function AdminUsersPage() {
     .limit(200)
     .returns<{ id: string; username: string | null; full_name: string | null; selling_blocked_at: string; selling_block_reason: string | null }[]>();
   const sellers = sellingData ?? [];
+  const { data: messagingData } = await ctx.db
+    .from("profiles")
+    .select("id, username, full_name, messaging_blocked_at, messaging_block_reason")
+    .not("messaging_blocked_at", "is", null)
+    .order("messaging_blocked_at", { ascending: false })
+    .limit(200)
+    .returns<{ id: string; username: string | null; full_name: string | null; messaging_blocked_at: string; messaging_block_reason: string | null }[]>();
+  const messagers = messagingData ?? [];
 
   return (
     <main className="container max-w-4xl py-8 sm:py-12">
@@ -50,8 +58,8 @@ export default async function AdminUsersPage() {
       </Link>
       <h1 className="mt-4 font-wide text-3xl font-extrabold tracking-tight">Users</h1>
       <p className="mt-1 text-sm text-mute">
-        Members blocked from bidding (a buyer&apos;s premium not paid in time, or after a report) or from selling (after a
-        report). Only an admin can lift a block.
+        Members blocked from bidding (a buyer&apos;s premium not paid in time, or after a report), from selling or from
+        messaging (after a report). Only an admin can lift a block.
       </p>
       <h2 className="mt-8 text-lg font-bold">Blocked from bidding ({rows.length})</h2>
       {rows.length === 0 ? (
@@ -113,6 +121,32 @@ export default async function AdminUsersPage() {
                   </p>
                   <div className="mt-3">
                     <LiftBlock userId={r.id} name={name} kind="selling" />
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <h2 className="mt-10 text-lg font-bold">Blocked from messaging ({messagers.length})</h2>
+      {messagers.length === 0 ? (
+        <p className="mt-3 text-sm text-mute">Nobody is blocked from messaging.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {messagers.map((r) => {
+            const name = r.username ?? r.full_name ?? "Member";
+            return (
+              <li key={r.id} className="rounded-lg border border-line bg-panel p-4">
+                <article aria-labelledby={`messaging-${r.id}`}>
+                  <h3 id={`messaging-${r.id}`} className="font-bold">
+                    {name} (messaging)
+                  </h3>
+                  <p className="mt-1 text-sm">{r.messaging_block_reason ?? "Blocked from messaging."}</p>
+                  <p className="mt-1 text-xs text-mute">
+                    Blocked <LocalDateTime iso={r.messaging_blocked_at} />
+                  </p>
+                  <div className="mt-3">
+                    <LiftBlock userId={r.id} name={name} kind="messaging" />
                   </div>
                 </article>
               </li>

@@ -24,11 +24,14 @@ export function AccountMenu({
   email,
   isAdmin = false,
   unanswered = 0,
+  unread = 0,
 }: {
   label: string;
   email?: string | null;
   isAdmin?: boolean;
   unanswered?: number;
+  /** Conversations with news (Messages). */
+  unread?: number;
 }) {
   const links: { label: string; href: string }[] = [...ACCOUNT_LINKS, ...(isAdmin ? [{ label: "Admin", href: "/admin" }] : [])];
   const [open, setOpen] = useState(false);
@@ -99,6 +102,7 @@ export function AccountMenu({
               >
                 {l.label}
                 {l.href === "/account/listings" && unanswered > 0 ? <>{" "}<MenuCount count={unanswered} /></> : null}
+                {l.href === "/account/messages" && unread > 0 ? <>{" "}<MenuCount count={unread} kind="unread" /></> : null}
               </Link>
             </li>
           ))}

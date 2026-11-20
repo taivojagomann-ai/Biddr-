@@ -8,10 +8,15 @@ import { minNextBid } from "@/lib/pricing";
 import { PREVIEW_TEXT } from "@/lib/listing-preview";
 import { cn } from "@/lib/utils";
 import type { BidUiState } from "./bid-box";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
+import { contactLabel } from "./contact-seller";
 
 /** Below the lg breakpoint (no sidebar), this bar pinned to the bottom of the viewport on the auction page. */
-export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash, initialNow, setAmount, preview = false }: BidUiState) {
+export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash, initialNow, setAmount, preview = false, contact = null }: BidUiState) {
   const live = auction.status === "live" && !auction.is_demo && !preview;
+  // Only while the auction is upcoming or live (the status updates live on this page).
+  const showContact = Boolean(contact) && (auction.status === "upcoming" || auction.status === "live");
   return (
     <div data-sticky-bottom="bid" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-panel/95 pb-safe pt-3 backdrop-blur lg:hidden">
       <div className="container flex items-center gap-3">
@@ -37,6 +42,13 @@ export function StickyBidBar({ auction, onPlaceBid, isLeading, wasOutbid, flash,
               initialNow={initialNow} className="font-wide text-lg font-black leading-tight" />
           </div>
         )}
+        {showContact && contact ? (
+          <Button asChild size="icon" variant="outline" className="size-12 shrink-0">
+            <Link href={contact.href} aria-label={contactLabel(contact)}>
+              <MessageCircle aria-hidden className="!size-5" />
+            </Link>
+          </Button>
+        ) : null}
         <Button size="lg" className="shrink-0" disabled={!live || isLeading}
           aria-describedby={preview ? "sticky-bid-preview-note" : undefined}
           onClick={() => { setAmount(minNextBid(auction)); onPlaceBid(); }}>
