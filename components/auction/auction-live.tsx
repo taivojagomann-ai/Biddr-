@@ -7,6 +7,7 @@ import { BidHistory } from "./bid-history";
 import { BidModal } from "./bid-modal";
 import { Comments } from "./comments";
 import { StickyBidBar } from "./sticky-bid-bar";
+import type { ContactLink } from "./contact-seller";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { formatEur } from "@/lib/format";
 import { minNextBid } from "@/lib/pricing";
@@ -25,6 +26,8 @@ interface AuctionLiveProps {
   initialWatching: boolean;
   initialNow: number;
   holdEur: number;
+  /** "Contact seller" for the phone bid bar (null when not offered). */
+  contact?: ContactLink | null;
   /**
    * Seller's preview of an unpublished listing: no bidding, no questions, no Realtime,
    * and nothing is read or written after the first render.
@@ -41,7 +44,7 @@ interface AuctionLiveProps {
  * On every (re)subscribe we refetch, so updates missed while offline aren't lost.
  */
 export function AuctionLive({
-  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialWatching, initialNow, holdEur, preview = false, children,
+  initialAuction, initialBids, initialComments, userId, initialHasHold, canComment, initialWatching, initialNow, holdEur, preview = false, contact = null, children,
 }: AuctionLiveProps) {
   const supabase = getBrowserSupabase();
   const router = useRouter();
@@ -164,7 +167,7 @@ export function AuctionLive({
   const ui: BidUiState = {
     auction, amount, setAmount, onPlaceBid: () => setModalOpen(true),
     isLeading, wasOutbid, justExtended, flash, initialNow, holdEur,
-    userId, watching: initialWatching, preview,
+    userId, watching: initialWatching, preview, contact,
   };
 
   return (

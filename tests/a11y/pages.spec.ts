@@ -124,12 +124,15 @@ const SIGNED_IN_PAGES = [
   ["Notifications", "/account/notifications"],
   ["Watchlist", "/account/watchlist"],
   ["Watchlist, ended", "/account/watchlist?tab=ended"],
+  ["Messages", "/account/messages"],
+  ["Contact the seller (terms first)", `/auctions/${LIVE}/contact`],
   ["Sell, step 1", "/sell"],
   ["Listing submitted", `/sell/submitted?id=${MY_DRAFT}`],
   ["Admin list", "/admin"],
   ["Admin list, live", "/admin?tab=live"],
   ["Admin auction, draft", `/admin/auctions/${MY_DRAFT}`],
   ["Admin auction, live", `/admin/auctions/${LIVE}`],
+  ["Admin, reported conversations", "/admin/messages"],
 ] as const;
 
 // Embedded YouTube/Vimeo players come from the internet. The tests must not

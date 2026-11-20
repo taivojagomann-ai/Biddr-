@@ -207,6 +207,10 @@ const TABLES = {
       withdraw_requested_at: iso(-2 * H), auction: { seller_id: SELLER, status: "live" } },
     { auction_id: "10000000-0000-4000-8000-000000000006", rejection_reason: "The photos don't show the underside. Add them and submit again.", auction: { seller_id: ME } }],
   admin_actions: [],
+  conversations: [],
+  messages: [],
+  viewing_requests: [],
+  conversation_reports: [],
 };
 
 const USER = { id: ME, aud: "authenticated", role: "authenticated", email: "test.admin@example.com",

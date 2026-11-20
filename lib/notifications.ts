@@ -21,6 +21,7 @@ const TYPES: readonly NotificationType[] = [
   "premium_due", "premium_paid", "premium_failed", "make_suggested",
   "premium_reminder", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer", "second_chance_closed", "bidding_unblocked",
   "new_message", "report_opened", "report_resolved", "account_blocked", "selling_unblocked",
+  "viewing_update", "conversation_reported", "messaging_unblocked",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -160,10 +161,31 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
       return withTitle("Biddr has reviewed the problem you reported. See the decision in your messages.");
     case "account_blocked": {
       const reason = str(n.data.reason);
-      return titled(
-        `${n.data.kind === "selling" ? "You can no longer list cars" : "Your bidding is blocked"}${reason ? `: ${reason}` : "."}`,
-      );
+      const what =
+        n.data.kind === "selling" ? "You can no longer list cars" : n.data.kind === "messaging" ? "You can no longer send messages" : "Your bidding is blocked";
+      return titled(`${what}${reason ? `: ${reason}` : "."}`);
     }
+    case "messaging_unblocked":
+      return titled("You can send messages again.");
+    case "viewing_update": {
+      const slot = str(n.data.slot);
+      switch (n.data.status) {
+        case "proposed":
+          return withTitle("New viewing times proposed. Choose one in the conversation.");
+        case "confirmed":
+          return withTitle(`Viewing confirmed${slot ? ` for ${formatDateTime(slot, tz)}` : ""}.`);
+        case "declined":
+          return withTitle("The proposed viewing times were declined.");
+        case "cancelled":
+          return withTitle("A viewing was cancelled.");
+        case "phone_shared":
+          return withTitle("A phone number was shared with you for the viewing.");
+        default:
+          return withTitle("Update about a viewing.");
+      }
+    }
+    case "conversation_reported":
+      return titled(`${car}: a conversation was reported`);
     case "selling_unblocked":
       return titled("You can list cars again.");
     case "premium_failed":
@@ -217,6 +239,7 @@ export function notificationHref(n: NotificationRow): string {
       return "/";
     case "new_message":
     case "report_resolved":
+    case "viewing_update":
       return str(n.data.conversation_id) ? `/account/messages/${str(n.data.conversation_id)}` : "/account/messages";
     case "report_opened":
       return str(n.data.report_id) ? `/admin/reports/${str(n.data.report_id)}` : "/admin/reports";
@@ -224,6 +247,10 @@ export function notificationHref(n: NotificationRow): string {
       return "/account/setup";
     case "selling_unblocked":
       return "/sell";
+    case "messaging_unblocked":
+      return "/account/messages";
+    case "conversation_reported":
+      return str(n.data.conversation_id) ? `/admin/messages#conversation-${str(n.data.conversation_id)}` : "/admin/messages";
     case "premium_paid":
       return n.data.role === "seller" ? "/account/listings" : "/account/purchases";
     case "premium_failed":

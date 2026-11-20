@@ -1,3 +1,4 @@
+import { contactAvailable, type ContactLink } from "@/components/auction/contact-seller";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -97,6 +98,16 @@ export default async function AuctionPage({ params }: { params: { id: string } }
       .eq("status", "authorized")
       .maybeSingle();
     hasHold = Boolean(hold);
+  }
+
+  // "Contact seller" (DECISIONS.md point 14): the buyer's existing conversation, or the
+  // contact page (which guides signed-out and incomplete members first).
+  let contact: ContactLink | null = null;
+  if (contactAvailable(auction, user?.id ?? null)) {
+    const { data: conv } = user
+      ? await supabase.from("conversations").select("id").eq("auction_id", auction.id).eq("buyer_id", user.id).maybeSingle<{ id: string }>()
+      : { data: null };
+    contact = conv ? { href: `/account/messages/${conv.id}`, existing: true } : { href: `/auctions/${auction.id}/contact`, existing: false };
   }
 
   // RLS only returns drafts and rejected listings to their seller and to admins;
@@ -203,6 +214,7 @@ export default async function AuctionPage({ params }: { params: { id: string } }
         preview={preview}
         inspectionPending={inspectionPending}
         seller={await loadSellerInfo(auction)}
+        contact={contact}
       />
     </main>
   );

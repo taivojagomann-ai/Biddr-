@@ -1,4 +1,5 @@
 import { Building2, User } from "lucide-react";
+import { ContactSellerButton, type ContactLink } from "@/components/auction/contact-seller";
 import { LocalDateTime } from "@/components/local-date-time";
 import { COUNTRY_NAMES } from "@/lib/countries";
 import type { Country } from "@/lib/types";
@@ -17,7 +18,7 @@ export interface SellerInfo {
   sold: number;
 }
 
-export function SellerCard({ seller }: { seller: SellerInfo }) {
+export function SellerCard({ seller, contact = null }: { seller: SellerInfo; contact?: ContactLink | null }) {
   const dealer = seller.sellerType === "dealer";
   return (
     <section aria-labelledby="seller-heading" className="rounded-lg border border-line bg-panel p-4">
@@ -72,6 +73,12 @@ export function SellerCard({ seller }: { seller: SellerInfo }) {
           </div>
         </dl>
       </div>
+      {contact ? (
+        <div className="mt-4 border-t border-line pt-4">
+          <ContactSellerButton link={contact} />
+          <p className="mt-2 text-xs text-mute">Ask privately or arrange a viewing, test drive or inspection before you bid.</p>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -13,6 +13,8 @@ export interface MenuLink {
   href: string;
   /** A count shown after the label, e.g. unanswered questions on My listings. */
   count?: number;
+  /** What the count is (default: unanswered questions). */
+  countKind?: "unanswered" | "unread";
 }
 
 /**
@@ -91,7 +93,7 @@ export function MobileMenu({ links, signedIn, email }: { links: MenuLink[]; sign
                 className="flex min-h-11 items-center gap-2 rounded-md px-2 text-base hover:bg-panel aria-[current=page]:font-semibold aria-[current=page]:text-signal"
               >
                 {l.label}
-                {l.count ? <>{" "}<MenuCount count={l.count} /></> : null}
+                {l.count ? <>{" "}<MenuCount count={l.count} kind={l.countKind} /></> : null}
               </Link>
             </li>
           ))}

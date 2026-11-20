@@ -1,4 +1,5 @@
 "use client";
+import type { ContactLink } from "./contact-seller";
 import Link from "next/link";
 import { Gavel, TimerReset } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ export interface BidUiState {
   watching: boolean;
   /** Seller's preview of an unpublished listing: nothing can be done yet. */
   preview?: boolean;
+  /** "Contact seller" on phones, next to the bid button (null when not offered). */
+  contact?: ContactLink | null;
 }
 
 export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasOutbid, justExtended, flash, initialNow, holdEur, userId, watching, preview = false }: BidUiState) {

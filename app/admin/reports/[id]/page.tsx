@@ -45,6 +45,13 @@ export default async function ReportPage({ params }: { params: { id: string } })
   if (showConversation) {
     const { data } = await ctx.db.from("messages").select(MESSAGE_COLUMNS).eq("conversation_id", report.conversation_id!).order("created_at").returns<MessageRow[]>();
     messages = data ?? [];
+    // Messages from before the sale had contact details hidden from the parties: admins see the original text.
+    const masked = messages.filter((m) => m.masked).map((m) => m.id);
+    if (masked.length) {
+      const { data: originals } = await ctx.db.from("messages_private").select("message_id, original_body").in("message_id", masked).returns<{ message_id: string; original_body: string }[]>();
+      const byId = new Map((originals ?? []).map((o) => [o.message_id, o.original_body]));
+      messages = messages.map((m) => (byId.has(m.id) ? { ...m, body: byId.get(m.id)! } : m));
+    }
     await logAdminAction(ctx, report.auction_id, "conversation.view", { report_id: report.id, conversation_id: report.conversation_id });
   }
   const title = report.auction?.title ?? "Car";

@@ -207,5 +207,18 @@ Use a paid sale from 8.1, with W and S in two browsers.
    - [ ] **Resolve** with a decision: W is told, the decision appears in the conversation, and the conversation is no longer shown to the admin.
 4. With a phone: the conversation page reads well, and the message box isn't hidden by the keyboard.
 
+### 8.7 Contact seller and viewing requests
+Use a live or upcoming car from another seller S, and a buyer B in a second browser.
+1. Signed out: the car's seller card shows **Contact seller**; it asks you to sign in first. As a member without accepted bidding terms, you accept them first.
+2. B: **Contact seller** → choose "Request a viewing or test drive", write a message with a phone number and an email address, add two times → **Send to the seller**.
+   - [ ] The phone number and email show as "[contact details hidden]" for both B and S.
+   - [ ] The times show in each viewer's own time zone with its abbreviation.
+   - [ ] On a phone, the message icon next to the bid button opens the same conversation.
+3. S: Messages shows the car's photo, B's username, "Viewing or test drive" and "New". S picks a time → **Confirm this time**.
+   - [ ] B sees "Viewing confirmed" without reloading; both get a notification.
+4. B: **Share my phone number for this viewing** → confirm. S sees B's number as a phone link. There is no way to hide it again.
+5. B: **Report** with a reason. Admin → **Reported conversations** shows the original text with the hidden details. **Close conversation** stops both from writing; **Block buyer from messaging** stops B contacting any seller until lifted on Admin → Users.
+6. When the auction ends: other buyers' conversations say "This auction has ended." If B wins and pays the premium, the same conversation shows "Sale confirmed: contact details are now shared", and new messages are no longer masked.
+
 ### Not testable with Stripe test cards
 - A hold that expired after 7 days (the whole premium is charged to the saved card) and a card declined after the hold was placed are covered by the automated tests (`e2e/specs/17-buyer-premium.spec.ts`).

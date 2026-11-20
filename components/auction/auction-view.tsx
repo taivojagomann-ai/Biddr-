@@ -12,6 +12,7 @@ import {
   ServiceHistory,
 } from "@/components/auction/listing-sections";
 import { SellerCard, type SellerInfo } from "@/components/auction/seller-card";
+import type { ContactLink } from "@/components/auction/contact-seller";
 import { SpecSheet } from "@/components/auction/spec-sheet";
 import { VideoPlayer } from "@/components/auction/video-player";
 import { DemoBadge, HistoryBadge, InspectionBadge, ReserveBadge, RestoredBadge } from "@/components/auction/badges";
@@ -43,6 +44,8 @@ export interface AuctionViewProps {
   inspectionPending?: boolean;
   /** The public seller card (username, country, member since, private/dealer, stats). */
   seller?: SellerInfo | null;
+  /** "Contact seller" (DECISIONS.md point 14); null when not offered. */
+  contact?: ContactLink | null;
 }
 
 /**
@@ -51,7 +54,7 @@ export interface AuctionViewProps {
  * No "use client": it renders on the server for /auctions/[id] and in the browser for /sell.
  */
 export function AuctionView({
-  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false, inspectionPending = false, seller = null,
+  auction, bids, comments, userId, hasHold, canComment, watching, initialNow, holdEur, preview = false, inspectionPending = false, seller = null, contact = null,
 }: AuctionViewProps) {
   return (
     <>
@@ -117,6 +120,7 @@ export function AuctionView({
           initialNow={initialNow}
           holdEur={holdEur}
           preview={preview}
+          contact={preview ? null : contact}
         >
           <Gallery auction={auction} />
           <Highlights auction={auction} />
@@ -129,7 +133,7 @@ export function AuctionView({
           <ServiceHistory auction={auction} />
           <ItemsIncluded auction={auction} />
           <SellerNotes auction={auction} />
-          {seller ? <SellerCard seller={seller} /> : null}
+          {seller ? <SellerCard seller={seller} contact={preview ? null : contact} /> : null}
           {auction.video_url && <VideoPlayer url={auction.video_url} title={auction.title} />}
         </AuctionLive>
       </Suspense>
