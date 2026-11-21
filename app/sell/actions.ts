@@ -117,6 +117,9 @@ export async function submitListing(input: unknown): Promise<SubmitResult> {
     return { ok: false, error: "We couldn't save your listing. Check your connection and try again." };
   }
 
+  // The fake-listing checks' record (the seller adds documents and photos next).
+  await admin.from("listing_verifications").upsert({ auction_id: auction.id, seller_id: user.id }, { onConflict: "auction_id", ignoreDuplicates: true });
+
   // A make that isn't in lib/data/car-makes.ts: tell the admins, who may add it later.
   if (v.makeOther) await notifyMakeSuggested(admin, auction.id, user.id, v.make);
 
