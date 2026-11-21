@@ -294,3 +294,13 @@ export async function issueMissingReceipts(admin: Admin, limit = 50): Promise<nu
   }
   return n;
 }
+
+/** The receipt's PDF (the stored file, or rendered again if it isn't stored), for an email attachment. */
+export async function receiptPdf(admin: Admin, receipt: ReceiptRow): Promise<{ filename: string; content: Buffer; contentType: string }> {
+  if (receipt.pdf_path) {
+    const { data: file } = await admin.storage.from(RECEIPT_BUCKET).download(receipt.pdf_path);
+    if (file) return { filename: receiptFileName(receipt), content: Buffer.from(await file.arrayBuffer()), contentType: "application/pdf" };
+  }
+  const pdf = await renderReceiptPdf(receipt, { testMode: testMode() });
+  return { filename: receiptFileName(receipt), content: Buffer.from(pdf), contentType: "application/pdf" };
+}
