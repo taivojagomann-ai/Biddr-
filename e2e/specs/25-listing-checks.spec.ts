@@ -94,7 +94,7 @@ test.describe("the seller verifies the car", () => {
 
     await page.goto("/account/listings");
     await expect(page.locator("[data-verify-status]").first()).toContainText("Verify your car: add the registration certificate and two photos at the car.");
-    await page.getByRole("link", { name: `Verify your car: ${a.title}` }).click();
+    await page.getByRole("link", { name: `Verify your car for ${a.title}` }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Verify your car" })).toBeVisible();
     await expectAccessible(page, "Verify your car");
 

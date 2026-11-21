@@ -22,7 +22,7 @@ export function VerifyStatus({ auctionId, title, view }: { auctionId: string; ti
         className="inline-flex min-h-11 items-center font-semibold text-chalk underline underline-offset-4 hover:text-signal"
       >
         {s.tone === "todo" || (s.tone === "bad" && view.canRetry) ? "Verify your car" : "Details"}
-        <span className="sr-only">: {title}</span>
+        <span className="sr-only"> for {title}</span>
       </Link>
     </div>
   );

@@ -100,7 +100,9 @@ createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/health") return send(res, 200, { ok: true });
     if (req.method === "GET" && url.pathname === "/__calls") return send(res, 200, calls.get(url.searchParams.get("listing")) ?? []);
     if (req.method === "POST" && url.pathname === "/v1/messages") {
-      if (!String(req.headers["x-api-key"] ?? "").startsWith("sk-ant-e2e")) return send(res, 401, { type: "error", error: { type: "authentication_error", message: "test key only" } });
+      // The SDK sends the key as x-api-key or as a bearer token: accept only the test key.
+      const key = String(req.headers["x-api-key"] ?? String(req.headers.authorization ?? "").replace(/^Bearer /, ""));
+      if (!key.startsWith("sk-ant-e2e")) return send(res, 401, { type: "error", error: { type: "authentication_error", message: "test key only" } });
       return send(res, 200, await claude(JSON.parse(await readBody(req))));
     }
     if (req.method === "POST" && url.pathname === "/v1/images:annotate") {
