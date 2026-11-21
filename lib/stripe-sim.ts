@@ -112,8 +112,9 @@ export function simulateStripe(method: string, url: URL, body: URLSearchParams):
   const path = url.pathname;
 
   if (method === "POST" && path === "/v1/identity/verification_sessions") {
-    const id = `vs_e2e_${Date.now().toString(36)}${counter++}`;
     const metadata = metadataOf(body);
+    // The member's id is part of the session id, so reading it back works from any route.
+    const id = `vs_e2e_${(metadata.user_id ?? "").replace(/-/g, "")}_${Date.now().toString(36)}${counter++}`;
     identitySessions.set(id, metadata);
     // The hosted page is skipped: the member comes straight back.
     return json({ ...identitySession(id, metadata), status: "requires_input", url: body.get("return_url") });
@@ -121,7 +122,9 @@ export function simulateStripe(method: string, url: URL, body: URLSearchParams):
   const vsMatch = /^\/v1\/identity\/verification_sessions\/(vs_e2e_[A-Za-z0-9_]+)$/.exec(path);
   if (vsMatch) {
     const id = vsMatch[1]!;
-    return json(identitySession(id, identitySessions.get(id) ?? { user_id: url.searchParams.get("e2e_user") ?? "" }));
+    const hex = /^vs_e2e_([0-9a-f]{32})_/.exec(id)?.[1];
+    const userId = hex ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` : "";
+    return json(identitySession(id, identitySessions.get(id) ?? { user_id: userId }));
   }
   const piMatch = /^\/v1\/payment_intents\/(pi_e2e_[A-Za-z0-9_]+)(\/(capture|cancel|confirm))?$/.exec(path);
 

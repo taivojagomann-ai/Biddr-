@@ -72,6 +72,8 @@ export async function handleIdentityEvent(db: SupabaseClient, event: Stripe.Even
 
   // Read the verified name and the document's country; nothing else is kept.
   const session = await stripe.identity.verificationSessions.retrieve(object.id, { expand: ["verified_outputs", "last_verification_report"] });
+  // Trust Stripe's current state, not only the event.
+  if (session.status !== "verified") return;
   const outputs = session.verified_outputs;
   const name = [outputs?.first_name, outputs?.last_name].filter(Boolean).join(" ").trim() || null;
   const report = session.last_verification_report;

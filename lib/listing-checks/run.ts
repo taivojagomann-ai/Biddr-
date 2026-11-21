@@ -106,17 +106,24 @@ export function readyForChecks(v: VerificationRow): boolean {
 }
 
 async function logCosts(db: Db, auctionId: string, usage: Usage[], vision: { units: number; costUsd: number } | null) {
-  const rows: Record<string, unknown>[] = usage.map((u) => ({
+  // Every row has the same keys (a bulk insert needs that).
+  const rows = usage.map((u) => ({
     auction_id: auctionId,
     provider: "anthropic",
     model: u.model,
     purpose: "extract",
     input_tokens: u.inputTokens,
     output_tokens: u.outputTokens,
+    units: 0,
     cost_usd: Number(u.costUsd.toFixed(5)),
   }));
-  if (vision) rows.push({ auction_id: auctionId, provider: "google_vision", model: "WEB_DETECTION", purpose: "reverse_image_search", units: vision.units, cost_usd: Number(vision.costUsd.toFixed(5)) });
-  if (rows.length) await db.from("listing_check_costs").insert(rows);
+  if (vision) {
+    rows.push({ auction_id: auctionId, provider: "google_vision", model: "WEB_DETECTION", purpose: "reverse_image_search", input_tokens: 0, output_tokens: 0, units: vision.units, cost_usd: Number(vision.costUsd.toFixed(5)) });
+  }
+  if (rows.length) {
+    const { error } = await db.from("listing_check_costs").insert(rows);
+    if (error) console.error("listing checks: couldn't log costs", auctionId, error);
+  }
 }
 
 async function notifyAdmins(db: Db, auctionId: string, sellerId: string, data: Record<string, unknown>) {
