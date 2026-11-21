@@ -12,6 +12,18 @@ export default function PrivacyPage() {
         Draft. Final text will be provided before launch.
       </p>
       <p className="mt-6 text-mute">[Privacy policy to be written with a lawyer]</p>
+      <section aria-labelledby="fraud-prevention" className="mt-6 rounded-md border border-line p-3 text-sm">
+        <h2 id="fraud-prevention" className="font-semibold">
+          [Placeholder: fraud prevention]
+        </h2>
+        <p className="mt-1 text-mute">
+          [To be reviewed by a lawyer.] To prevent fake listings, Biddr uses: Stripe Identity to verify sellers&apos; identity
+          (Biddr keeps only the verified name, the document&apos;s country and the date); Anthropic&apos;s Claude to read the
+          VIN, mileage, code and owner&apos;s name from the seller&apos;s photos and registration certificate; and Google Cloud
+          Vision to search the web for copies of listing photos. Only what each check needs is sent. Challenge photos and
+          registration documents are deleted 30 days after the auction ends.
+        </p>
+      </section>
       <p className="mt-2 text-mute">
         Questions in the meantime? Email{" "}
         <a href={`mailto:${SUPPORT_EMAIL}`} className="text-chalk underline underline-offset-4 hover:text-signal">

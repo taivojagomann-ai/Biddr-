@@ -65,6 +65,21 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
         {dealerReport ? "We'll review your listing and check the dealer's inspection report." : "We'll review your listing."}
       </p>
 
+      {id && title ? (
+        <section aria-labelledby="verify-heading" className="mt-8 rounded-lg border border-signal/50 bg-panel p-4">
+          <h2 id="verify-heading" className="text-lg font-bold">
+            Next: verify your car
+          </h2>
+          <p className="mt-1 text-sm text-mute">
+            Add the registration certificate and take two photos at the car with a code we give you. It takes a few minutes
+            and is needed before the auction can be scheduled.
+          </p>
+          <Button asChild className="mt-3">
+            <Link href={`/account/listings/${id}/verify`}>Verify your car</Link>
+          </Button>
+        </section>
+      ) : null}
+
       <h2 className="mt-10 text-lg font-bold">What happens next</h2>
       <ol className="mt-4 space-y-4">
         {steps.map((s, i) => (
@@ -81,7 +96,7 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
       </ol>
 
       <div className="mt-10 flex flex-wrap gap-3">
-        <Button asChild>
+        <Button asChild variant="outline">
           <Link href="/account/listings">See my listings</Link>
         </Button>
         <Button asChild variant="outline">

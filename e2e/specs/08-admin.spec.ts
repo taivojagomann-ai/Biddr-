@@ -56,7 +56,7 @@ test.describe("admin", () => {
     await signIn(context, seed.admin);
     await page.goto("/admin");
     await expect(page.getByRole("heading", { level: 1, name: "Admin" })).toBeVisible();
-    for (const tab of ["To review", "Scheduled", "Live", "Finished", "Rejected or withdrawn"]) {
+    for (const tab of ["To review", "Needs a check", "Scheduled", "Live", "Finished", "Rejected or withdrawn"]) {
       await expect(page.getByRole("link", { name: new RegExp(`^${tab}`) }).first()).toBeVisible();
     }
     await expect(page.locator(`a[href="/admin/auctions/${a.id}"]`)).not.toHaveCount(0);

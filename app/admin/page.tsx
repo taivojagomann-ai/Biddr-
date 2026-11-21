@@ -11,6 +11,7 @@ import { countDemoAuctions } from "@/lib/demo/seed";
 import { DemoDataPanel } from "./demo-data-panel";
 import { ADMIN_STATUS_LABELS, ADMIN_TABS, type AdminTab } from "@/lib/admin-schemas";
 import { formatEur } from "@/lib/format";
+import { formatUsd } from "@/lib/listing-checks/costs";
 import type { Auction, Country } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -33,8 +34,25 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
 
   const active = ADMIN_TABS.find((t) => t.key === searchParams.tab) ?? ADMIN_TABS[0];
 
+  // Fake-listing checks that need an admin (DECISIONS.md point 16).
+  const { data: needsRows } = await ctx.db
+    .from("listing_verifications")
+    .select("auction_id, auction:auctions!inner(status)")
+    .eq("needs_admin", true)
+    .eq("auction.status", "draft")
+    .returns<{ auction_id: string }[]>();
+  const needsIds = (needsRows ?? []).map((r) => r.auction_id);
+  const { data: costRows } = await ctx.db
+    .from("listing_check_costs")
+    .select("auction_id, cost_usd")
+    .gte("created_at", new Date(Date.now() - 30 * 86_400_000).toISOString())
+    .returns<{ auction_id: string | null; cost_usd: number }[]>();
+  const checkCost = (costRows ?? []).reduce((sum, r) => sum + Number(r.cost_usd), 0);
+  const checkedListings = new Set((costRows ?? []).map((r) => r.auction_id).filter(Boolean)).size;
+
   const counts = await Promise.all(
     ADMIN_TABS.map(async (t) => {
+      if (t.key === "checks") return [t.key, needsIds.length] as const;
       const { count } = await ctx.db.from("auctions").select("id", { count: "exact", head: true }).in("status", [...t.statuses]);
       return [t.key, count ?? 0] as const;
     }),
@@ -53,6 +71,7 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
 
   let query = ctx.db.from("auctions").select(ROW_COLUMNS).in("status", [...active.statuses]).limit(200);
   if (onlyRequests) query = query.in("id", requestIds.size ? [...requestIds] : ["00000000-0000-0000-0000-000000000000"]);
+  if (active.key === "checks") query = query.in("id", needsIds.length ? needsIds : ["00000000-0000-0000-0000-000000000000"]);
   query =
     active.key === "live"
       ? query.order("ends_at", { ascending: true })
@@ -87,6 +106,10 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
         <Link href="/admin/messages" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
           Reported conversations
         </Link>
+      </p>
+      <p className="mt-1 text-xs text-mute">
+        Fake-listing checks, last 30 days: {checkedListings} {checkedListings === 1 ? "listing" : "listings"}, estimated API cost{" "}
+        {formatUsd(checkCost)}.
       </p>
 
       <nav aria-label="Auction status" className="-mx-4 mt-6 overflow-x-auto px-4">

@@ -22,6 +22,7 @@ const TYPES: readonly NotificationType[] = [
   "premium_reminder", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer", "second_chance_closed", "bidding_unblocked",
   "new_message", "report_opened", "report_resolved", "account_blocked", "selling_unblocked",
   "viewing_update", "conversation_reported", "messaging_unblocked",
+  "identity_required", "identity_verified", "listing_on_hold", "listing_needs_check",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -186,6 +187,18 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
     }
     case "conversation_reported":
       return titled(`${car}: a conversation was reported`);
+    case "identity_required":
+      return withTitle("Your listing is approved. Verify your identity to schedule the auction.");
+    case "identity_verified":
+      return titled("Your identity is verified. Buyers see \"Verified seller\" on your listings.");
+    case "listing_on_hold":
+      return withTitle(
+        n.data.retry === false
+          ? "Your listing is on hold. Biddr's team is reviewing it."
+          : "Your listing is on hold: something didn't match. Check the details and try again.",
+      );
+    case "listing_needs_check":
+      return titled(`${car}: the automated checks ${n.data.outcome === "red" ? "failed twice" : "need a look"}`);
     case "selling_unblocked":
       return titled("You can list cars again.");
     case "premium_failed":
@@ -249,6 +262,13 @@ export function notificationHref(n: NotificationRow): string {
       return "/sell";
     case "messaging_unblocked":
       return "/account/messages";
+    case "identity_required":
+    case "listing_on_hold":
+      return a ? `/account/listings/${a}/verify` : "/account/listings";
+    case "identity_verified":
+      return "/account/listings";
+    case "listing_needs_check":
+      return a ? `/admin/auctions/${a}#checks` : "/admin?tab=checks";
     case "conversation_reported":
       return str(n.data.conversation_id) ? `/admin/messages#conversation-${str(n.data.conversation_id)}` : "/admin/messages";
     case "premium_paid":

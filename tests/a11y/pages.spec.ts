@@ -128,6 +128,7 @@ const SIGNED_IN_PAGES = [
   ["Contact the seller (terms first)", `/auctions/${LIVE}/contact`],
   ["Sell, step 1", "/sell"],
   ["Listing submitted", `/sell/submitted?id=${MY_DRAFT}`],
+  ["Verify your car", `/account/listings/${MY_DRAFT}/verify`],
   ["Admin list", "/admin"],
   ["Admin list, live", "/admin?tab=live"],
   ["Admin auction, draft", `/admin/auctions/${MY_DRAFT}`],

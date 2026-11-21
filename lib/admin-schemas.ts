@@ -23,6 +23,8 @@ export const MAX_HIGHLIGHTS = 20;
 
 export const ADMIN_TABS = [
   { key: "review", label: "To review", statuses: ["draft"] },
+  // Listings in review whose automated fake-listing checks need an admin (yellow, or red twice).
+  { key: "checks", label: "Needs a check", statuses: ["draft"] },
   { key: "scheduled", label: "Scheduled", statuses: ["upcoming"] },
   { key: "live", label: "Live", statuses: ["live"] },
   { key: "finished", label: "Finished", statuses: ["ended", "sold", "reserve_not_met"] },

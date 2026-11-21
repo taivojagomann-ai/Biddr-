@@ -24,6 +24,8 @@ import { PricingForm } from "./pricing-form";
 import { ScheduleForm } from "./schedule-form";
 import { Section } from "./section";
 import { StatusActions, type ApprovalCheck } from "./status-actions";
+import { ChecksSection } from "./checks-section";
+import { loadVerification } from "@/lib/listing-checks/run";
 
 export const metadata: Metadata = { title: "Review auction" };
 export const dynamic = "force-dynamic";
@@ -36,6 +38,7 @@ type ActionRow = { id: string; action: string; created_at: string; admin: { user
 
 const NAV = [
   ["status", "Status"],
+  ["checks", "Checks"],
   ["seller", "Seller"],
   ["listing", "Listing"],
   ["details", "Details"],
@@ -162,7 +165,16 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
   const now = Date.now();
   const isPublic = a.status !== "draft" && a.status !== "rejected";
 
+  // Fake-listing checks and the seller's identity (DECISIONS.md point 16).
+  const [verification, { data: identity }] = await Promise.all([
+    loadVerification(ctx.db, a.id),
+    ctx.db.from("profiles").select("identity_status").eq("id", a.seller_id).maybeSingle<{ identity_status: string }>(),
+  ]);
+  const sellerVerified = identity?.identity_status === "verified";
+  const checksOk = Boolean(verification && (verification.override_at || verification.outcome === "green"));
   const checks: ApprovalCheck[] = [
+    { label: "Seller's identity verified", done: sellerVerified },
+    { label: "Fake-listing checks green, or overridden with a reason", done: checksOk },
     { label: "Start and end time saved", done: Boolean(a.starts_at && a.ends_at) },
     { label: "End time is in the future", done: Boolean(a.ends_at && Date.parse(a.ends_at) > now) },
     {
@@ -278,6 +290,14 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
             rejectionReason={priv?.rejection_reason ?? null}
             waitingForSeller={priv?.seller_decision_required ? (priv.seller_decision_deadline ?? null) : null}
           />
+        </Section>
+
+        <Section
+          id="checks"
+          title="Fake-listing checks"
+          intro="Read automatically from the seller's photos and documents (values only; the decision is made by these rules and by you)."
+        >
+          <ChecksSection db={ctx.db} auctionId={a.id} status={a.status} sellerId={a.seller_id} />
         </Section>
 
         <Section id="seller" title="Seller">

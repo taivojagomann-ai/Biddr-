@@ -1,4 +1,6 @@
-import { Building2, User } from "lucide-react";
+import { Building2, ShieldCheck, User } from "lucide-react";
+import { InfoTip } from "@/components/info-tip";
+import { HELP } from "@/lib/help";
 import { ContactSellerButton, type ContactLink } from "@/components/auction/contact-seller";
 import { LocalDateTime } from "@/components/local-date-time";
 import { COUNTRY_NAMES } from "@/lib/countries";
@@ -16,6 +18,8 @@ export interface SellerInfo {
   /** Cars this seller has had scheduled, live or finished on Biddr. */
   listed: number;
   sold: number;
+  /** Identity verified with Stripe Identity (DECISIONS.md point 16). */
+  verified?: boolean;
 }
 
 export function SellerCard({ seller, contact = null }: { seller: SellerInfo; contact?: ContactLink | null }) {
@@ -34,7 +38,18 @@ export function SellerCard({ seller, contact = null }: { seller: SellerInfo; con
         <dl className="grid min-w-0 flex-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-mute">Username</dt>
-            <dd className="font-semibold">{seller.username ?? "Member"}</dd>
+            <dd className="font-semibold">
+              {seller.username ?? "Member"}
+              {seller.verified ? (
+                <span className="ml-2 inline-flex items-center gap-0.5 align-middle">
+                  <span className="inline-flex items-center gap-1 rounded-sm border border-verified/70 px-1.5 py-0.5 text-xs font-semibold text-verified">
+                    <ShieldCheck aria-hidden className="size-3.5" />
+                    Verified seller
+                  </span>
+                  <InfoTip topic={HELP.verifiedSeller} />
+                </span>
+              ) : null}
+            </dd>
           </div>
           {seller.country ? (
             <div>
