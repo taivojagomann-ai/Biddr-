@@ -4,6 +4,7 @@ import { partyContact, CONTACT_NOTE } from "@/lib/contacts";
 import { formatEur } from "@/lib/format";
 import { ensureInvoice, invoiceFileName } from "@/lib/invoice/issue";
 import { renderInvoicePdf } from "@/lib/invoice/pdf";
+import { RECEIPT_BUCKET, receiptFileName } from "@/lib/receipts/issue";
 import { SELLER_PAYMENT_DAYS } from "@/lib/settlement-constants";
 import type { BuyerPaymentRow } from "@/lib/settlement";
 import { siteUrl } from "@/lib/site";
@@ -30,6 +31,7 @@ export function isEmailed(type: string, data: Record<string, unknown>): boolean 
     case "premium_paid":
     case "premium_unpaid":
     case "second_chance_offer":
+    case "receipt_ready":
       return true;
     case "auction_ended":
       return data.status === "sold";
@@ -39,7 +41,7 @@ export function isEmailed(type: string, data: Record<string, unknown>): boolean 
       return false;
   }
 }
-export const EMAIL_TYPES = ["auction_won", "auction_ended", "premium_due", "premium_reminder", "premium_paid", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer"];
+export const EMAIL_TYPES = ["auction_won", "auction_ended", "premium_due", "premium_reminder", "premium_paid", "premium_unpaid", "buyer_did_not_pay", "second_chance_offer", "receipt_ready"];
 
 export interface EmailNotification {
   id: string;
@@ -229,6 +231,33 @@ export async function buildEmail(admin: SupabaseClient, n: EmailNotification, co
         ],
         button: { label: "See the offer", href: `${base}/account/purchases` },
       };
+      break;
+    }
+    case "receipt_ready": {
+      // The stored receipt PDF, attached.
+      const id = str(n.data.receipt_id);
+      const { data: receipt } = id
+        ? await admin.from("receipts").select("id, number, type, amount, pdf_path, buyer_id").eq("id", id).maybeSingle<{ id: string; number: string; type: "payment" | "refund"; amount: number; pdf_path: string | null; buyer_id: string }>()
+        : { data: null };
+      if (!receipt || receipt.buyer_id !== n.user_id) return null;
+      const refund = receipt.type === "refund";
+      const amount = formatEur(receipt.amount / 100);
+      content = {
+        subject: refund ? `Refund receipt ${receipt.number}: ${car}` : `Receipt ${receipt.number}: buyer's premium for ${car}`,
+        preview: refund ? `${amount} refunded to your card.` : `${amount} paid in full. Thank you.`,
+        heading: refund ? "Your refund receipt" : "Your receipt",
+        paragraphs: [
+          refund
+            ? `We've refunded ${amount} of the buyer's premium for ${car} to your card. Your refund receipt ${receipt.number} is attached.`
+            : `The buyer's premium of ${amount} for ${car} is paid in full. Your receipt ${receipt.number} is attached. Thank you.`,
+          "You can also open it, and your invoice, on My purchases.",
+        ],
+        button: purchases,
+      };
+      if (receipt.pdf_path) {
+        const { data: file } = await admin.storage.from(RECEIPT_BUCKET).download(receipt.pdf_path);
+        if (file) attachments = [{ filename: receiptFileName(receipt), content: Buffer.from(await file.arrayBuffer()), contentType: "application/pdf" }];
+      }
       break;
     }
     default:

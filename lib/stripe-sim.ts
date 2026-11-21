@@ -56,7 +56,28 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "request-id": "req_e2e_sim" } });
 
 function receipt(piId: string) {
-  return { id: `ch_${piId}`, object: "charge", receipt_url: `https://pay.stripe.com/receipts/e2e/${piId}` };
+  return {
+    id: `ch_${piId}`,
+    object: "charge",
+    payment_intent: piId,
+    created: Math.floor(Date.now() / 1000),
+    receipt_url: `https://pay.stripe.com/receipts/e2e/${piId}`,
+    payment_method_details: { type: "card", card: { brand: "visa", last4: "4242" } },
+  };
+}
+
+/**
+ * Refunds made outside Biddr (e.g. a partial refund in Stripe's dashboard), as the test
+ * wrote them to e2e/.state/stripe-sim-refunds.json: { "<charge id>": [{ "id", "amount" }] }.
+ */
+function refundsOf(chargeId: string): { id: string; amount: number }[] {
+  const file = join(process.cwd(), "e2e", ".state", "stripe-sim-refunds.json");
+  if (!existsSync(file)) return [];
+  try {
+    return (JSON.parse(readFileSync(file, "utf8")) as Record<string, { id: string; amount: number }[]>)[chargeId] ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function paymentIntent(id: string, fields: Record<string, unknown>) {
@@ -209,8 +230,19 @@ export function simulateStripe(method: string, url: URL, body: URLSearchParams):
     }
   }
 
+  if (method === "GET" && path === "/v1/refunds" && (url.searchParams.get("charge") ?? "").startsWith("ch_pi_e2e_")) {
+    const charge = url.searchParams.get("charge")!;
+    const data = refundsOf(charge).map((r) => ({ id: r.id, object: "refund", amount: r.amount, charge, status: "succeeded", created: Math.floor(Date.now() / 1000) }));
+    return json({ object: "list", data, has_more: false, url: "/v1/refunds" });
+  }
   if (method === "POST" && path === "/v1/refunds" && (body.get("payment_intent") ?? "").startsWith("pi_e2e_")) {
-    return json({ id: `re_e2e_${counter++}`, object: "refund", status: "succeeded", amount: Number(body.get("amount") ?? 0), payment_intent: body.get("payment_intent") });
+    return json({
+      id: `re_e2e_${Date.now().toString(36)}${counter++}`,
+      object: "refund",
+      status: "succeeded",
+      amount: Number(body.get("amount") ?? 0),
+      payment_intent: body.get("payment_intent"),
+    });
   }
   return null;
 }

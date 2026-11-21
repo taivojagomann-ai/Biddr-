@@ -4,6 +4,7 @@ import { stripe } from "@/lib/stripe";
 import { markHoldAuthorized } from "@/lib/holds";
 import { finishWithPaymentIntent } from "@/lib/settlement";
 import { handleIdentityEvent } from "@/lib/identity";
+import { receiptForRefundedCharge } from "@/lib/receipts/issue";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,10 @@ async function handle(admin: ReturnType<typeof getAdminSupabase>, event: Stripe.
       } else {
         check((await admin.from("bid_holds").update({ status: "captured" }).eq("stripe_payment_intent_id", event.data.object.id)).error);
       }
+      break;
+    case "charge.refunded":
+      // A refund on a premium (e.g. a partial refund in Stripe's dashboard): a refund receipt.
+      await receiptForRefundedCharge(admin, event.data.object);
       break;
     case "identity.verification_session.processing":
     case "identity.verification_session.requires_input":

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { logAdminAction, requireAdmin } from "@/lib/admin";
 import type { AdminResult } from "@/lib/admin-schemas";
 import { ensureCreditNote } from "@/lib/invoice/issue";
+import { ensureRefundReceipt, type RefundInput } from "@/lib/receipts/issue";
 import { settleBuyerPayment, type BuyerPaymentRow } from "@/lib/settlement";
 import { stripe } from "@/lib/stripe";
 
@@ -98,6 +99,7 @@ export async function refundPremium(input: unknown): Promise<AdminResult> {
 
   const captured = row.captured_from_hold ?? 0;
   const refunds: string[] = [];
+  const refunded: RefundInput[] = [];
   try {
     if (captured > 0 && row.hold_payment_intent_id) {
       const r = await stripe.refunds.create(
@@ -105,6 +107,7 @@ export async function refundPremium(input: unknown): Promise<AdminResult> {
         { idempotencyKey: `premium-refund:${row.id}:hold` },
       );
       refunds.push(r.id);
+      refunded.push({ id: r.id, amountCents: r.amount || captured * 100, paymentIntent: row.hold_payment_intent_id, charge: typeof r.charge === "string" ? r.charge : null, at: new Date().toISOString() });
     }
     if (row.premium_amount - captured > 0 && row.remainder_payment_intent_id) {
       const r = await stripe.refunds.create(
@@ -112,6 +115,13 @@ export async function refundPremium(input: unknown): Promise<AdminResult> {
         { idempotencyKey: `premium-refund:${row.id}:rest` },
       );
       refunds.push(r.id);
+      refunded.push({
+        id: r.id,
+        amountCents: r.amount || (row.premium_amount - captured) * 100,
+        paymentIntent: row.remainder_payment_intent_id,
+        charge: typeof r.charge === "string" ? r.charge : null,
+        at: new Date().toISOString(),
+      });
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Stripe refused the refund.";
@@ -125,11 +135,17 @@ export async function refundPremium(input: unknown): Promise<AdminResult> {
     console.error("invoice: credit note failed", row.id, e);
     return null;
   });
+  // The refund receipt (refers to the payment receipt and the invoice).
+  const refundReceipt = await ensureRefundReceipt(ctx.db, row.id, refunded).catch((e) => {
+    console.error("receipt: refund receipt failed", row.id, e);
+    return null;
+  });
   await logAdminAction(ctx, row.auction_id, "payment.refund", {
     payment_id: row.id,
     amount: row.premium_amount,
     refunds,
     credit_note: creditNote?.number ?? null,
+    refund_receipt: refundReceipt?.number ?? null,
   });
   refresh(row.auction_id);
   return { ok: true, message: "Refunded. Stripe returns the money to the winner's card." };
