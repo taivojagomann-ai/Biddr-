@@ -211,6 +211,9 @@ const TABLES = {
   messages: [],
   viewing_requests: [],
   conversation_reports: [],
+  listing_verifications: [],
+  listing_checks: [],
+  listing_check_costs: [],
 };
 
 const USER = { id: ME, aud: "authenticated", role: "authenticated", email: "test.admin@example.com",
