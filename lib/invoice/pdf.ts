@@ -5,6 +5,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { COUNTRY_NAMES } from "@/lib/countries";
 import type { InvoiceRow } from "./issue";
+import type { ReceiptRow } from "@/lib/receipts/issue";
 
 // Liberation Sans (SIL Open Font License, lib/invoice/fonts/OFL.txt): covers every
 // European letter, so names and car titles like "Škoda" or "Ģirts" print correctly.
@@ -183,4 +184,169 @@ function wrap(s: string, font: PDFFont, size: number, width: number): string[] {
   }
   if (line) lines.push(line);
   return lines;
+}
+
+const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Tallinn",
+    timeZoneName: "short",
+  }).format(new Date(iso));
+
+const cardText = (c: { brand: string | null; last4: string | null }) =>
+  c.last4 ? `${c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card"} •••• ${c.last4}` : null;
+
+/**
+ * A receipt (or refund receipt) as an A4 PDF: the same generator, fonts, branding,
+ * company details and VAT breakdown as the invoice it settles.
+ */
+export async function renderReceiptPdf(r: ReceiptRow, { testMode }: { testMode: boolean }): Promise<Uint8Array> {
+  const [regularBytes, boldBytes] = await loadFonts();
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  const regular = await doc.embedFont(regularBytes, { subset: true });
+  const bold = await doc.embedFont(boldBytes, { subset: true });
+  const refund = r.type === "refund";
+  const title = refund ? "Refund receipt" : "Receipt";
+  doc.setTitle(`${title} ${r.number}`);
+  doc.setAuthor(r.details.payee.name);
+  doc.setLanguage("en-GB");
+
+  const page = doc.addPage([595.28, 841.89]);
+  const left = 56;
+  const right = 595.28 - 56;
+  let y = 841.89 - 64;
+  const text = (s: string, x: number, yy: number, o: { font?: PDFFont; size?: number; color?: ReturnType<typeof rgb>; align?: "left" | "right" } = {}) => {
+    const font = o.font ?? regular;
+    const size = o.size ?? 10;
+    const w = font.widthOfTextAtSize(s, size);
+    page.drawText(s, { x: o.align === "right" ? x - w : x, y: yy, size, font, color: o.color ?? INK });
+  };
+  const rule = (yy: number) => page.drawLine({ start: { x: left, y: yy }, end: { x: right, y: yy }, thickness: 0.75, color: LINE });
+
+  text("Biddr", left, y, { font: bold, size: 24 });
+  page.drawCircle({ x: left + bold.widthOfTextAtSize("Biddr", 24) + 4, y: y + 2.5, size: 2.6, color: SIGNAL });
+  text(title.toUpperCase(), right, y + 2, { font: bold, size: 18, align: "right" });
+  y -= 22;
+  if (testMode) text("Test mode (Stripe sandbox): not a valid receipt.", right, y, { size: 9, color: SIGNAL, align: "right" });
+  y -= 26;
+
+  const meta: [string, string][] = [
+    [`${title} number`, r.number],
+    [refund ? "Date and time of refund" : "Date and time of payment", formatDateTime(r.issued_at)],
+  ];
+  if (r.details.reference.invoiceNumber) meta.push([refund ? "Invoice" : "Settles invoice", r.details.reference.invoiceNumber]);
+  if (refund && r.details.refunds) meta.push(["Refers to receipt", r.details.refunds.receiptNumber]);
+
+  const payee = r.details.payee;
+  let yl = y;
+  text(refund ? "Refunded by" : "Paid to", left, yl, { font: bold, size: 9, color: MUTE });
+  yl -= 15;
+  [payee.name, ...payee.addressLines, `Registry code ${payee.registryCode}`, `VAT number ${payee.vatNumber}`, payee.email].forEach((l, i) => {
+    text(l, left, yl, { font: i === 0 ? bold : regular });
+    yl -= 14;
+  });
+  let yr = y;
+  for (const [k, v] of meta) {
+    text(k, right - 210, yr, { size: 9, color: MUTE });
+    for (const [i, l] of wrap(v, bold, 10, 120).entries()) text(l, right, yr - i * 12, { font: bold, size: 10, align: "right" });
+    yr -= 16 + (wrap(v, bold, 10, 120).length - 1) * 12;
+  }
+  yr -= 10;
+  text(refund ? "Refunded to" : "Paid by", right - 210, yr, { font: bold, size: 9, color: MUTE });
+  yr -= 15;
+  text(r.details.payer.name, right - 210, yr, { font: bold });
+  yr -= 14;
+  if (r.details.payer.email) {
+    text(r.details.payer.email, right - 210, yr);
+    yr -= 14;
+  }
+  y = Math.min(yl, yr) - 20;
+
+  // Reference: the car and the auction.
+  text("Reference", left, y, { font: bold, size: 9, color: MUTE });
+  y -= 15;
+  const ref = [
+    r.details.reference.auctionTitle,
+    r.details.reference.vin ? `VIN ${r.details.reference.vin}` : null,
+    r.details.reference.auctionEndedAt ? `Auction ended ${formatDate(r.details.reference.auctionEndedAt)}` : null,
+  ].filter(Boolean) as string[];
+  for (const l of ref) {
+    text(l, left, y);
+    y -= 14;
+  }
+  y -= 12;
+
+  // The line.
+  text("Description", left, y, { font: bold, size: 9, color: MUTE });
+  text(refund ? "Refunded" : "Paid", right, y, { font: bold, size: 9, color: MUTE, align: "right" });
+  y -= 8;
+  rule(y);
+  y -= 18;
+  const descWidth = right - left - 120;
+  const desc = refund ? `Refund of the buyer's premium: ${r.details.reference.auctionTitle}` : r.details.line.description;
+  for (const l of wrap(desc, bold, 11, descWidth)) {
+    text(l, left, y, { font: bold, size: 11 });
+    y -= 15;
+  }
+  text(formatCents(r.amount), right, y + 15, { font: bold, size: 11, align: "right" });
+  for (const s of [
+    `Buyer's premium ${formatCents(r.details.line.premium * 100)}: ${r.details.line.basis}`,
+    `Winning bid ${formatCents(r.details.line.winningBid * 100)}`,
+  ]) for (const l of wrap(s, regular, 9.5, descWidth)) {
+    text(l, left, y, { size: 9.5, color: MUTE });
+    y -= 13;
+  }
+  y -= 8;
+  rule(y);
+  y -= 20;
+
+  // VAT, as on the invoice.
+  const totals: [string, string, boolean][] = [
+    ["Amount excluding VAT", formatCents(r.net_cents), false],
+    [`VAT ${rateText(r.vat_rate)} (${countryName(r.vat_country)})`, formatCents(r.vat_cents), false],
+    [refund ? "Total refunded (EUR)" : "Total paid (EUR)", formatCents(r.amount), true],
+  ];
+  for (const [k, v, strong] of totals) {
+    text(k, right - 210, y, { font: strong ? bold : regular, size: strong ? 11 : 10 });
+    text(v, right, y, { font: strong ? bold : regular, size: strong ? 11 : 10, align: "right" });
+    y -= strong ? 20 : 16;
+  }
+  y -= 12;
+
+  // Payment details: each charge (or refund), the card and Stripe's reference.
+  text(refund ? "Refund details" : "Payment details", left, y, { font: bold, size: 9, color: MUTE });
+  y -= 15;
+  for (const c of r.charges) {
+    const card = cardText(c);
+    const line = `${formatCents(c.amountCents)} ${c.label.charAt(0).toLowerCase()}${c.label.slice(1)}${card ? `, ${card}` : ""}`;
+    text(line, left, y);
+    y -= 13;
+    const stripeRef = [c.refund, c.paymentIntent, c.charge].filter(Boolean).join(" · ");
+    if (stripeRef) {
+      text(`Stripe reference: ${stripeRef}`, left + 10, y, { size: 8.5, color: MUTE });
+      y -= 13;
+    }
+  }
+  y -= 10;
+  text(refund ? "Refunded to your card. It can take 5–10 days to appear." : "Paid in full. Thank you.", left, y, { font: bold, size: 11 });
+  y -= 22;
+
+  const notes = refund
+    ? [`This refund refers to receipt ${r.details.refunds?.receiptNumber ?? ""} and invoice ${r.details.reference.invoiceNumber ?? ""}.`]
+    : [
+        "The buyer's premium includes VAT. The car itself is paid directly to the seller and is not part of this receipt.",
+        "Questions about this payment? Write to us with the receipt number and the Stripe reference above.",
+      ];
+  for (const n of notes) for (const l of wrap(n, regular, 9, right - left)) {
+    text(l, left, y, { size: 9, color: MUTE });
+    y -= 12;
+  }
+
+  footer(page, regular, `${payee.name}  ·  Registry code ${payee.registryCode}  ·  VAT ${payee.vatNumber}  ·  ${payee.email}`);
+  return doc.save();
 }

@@ -17,7 +17,7 @@ import {
   Trophy,
   XCircle,
   type LucideIcon,
-  Tag, CalendarCheck, ShieldCheck } from "lucide-react";
+  Tag, CalendarCheck, ShieldCheck, Receipt } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTimeZone } from "@/hooks/use-time-zone";
 import { notificationCopy, notificationHref } from "@/lib/notifications";
@@ -66,6 +66,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   identity_verified: ShieldCheck,
   listing_on_hold: CircleSlash,
   listing_needs_check: FileWarning,
+  receipt_ready: Receipt,
 };
 
 /** Sets read_at on the user's own rows (the only column they may update). */

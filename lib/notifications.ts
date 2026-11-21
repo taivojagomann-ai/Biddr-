@@ -23,6 +23,7 @@ const TYPES: readonly NotificationType[] = [
   "new_message", "report_opened", "report_resolved", "account_blocked", "selling_unblocked",
   "viewing_update", "conversation_reported", "messaging_unblocked",
   "identity_required", "identity_verified", "listing_on_hold", "listing_needs_check",
+  "receipt_ready",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -187,6 +188,14 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
     }
     case "conversation_reported":
       return titled(`${car}: a conversation was reported`);
+    case "receipt_ready": {
+      const number = str(n.data.number);
+      return withTitle(
+        n.data.receipt_type === "refund"
+          ? `Your refund receipt${number ? ` ${number}` : ""} is ready.`
+          : `Your receipt${number ? ` ${number}` : ""} for the buyer's premium is ready.`,
+      );
+    }
     case "identity_required":
       return withTitle("Your listing is approved. Verify your identity to schedule the auction.");
     case "identity_verified":
@@ -267,6 +276,8 @@ export function notificationHref(n: NotificationRow): string {
       return a ? `/account/listings/${a}/verify` : "/account/listings";
     case "identity_verified":
       return "/account/listings";
+    case "receipt_ready":
+      return "/account/purchases";
     case "listing_needs_check":
       return a ? `/admin/auctions/${a}#checks` : "/admin?tab=checks";
     case "conversation_reported":

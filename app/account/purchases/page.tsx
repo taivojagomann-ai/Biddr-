@@ -84,6 +84,17 @@ export default async function PurchasesPage() {
     : { data: [] };
   const docs = new Map<string, { id: string; number: string; kind: InvoiceKind }[]>();
   for (const d of invoiceRows ?? []) docs.set(d.buyer_payment_id, [...(docs.get(d.buyer_payment_id) ?? []), d]);
+  // Receipts for the payment and any refunds (RLS: their own only).
+  const { data: receiptRows } = rows.length
+    ? await supabase
+        .from("receipts")
+        .select("id, number, type, buyer_payment_id, issued_at")
+        .in("buyer_payment_id", rows.map((r) => r.id))
+        .order("issued_at")
+        .returns<{ id: string; number: string; type: "payment" | "refund"; buyer_payment_id: string; issued_at: string }[]>()
+    : { data: [] as { id: string; number: string; type: "payment" | "refund"; buyer_payment_id: string; issued_at: string }[] };
+  const receipts = new Map<string, { id: string; number: string; type: "payment" | "refund" }[]>();
+  for (const d of receiptRows ?? []) receipts.set(d.buyer_payment_id, [...(receipts.get(d.buyer_payment_id) ?? []), d]);
 
   // Conversations with the seller (opened when the premium is paid; RLS: own only).
   const { data: convRows } = rows.length
@@ -203,7 +214,13 @@ export default async function PurchasesPage() {
                     ) : null}
                     <dt className="text-mute">Status</dt>
                     <dd className={cn("text-right", needsWinner ? "font-semibold text-signal" : r.status === "paid" ? "font-semibold text-verified" : undefined)}>
-                      {statusText(r)}
+                      {r.status === "paid" && r.paid_at ? (
+                        <>
+                          Paid on <LocalDateTime iso={r.paid_at} dateOnly />
+                        </>
+                      ) : (
+                        statusText(r)
+                      )}
                     </dd>
                     {needsWinner && r.due_at ? (
                       <>
@@ -215,10 +232,6 @@ export default async function PurchasesPage() {
                     ) : null}
                     {r.status === "paid" && r.paid_at ? (
                       <>
-                        <dt className="text-mute">Paid on</dt>
-                        <dd className="text-right">
-                          <LocalDateTime iso={r.paid_at} />
-                        </dd>
                         {r.sale_completed_at ? (
                           <>
                             <dt className="text-mute">Sale completed (confirmed by the seller)</dt>
@@ -245,7 +258,7 @@ export default async function PurchasesPage() {
                     </p>
                   ) : null}
                   {r.status === "paid" || r.status === "refunded" || (r.status === "unpaid" && captured > 0) ? (
-                    <InvoiceLinks docs={docs.get(r.id) ?? []} title={title} />
+                    <InvoiceLinks docs={docs.get(r.id) ?? []} receipts={r.status === "unpaid" ? [] : (receipts.get(r.id) ?? [])} title={title} />
                   ) : null}
                   {needsWinner ? (
                     <div className="flex flex-wrap items-center gap-3">
@@ -274,8 +287,19 @@ export default async function PurchasesPage() {
   );
 }
 
-/** The invoice (and the credit note after a refund), each opening in a new tab; the browser's viewer can save it. */
-function InvoiceLinks({ docs, title }: { docs: { id: string; number: string; kind: InvoiceKind }[]; title: string }) {
+/**
+ * The invoice and the receipt (and after a refund the credit note and the refund
+ * receipt), each opening in a new tab; the browser's viewer can save it.
+ */
+function InvoiceLinks({
+  docs,
+  receipts,
+  title,
+}: {
+  docs: { id: string; number: string; kind: InvoiceKind }[];
+  receipts: { id: string; number: string; type: "payment" | "refund" }[];
+  title: string;
+}) {
   const sorted = [...docs].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "invoice" ? -1 : 1));
   if (!sorted.length) {
     return <p className="text-sm text-mute">Your invoice is being prepared. It appears here within a few minutes.</p>;
@@ -291,6 +315,20 @@ function InvoiceLinks({ docs, title }: { docs: { id: string; number: string; kin
             className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal"
           >
             {d.kind === "credit_note" ? "View credit note" : "View invoice"} {d.number} (PDF)
+            <ExternalLink aria-hidden className="size-3.5" />
+            <span className="sr-only"> for {title} (opens in a new tab)</span>
+          </a>
+        </li>
+      ))}
+      {receipts.map((d) => (
+        <li key={d.id}>
+          <a
+            href={`/api/receipts/${d.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal"
+          >
+            {d.type === "refund" ? "View refund receipt" : "View receipt"} {d.number} (PDF)
             <ExternalLink aria-hidden className="size-3.5" />
             <span className="sr-only"> for {title} (opens in a new tab)</span>
           </a>

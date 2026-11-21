@@ -52,6 +52,16 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
     : { data: [] };
   const docs = new Map<string, { id: string; number: string; kind: "invoice" | "credit_note" }[]>();
   for (const d of invoiceRows ?? []) docs.set(d.buyer_payment_id, [...(docs.get(d.buyer_payment_id) ?? []), d]);
+  const { data: receiptRows } = rows.length
+    ? await ctx.db
+        .from("receipts")
+        .select("id, number, type, buyer_payment_id, issued_at")
+        .in("buyer_payment_id", rows.map((r) => r.id))
+        .order("issued_at")
+        .returns<{ id: string; number: string; type: "payment" | "refund"; buyer_payment_id: string }[]>()
+    : { data: [] };
+  const receipts = new Map<string, { id: string; number: string; type: "payment" | "refund" }[]>();
+  for (const d of receiptRows ?? []) receipts.set(d.buyer_payment_id, [...(receipts.get(d.buyer_payment_id) ?? []), d]);
 
   return (
     <main className="container py-8 sm:py-12">
@@ -126,6 +136,12 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                   {(docs.get(r.id) ?? []).map((d) => (
                     <a key={d.id} href={`/api/invoices/${d.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal">
                       {d.kind === "credit_note" ? "Credit note" : "Invoice"} {d.number} (PDF) <ExternalLink aria-hidden className="size-3.5" />
+                      <span className="sr-only"> for {title} (opens in a new tab)</span>
+                    </a>
+                  ))}
+                  {(receipts.get(r.id) ?? []).map((d) => (
+                    <a key={d.id} href={`/api/receipts/${d.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 underline underline-offset-4 hover:text-signal">
+                      {d.type === "refund" ? "Refund receipt" : "Receipt"} {d.number} (PDF) <ExternalLink aria-hidden className="size-3.5" />
                       <span className="sr-only"> for {title} (opens in a new tab)</span>
                     </a>
                   ))}

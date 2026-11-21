@@ -1,5 +1,6 @@
 import "server-only";
 import { ensureInvoice, issueMissingInvoices } from "@/lib/invoice/issue";
+import { ensureReceipt, issueMissingReceipts } from "@/lib/receipts/issue";
 import Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { HOLD_AMOUNT_EUR, stripe } from "@/lib/stripe";
@@ -111,8 +112,10 @@ async function markPaid(admin: Admin, row: BuyerPaymentRow, receipt: string | nu
   if (row.second_chance_offer_id) {
     await admin.from("second_chance_offers").update({ status: "paid" }).eq("id", row.second_chance_offer_id);
   }
-  // The invoice for the whole premium. If this fails, the settlement job issues it later.
+  // The invoice for the whole premium, then the receipt for the payment (it settles the
+  // invoice). If either fails, the settlement job issues it later.
   await ensureInvoice(admin, row.id).catch((e) => console.error("invoice: issuing failed", row.id, e));
+  await ensureReceipt(admin, row.id).catch((e) => console.error("receipt: issuing failed", row.id, e));
 }
 
 async function needsWinner(admin: Admin, row: BuyerPaymentRow, kind: "action_required" | "failed", reason: string, remainderPi: string | null) {
@@ -262,6 +265,7 @@ export async function settlePending(
   results: Record<string, number>;
   deadlines: { reminded: number; expired: number; offersExpired: number };
   invoices: number;
+  receipts: number;
 }> {
   const { data } = await admin
     .from("buyer_payments")
@@ -279,7 +283,9 @@ export async function settlePending(
   const deadlines = await processDeadlines(admin);
   // Invoices that couldn't be issued when the premium was paid (or refunded).
   const invoices = await issueMissingInvoices(admin);
-  return { attempted: data?.length ?? 0, results, deadlines, invoices };
+  // Receipts likewise (only for premiums paid in full).
+  const receipts = await issueMissingReceipts(admin);
+  return { attempted: data?.length ?? 0, results, deadlines, invoices, receipts };
 }
 
 /**
