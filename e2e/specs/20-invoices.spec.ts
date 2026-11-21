@@ -175,6 +175,8 @@ test.describe("admin", () => {
     expect(credit).toMatchObject({ credited_invoice_id: inv!.id, total_cents: -60_000, net_cents: -48_387, vat_cents: -11_613, vat_country: "EE" });
     expect(credit.details.credits!.number).toBe(inv!.number);
     expect(seq(credit.number)).toBeGreaterThan(seq(inv!.number));
+    // The action logs after issuing the documents: wait for it.
+    await expect.poll(async () => (await service().from("admin_actions").select("id").eq("auction_id", s.auctionId).eq("action", "payment.refund")).data?.length ?? 0).toBe(1);
     const { data: log } = await service().from("admin_actions").select("details").eq("auction_id", s.auctionId).eq("action", "payment.refund").single();
     expect((log!.details as { credit_note: string }).credit_note).toBe(credit.number);
 

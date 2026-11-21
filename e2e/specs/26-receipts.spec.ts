@@ -152,7 +152,9 @@ test("a full refund gets a refund receipt that refers to the receipt and the inv
   expect(refund.details.refunds).toEqual({ receiptNumber: original!.number, invoiceNumber: inv.number });
   expect(refund.stripe_refund_ids).toHaveLength(2);
   expect(refund.charges.map((c) => c.amountCents)).toEqual([50_000, 10_000]);
-  const { data: log } = await service().from("admin_actions").select("details").eq("auction_id", s.auctionId).eq("action", "payment.refund").single();
+  // The action logs after issuing the documents: wait for it.
+    await expect.poll(async () => (await service().from("admin_actions").select("id").eq("auction_id", s.auctionId).eq("action", "payment.refund")).data?.length ?? 0).toBe(1);
+    const { data: log } = await service().from("admin_actions").select("details").eq("auction_id", s.auctionId).eq("action", "payment.refund").single();
   expect(log!.details).toMatchObject({ refund_receipt: refund.number });
 
   // Stripe reports the refunds on each charge: already receipted, nothing new.
