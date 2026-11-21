@@ -54,6 +54,21 @@ export async function soldAuction(winningBid: number, card: Card, o: { country?:
 export async function settle(request: APIRequestContext) {
   const res = await request.get(`${APP_URL}/api/stripe/settle`, { headers: { authorization: `Bearer ${CRON_SECRET}` } });
   expect(res.status()).toBe(200);
+  // The sale also starts a settlement by itself (pg_net): if that attempt was still
+  // running, this call skipped the row. Wait until no attempt is in flight.
+  await expect
+    .poll(
+      async () => {
+        const { count } = await service()
+          .from("buyer_payments")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending")
+          .gt("last_attempt_at", new Date(Date.now() - 2 * 60_000).toISOString());
+        return count ?? 0;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(0);
 }
 
 export async function payment(id: string) {

@@ -180,6 +180,8 @@ export function simulateStripe(method: string, url: URL, body: URLSearchParams):
         amount_capturable: expired ? 0 : 50_000,
         payment_method: holdPaymentMethod(id),
         capture_method: "manual",
+        // An authorised hold has a charge too (with the card's brand and last 4).
+        latest_charge: expired ? null : receipt(id),
       }),
     );
   }
