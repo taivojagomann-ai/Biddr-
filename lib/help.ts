@@ -44,6 +44,11 @@ export const HELP = {
     text: "Inspected by the selling dealer: the seller is an authorised dealer of the car's brand and inspected the car itself, so this isn't an independent check. We checked the report matches the VIN and mileage and is no older than 90 days.",
     href: "/how-it-works#badges",
   },
+  verifiedSeller: {
+    label: "What does Verified seller mean?",
+    text: "Verified seller: this seller verified their identity with an ID document and a selfie through Stripe. Every car is also checked before it goes live: its VIN, mileage and registered owner.",
+    href: "/how-it-works#verified-seller",
+  },
   historyReport: {
     label: "What does History report mean?",
     text: HISTORY_TEXT.tip,

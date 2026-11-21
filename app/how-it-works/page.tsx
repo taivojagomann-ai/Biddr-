@@ -221,14 +221,25 @@ export default function HowItWorksPage() {
               cars are welcome either way.
             </li>
             <li>
-              <strong>We review the listing</strong> (and check the dealer&apos;s report, if there is one) and agree the
-              auction dates with you.
+              <strong>Verify your car.</strong> Add the registration certificate and take two photos at the car with a
+              code we give you: the VIN plate and the odometer. Biddr checks them automatically.
+            </li>
+            <li>
+              <strong>We review the listing</strong> (and check the dealer&apos;s report, if there is one). Once it&apos;s
+              approved, you verify your identity with Stripe (once, for all your listings) and we agree the auction dates
+              with you.
             </li>
             <li>
               <strong>Your auction runs</strong> for up to 7 days. If you set a reserve, the car only sells if bidding reaches
               it.
             </li>
           </ol>
+          <p id="verified-seller" className="mt-4 scroll-mt-20">
+            <strong>Verified seller</strong> on a seller&apos;s card means they verified their identity with an ID document
+            and a selfie through Stripe. Every car on Biddr is also checked before it goes live: the seller photographs the VIN
+            plate and the odometer with a one-time code, and the VIN, the mileage and the registered owner are compared with
+            the listing.
+          </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild>
               <Link href="/sell">Sell your car</Link>

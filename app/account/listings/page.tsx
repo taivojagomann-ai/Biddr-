@@ -21,6 +21,9 @@ import { SalePanel, type SaleState } from "./sale-panel";
 import type { ReportStatus } from "@/lib/reports";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
+import { IdentityButton } from "./[id]/verify/identity-button";
+import { VerifyStatus } from "./verify-status";
+import { IDENTITY_REQUEST, sellerView } from "@/lib/listing-checks/seller-status";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
@@ -48,7 +51,7 @@ const STATUS_STYLES: Record<Auction["status"], string> = {
   withdrawn: "border-line text-mute",
 };
 
-export default async function MyListingsPage() {
+export default async function MyListingsPage({ searchParams }: { searchParams?: { identity?: string } }) {
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(loginPath("/account/listings"));
@@ -76,6 +79,29 @@ export default async function MyListingsPage() {
       .returns<PrivateRow[]>();
     for (const r of rows ?? []) privates.set(r.auction_id, r);
   }
+
+  // Fake-listing checks for listings in review (admin-only tables: the service role,
+  // strictly for this seller's own drafts) and the seller's identity status.
+  const drafts = listings.filter((l) => l.status === "draft").map((l) => l.id);
+  const verifications = new Map<string, Parameters<typeof sellerView>[0]>();
+  let identityStatus = "none";
+  {
+    const admin = getAdminSupabase();
+    const [{ data: vRows }, { data: me }] = await Promise.all([
+      drafts.length
+        ? admin
+            .from("listing_verifications")
+            .select("auction_id, registration_paths, vin_photo_path, odometer_photo_path, outcome, outcome_reasons, on_hold, red_count, content_approved_at, override_at")
+            .in("auction_id", drafts)
+            .eq("seller_id", user.id)
+            .returns<(NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[]>()
+        : Promise.resolve({ data: [] as (NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[] }),
+      admin.from("profiles").select("identity_status").eq("id", user.id).maybeSingle<{ identity_status: string }>(),
+    ]);
+    for (const r of vRows ?? []) verifications.set(r.auction_id, r);
+    identityStatus = me?.identity_status ?? "none";
+  }
+  const identityRequested = identityStatus !== "verified" && [...verifications.values()].some((v) => v?.content_approved_at);
 
   // Sold cars: the buyer's premium, the buyer's contact details once it's paid, and what
   // the seller can do when the buyer didn't pay (DECISIONS.md point 12).
@@ -135,6 +161,23 @@ export default async function MyListingsPage() {
           <Link href="/sell">Sell a car</Link>
         </Button>
       </div>
+
+      {searchParams?.identity === "return" && identityStatus !== "verified" ? (
+        <p role="status" className="mt-6 rounded-md border border-line bg-panel p-3 text-sm">
+          Thanks. Stripe is checking your identity; this page updates when it&apos;s done (usually within a few minutes).
+        </p>
+      ) : null}
+      {identityRequested && identityStatus !== "pending" ? (
+        <section aria-labelledby="identity-request" className="mt-6 rounded-lg border border-signal/50 bg-panel p-4">
+          <h2 id="identity-request" className="font-bold">
+            {IDENTITY_REQUEST}
+          </h2>
+          <p className="mt-1 text-sm text-mute">With Stripe: a photo of your ID and a selfie, once for all your listings.</p>
+          <div className="mt-3">
+            <IdentityButton />
+          </div>
+        </section>
+      ) : null}
 
       {listings.length === 0 ? (
         <div className="mt-10 rounded-lg border border-dashed border-line p-8 text-center">
@@ -213,6 +256,7 @@ export default async function MyListingsPage() {
                 )}
                 {/* Outside the link: no buttons inside links. */}
                 <div className="space-y-3 px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
+                  {l.status === "draft" ? <VerifyStatus auctionId={l.id} title={l.title} view={sellerView(verifications.get(l.id) ?? null, identityStatus)} /> : null}
                   {l.status === "draft" && (deciding || priv?.seller_decision) ? (
                     <DecisionPanel
                       auctionId={l.id}

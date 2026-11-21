@@ -21,5 +21,11 @@ export EMAIL_FROM="Biddr <noreply@biddr.test>"
 export ENABLE_DEMO_DATA=true
 export BID_HOLD_AMOUNT_EUR=500
 export NEXT_TELEMETRY_DISABLED=1
+# Fake-listing checks: the local mock of the Anthropic and Google Vision APIs (test-only keys).
+export ANTHROPIC_BASE_URL=http://127.0.0.1:54330
+export ANTHROPIC_API_KEY=sk-ant-e2e-only
+export GOOGLE_VISION_BASE_URL=http://127.0.0.1:54330
+export GOOGLE_VISION_API_KEY=e2e-vision-key
+curl -sf http://127.0.0.1:54330/health > /dev/null || (node e2e/mock-apis.mjs > /tmp/mock-apis.log 2>&1 &)
 npx next build
 exec npx next start -p 3100

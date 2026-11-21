@@ -14,9 +14,9 @@ export async function loadSellerInfo(
   const [{ data: profile }, listedRes, soldRes] = await Promise.all([
     supabase
       .from("profiles")
-      .select("username, country, created_at")
+      .select("username, country, created_at, is_verified_seller")
       .eq("id", a.seller_id)
-      .maybeSingle<{ username: string | null; country: Country | null; created_at: string }>(),
+      .maybeSingle<{ username: string | null; country: Country | null; created_at: string; is_verified_seller: boolean | null }>(),
     supabase
       .from("auctions")
       .select("id", { count: "exact", head: true })
@@ -33,5 +33,6 @@ export async function loadSellerInfo(
     dealerRegistryCode: a.dealer_registry_code,
     listed: listedRes.count ?? 0,
     sold: soldRes.count ?? 0,
+    verified: profile?.is_verified_seller === true,
   };
 }

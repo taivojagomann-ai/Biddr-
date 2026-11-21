@@ -1,4 +1,5 @@
 "use server";
+import { loadVerification, schedulingBlockers } from "@/lib/listing-checks/run";
 import { findMake } from "@/lib/data/car-makes";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
@@ -661,6 +662,12 @@ export async function approveAuction(input: unknown): Promise<AdminResult> {
     .eq("auction_id", v.auctionId)
     .maybeSingle<{ seller_decision_required: boolean }>();
   if (decision?.seller_decision_required) missing.push("wait for the seller to choose: new report or list without an inspection");
+  // Fake-listing checks (DECISIONS.md point 16): the seller's identity, and green checks or an override.
+  const [verification, { data: identity }] = await Promise.all([
+    loadVerification(ctx.db, v.auctionId),
+    ctx.db.from("profiles").select("identity_status").eq("id", a.seller_id).maybeSingle<{ identity_status: string }>(),
+  ]);
+  missing.push(...schedulingBlockers(verification, identity?.identity_status === "verified"));
   if (missing.length) return { ok: false, error: `Before approving, ${missing.join(", and ")}.` };
 
   const changed = await changeStatus(ctx, v.auctionId, ["draft"], "upcoming");

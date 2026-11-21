@@ -125,6 +125,11 @@ export interface AuctionOptions {
   beforePhotos?: number;
   minIncrement?: number;
   extra?: Record<string, unknown>;
+  /**
+   * Drafts only: start with green fake-listing checks and a verified seller (default
+   * true), so tests about other approval rules can approve them. false: no checks yet.
+   */
+  checks?: boolean;
 }
 
 export interface TestAuction {
@@ -203,6 +208,17 @@ export async function createAuction(o: AuctionOptions): Promise<TestAuction> {
     .from("auction_private")
     .upsert({ auction_id: data.id, reserve_price: o.reserve ?? null, requested_reserve: o.reserve ?? null });
   if (pErr) throw pErr;
+  if (status === "draft" && o.checks !== false) {
+    const { error: vErr } = await db
+      .from("listing_verifications")
+      .upsert({ auction_id: data.id, seller_id: o.seller.id, outcome: "green", checked_at: new Date().toISOString() });
+    if (vErr) throw vErr;
+    const { error: idErr } = await db
+      .from("profiles")
+      .update({ identity_status: "verified", identity_verified_name: "E2E Private Name", identity_verified_at: new Date().toISOString() })
+      .eq("id", o.seller.id);
+    if (idErr) throw idErr;
+  }
   return { id: data.id, title, vin };
 }
 

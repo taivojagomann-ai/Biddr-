@@ -3,6 +3,7 @@ import { getAdminSupabase } from "@/lib/supabase/server";
 import { stripe } from "@/lib/stripe";
 import { markHoldAuthorized } from "@/lib/holds";
 import { finishWithPaymentIntent } from "@/lib/settlement";
+import { handleIdentityEvent } from "@/lib/identity";
 
 export const runtime = "nodejs";
 
@@ -87,6 +88,13 @@ async function handle(admin: ReturnType<typeof getAdminSupabase>, event: Stripe.
       } else {
         check((await admin.from("bid_holds").update({ status: "captured" }).eq("stripe_payment_intent_id", event.data.object.id)).error);
       }
+      break;
+    case "identity.verification_session.processing":
+    case "identity.verification_session.requires_input":
+    case "identity.verification_session.canceled":
+    case "identity.verification_session.verified":
+      // A seller's identity check (Stripe Identity).
+      await handleIdentityEvent(admin, event);
       break;
     default:
       break;

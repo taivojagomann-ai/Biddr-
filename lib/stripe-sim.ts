@@ -13,6 +13,10 @@ import "server-only";
  *   id contains "authreq", pm_e2e_declined for "declined", else pm_e2e_ok.
  * - Off-session charges with pm_e2e_ok succeed; pm_e2e_authreq fails with
  *   authentication_required; pm_e2e_declined fails with card_declined.
+ * - Stripe Identity: a created VerificationSession (vs_e2e_…) sends the member straight
+ *   back to its return_url. Reading it back gives the result the test wrote to
+ *   e2e/.state/identity-sim.json under the member's id:
+ *   { "<user id>": { "status": "verified", "first_name": "…", "last_name": "…", "country": "EE" } }.
  * - Created PaymentIntents (pi_e2e_new_…) are remembered with their metadata,
  *   amount and status; one the test lists in e2e/.state/stripe-sim-paid.json
  *   reads back as succeeded (the winner "paid in the browser").
@@ -74,9 +78,54 @@ function holdPaymentMethod(id: string): string {
   return "pm_e2e_ok";
 }
 
+/** Identity sessions this simulator created: their member (metadata.user_id). */
+const identitySessions = new Map<string, Record<string, string>>();
+
+function identityResult(userId: string | undefined): { status: string; first_name?: string; last_name?: string; country?: string } | null {
+  const file = join(process.cwd(), "e2e", ".state", "identity-sim.json");
+  if (!userId || !existsSync(file)) return null;
+  try {
+    return (JSON.parse(readFileSync(file, "utf8")) as Record<string, { status: string }>)[userId] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function identitySession(id: string, metadata: Record<string, string>) {
+  const result = identityResult(metadata.user_id);
+  const status = result?.status ?? "requires_input";
+  return {
+    id,
+    object: "identity.verification_session",
+    type: "document",
+    status,
+    metadata,
+    url: null,
+    verified_outputs: status === "verified" ? { first_name: result?.first_name ?? null, last_name: result?.last_name ?? null } : null,
+    last_verification_report:
+      status === "verified" ? { id: `vr_${id}`, object: "identity.verification_report", document: { issuing_country: result?.country ?? null } } : null,
+  };
+}
+
 /** Returns a simulated response, or null to let stripe-mock answer. */
 export function simulateStripe(method: string, url: URL, body: URLSearchParams): Response | null {
   const path = url.pathname;
+
+  if (method === "POST" && path === "/v1/identity/verification_sessions") {
+    const metadata = metadataOf(body);
+    // The member's id is part of the session id, so reading it back works from any route.
+    const id = `vs_e2e_${(metadata.user_id ?? "").replace(/-/g, "")}_${Date.now().toString(36)}${counter++}`;
+    identitySessions.set(id, metadata);
+    // The hosted page is skipped: the member comes straight back.
+    return json({ ...identitySession(id, metadata), status: "requires_input", url: body.get("return_url") });
+  }
+  const vsMatch = /^\/v1\/identity\/verification_sessions\/(vs_e2e_[A-Za-z0-9_]+)$/.exec(path);
+  if (vsMatch) {
+    const id = vsMatch[1]!;
+    const hex = /^vs_e2e_([0-9a-f]{32})_/.exec(id)?.[1];
+    const userId = hex ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` : "";
+    return json(identitySession(id, identitySessions.get(id) ?? { user_id: userId }));
+  }
   const piMatch = /^\/v1\/payment_intents\/(pi_e2e_[A-Za-z0-9_]+)(\/(capture|cancel|confirm))?$/.exec(path);
 
   if (piMatch) {
