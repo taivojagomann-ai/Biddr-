@@ -157,6 +157,10 @@ test.describe("sell form: Make", () => {
       shown = (await page.locator("main").getByText("New make suggested: Zenvo").count()) > 0;
     }
     expect(shown, "New make suggested: Zenvo on the notifications page").toBe(true);
+    // This test is about the make: the fake-listing checks (spec 25) are passed here directly.
+    const { data: owner } = await service().from("auctions").select("seller_id").eq("id", auction!.id).single();
+    await service().from("listing_verifications").update({ outcome: "green", checked_at: new Date().toISOString() }).eq("auction_id", auction!.id);
+    await service().from("profiles").update({ identity_status: "verified", identity_verified_name: "E2E Private Name" }).eq("id", owner!.seller_id);
     await page.goto(`/admin/auctions/${auction!.id}`);
     const note = page.getByRole("note", { name: "Suggested make" });
     await expect(note).toContainText("Suggested make: Zenvo.");
