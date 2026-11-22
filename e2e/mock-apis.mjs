@@ -46,12 +46,12 @@ async function claude(body) {
   const model = body.model;
   if (listingId) calls.set(listingId, [...(calls.get(listingId) ?? []), model]);
   const [auction] = await rest(`auctions?id=eq.${listingId}&select=vin,mileage_km,model,exterior_color,body_style,seller_id,seller_type,dealer_name`);
-  const [v] = await rest(`listing_verifications?auction_id=eq.${listingId}&select=challenge_code,seller_is_owner`);
+  const [v] = await rest(`listing_verifications?auction_id=eq.${listingId}&select=challenge_code,photos_code,seller_is_owner`);
   const [seller] = auction ? await rest(`profiles?id=eq.${auction.seller_id}&select=full_name`) : [];
   const scenario = String(auction?.model ?? "").toLowerCase();
   const opus = model === "claude-opus-5-5";
   const read = {
-    challenge_code: { value: scenario.includes("redcode") ? "ZZZZZZ" : (v?.challenge_code ?? null), confidence: "high" },
+    challenge_code: { value: scenario.includes("redcode") ? "ZZZZZZ" : (v?.photos_code ?? v?.challenge_code ?? null), confidence: "high" },
     plate_vin: { value: scenario.includes("redvin") ? "WBA00000000000000" : (auction?.vin ?? null), confidence: "high" },
     odometer: {
       value: (auction?.mileage_km ?? 0) + (scenario.includes("yellowmileage") ? 5000 : 120),

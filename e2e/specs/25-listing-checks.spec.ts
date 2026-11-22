@@ -45,7 +45,7 @@ async function shoot(page: Page, title: RegExp) {
 /** The live challenge: a code, two camera photos, send. Returns the status text. */
 async function takeChallenge(page: Page, { newCode = true } = {}) {
   const photos = page.getByRole("region", { name: "2. Two photos at the car" });
-  if (newCode) await photos.getByRole("button", { name: /^Get (a|a new) code$/ }).click();
+  if (newCode) await photos.getByRole("button", { name: /^Get (a|a new) code( to retake them)?$/ }).click();
   await expect(photos.getByLabel(/^Code: /)).toBeVisible();
   await shoot(page, /^Open the camera for Photo 1/);
   await expect(photos.getByRole("img", { name: /Your photo: Photo 1/ })).toBeVisible();
@@ -93,13 +93,14 @@ test.describe("the seller verifies the car", () => {
     await context.grantPermissions(["camera"], { origin: APP_URL });
 
     await page.goto("/account/listings");
-    await expect(page.locator("[data-verify-status]").first()).toContainText("Verify your car: add the registration certificate and two photos at the car.");
+    await expect(page.locator("[data-verify-status]").first()).toContainText("Verify your car: add the registration certificate and two photos at the car. The checks start when both are added.");
     await page.getByRole("link", { name: `Verify your car for ${a.title}` }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Verify your car" })).toBeVisible();
     await expectAccessible(page, "Verify your car");
 
     await addRegistration(page);
-    await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Documents saved. Now take the two photos at the car (step 2) to run the checks.")).toBeVisible();
+    await expect(page.getByText("Your documents are saved. Take the two photos at the car to run the checks.")).toBeVisible();
 
     // The two photos can only be taken with the camera: no file input, and the reason why.
     const photos = page.getByRole("region", { name: "2. Two photos at the car" });
@@ -196,6 +197,55 @@ test.describe("the seller verifies the car", () => {
   });
 });
 
+test.describe("photos first, certificate later", () => {
+  test.skip(({ isMobile }) => isMobile, "covered on desktop");
+
+  test("the certificate can be added after the code has expired, a new code doesn't spoil the photos sent, and the checks can be run again after an error", async ({ page, context }) => {
+    const seller = await createUser({ role: "seller" });
+    const a = await draft(seller);
+    await signIn(context, seller);
+    await context.grantPermissions(["camera"], { origin: APP_URL });
+    await page.goto(`/account/listings/${a.id}/verify`);
+    await expect(page.getByText("You need both, in any order:")).toBeVisible();
+
+    await takeChallenge(page);
+    await expect(page.getByText("Photos saved. Now add the registration certificate (step 1) to run the checks.")).toBeVisible();
+    await expect(page.getByText("Your photos are saved. Add the registration certificate here to run the checks.")).toBeVisible();
+    // Each step shows its own state: the photos are done, the rest still needed.
+    const step = (name: string) => page.getByRole("region", { name }).locator("[data-step-status]");
+    await expect(step("2. Two photos at the car")).toHaveText("Done");
+    await expect(step("2. Two photos at the car")).toHaveAttribute("data-step-status", "done");
+    await expect(step("1. Registration certificate")).toHaveText("Needed");
+    await expect(step("3. Your identity")).toHaveText("After approval");
+    const sent = await verification(a.id);
+    expect(sent).toMatchObject({ outcome: "pending", run_count: 0, photos_code: sent!.challenge_code });
+
+    // Later: the code has long expired, and the seller even asked for a new one.
+    await service().from("listing_verifications").update({ challenge_expires_at: iso(-60 * 60_000) }).eq("auction_id", a.id);
+    await page.reload();
+    const photos = page.getByRole("region", { name: "2. Two photos at the car" });
+    await expect(photos.getByText("Both photos are sent. You don't need to take them again.")).toBeVisible();
+    await photos.getByRole("button", { name: "Get a new code to retake them" }).click();
+    await expect(photos.getByLabel(/^Code: /)).toBeVisible();
+    expect((await verification(a.id))!.challenge_code).not.toBe(sent!.challenge_code);
+
+    await addRegistration(page);
+    await expect(page.getByText("Saved. The automated checks passed.")).toBeVisible({ timeout: 60_000 });
+    expect(await verification(a.id)).toMatchObject({ outcome: "green", run_count: 1 });
+    await expect(step("1. Registration certificate")).toHaveText("Done");
+
+    // A run that didn't finish (an error or a timeout): the seller can run it again.
+    await service().from("listing_verifications").update({ outcome: "pending", checked_at: null }).eq("auction_id", a.id);
+    await page.reload();
+    await expect(page.getByText("We couldn't check your car yet. Run the checks again: your files are saved.")).toBeVisible();
+    await expectAccessible(page, "Verify your car: run the checks again");
+    await page.getByRole("button", { name: "Run the checks" }).click();
+    await expect(page.getByText("Saved. The automated checks passed.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Run the checks" })).toHaveCount(0);
+    expect(await verification(a.id)).toMatchObject({ outcome: "green", run_count: 2 });
+  });
+});
+
 test.describe("yellow and red", () => {
   test.skip(({ isMobile }) => isMobile, "seller and admin flows on desktop");
 
@@ -207,7 +257,7 @@ test.describe("yellow and red", () => {
     await page.goto(`/account/listings/${a.id}/verify`);
     await addRegistration(page);
     await takeChallenge(page);
-    await expect(page.getByText("Saved. Something didn't match: see below.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("Saved. Something didn't match: see above.")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/The VIN on the plate \(WBA00000000000000\) doesn't match the listing's VIN/)).toBeVisible();
     await expect(page.getByText("You can try once more")).toBeVisible();
     expect(await verification(a.id)).toMatchObject({ outcome: "red", on_hold: true, red_count: 1, needs_admin: false });
