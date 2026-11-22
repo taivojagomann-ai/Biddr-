@@ -135,7 +135,7 @@ test.describe("Edit listing", () => {
     const price = page.getByRole("region", { name: "Price" });
     await price.getByLabel("Starting bid (€)").fill("900");
     await price.getByRole("button", { name: "Save changes" }).click();
-    await expect(price.getByText("The starting bid must be at least €1,000.")).toBeVisible();
+    await expect(price.getByText("The starting bid must be at least €1,000.").first()).toBeVisible();
     await price.getByLabel("Starting bid (€)").fill("12000");
     await price.getByLabel(/Reserve price/).fill("15000");
     await price.getByRole("button", { name: "Save changes" }).click();
