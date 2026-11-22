@@ -246,6 +246,31 @@ test.describe("photos first, certificate later", () => {
   });
 });
 
+test.describe("file formats", () => {
+  test.skip(({ isMobile }) => isMobile, "covered on desktop");
+
+  test("an iPhone HEIC photo of the certificate is taken (even without a file type) and stored as a regular image", async ({ page, context }) => {
+    const seller = await createUser({ role: "seller" });
+    const a = await draft(seller);
+    await signIn(context, seller);
+    await page.goto(`/account/listings/${a.id}/verify`);
+    await expect(page.getByText("as a PDF or clear photos (JPG, PNG, WebP, HEIC or PDF)")).toBeVisible();
+    const input = page.getByLabel("Registration certificate", { exact: true });
+    await expect(input).toHaveAttribute("accept", /\.heic/);
+    // Windows and some Android pickers give HEIC no type: the name and the file's bytes count.
+    await input.setInputFiles({ name: "IMG_0001.HEIC", mimeType: "", buffer: readFileSync(join(process.cwd(), "e2e", "fixtures", "registration.heic")) });
+    await expect(page.getByText("IMG_0001.HEIC")).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Save documents" }).click();
+    await expect.poll(async () => ((await verification(a.id))?.registration_paths as string[] | undefined)?.length ?? 0).toBe(1);
+    const [path] = (await verification(a.id))!.registration_paths as string[];
+    expect(path).toMatch(/\/registration-[0-9a-f-]{36}\.(webp|jpg)$/);
+
+    // A file that isn't a photo or a PDF is refused with the formats that work.
+    await input.setInputFiles({ name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello") });
+    await expect(page.getByText("notes.txt isn't a PDF or a photo. Add JPG, PNG, WebP, HEIC or PDF files.")).toBeVisible();
+  });
+});
+
 test.describe("yellow and red", () => {
   test.skip(({ isMobile }) => isMobile, "seller and admin flows on desktop");
 

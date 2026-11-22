@@ -2,13 +2,13 @@
 import { useEffect, useRef, useState } from "react";
 import { FileText, Loader2, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PhotoError, randomId, uploadBlob } from "@/lib/photo-upload";
+import { ACCEPT_PHOTOS_AND_PDF, FORMATS_TEXT, isPdfFile, isPhotoFile } from "@/lib/file-types";
+import { PhotoError, randomId, uploadableFile, uploadBlob } from "@/lib/photo-upload";
 import {
   MAX_REPORT_BYTES,
   MAX_REPORT_FILES,
   REPORT_BUCKET,
   REPORT_TYPES,
-  type ReportContentType,
   type ReportFile,
 } from "@/lib/sell";
 import { getBrowserSupabase } from "@/lib/supabase/client";
@@ -24,7 +24,6 @@ interface Pending {
   error?: string;
 }
 
-const isReportType = (t: string): t is ReportContentType => t in REPORT_TYPES;
 
 /**
  * Uploads the dealer's inspection report (PDF or photos, up to 10 files) to the
@@ -70,15 +69,17 @@ export function DealerReportUpload({
   useEffect(() => onBusyChange(pending.some((p) => p.status === "uploading")), [pending, onBusyChange]);
 
   const upload = async (item: Pending) => {
-    const type = item.file.type as ReportContentType;
-    const path = `${userId}/${draftId}/${randomId()}.${REPORT_TYPES[type]}`;
     try {
+      // HEIC (and photos without a type) become JPEG; PDF, JPEG, PNG and WebP stay as they are.
+      const { blob, contentType: type } = await uploadableFile(item.file);
+      if (blob.size > MAX_REPORT_BYTES) throw new PhotoError(`${item.name} is larger than 20 MB.`);
+      const path = `${userId}/${draftId}/${randomId()}.${REPORT_TYPES[type]}`;
       const { data: { session } } = await getBrowserSupabase().auth.getSession();
       if (!session) throw new PhotoError("Your session has expired. Reload the page.");
       await uploadBlob({
         bucket: REPORT_BUCKET,
         path,
-        blob: item.file,
+        blob,
         contentType: type,
         accessToken: session.access_token,
         tooLarge: `${item.name} is larger than 20 MB.`,
@@ -98,8 +99,8 @@ export function DealerReportUpload({
     const problems: string[] = [];
     const accepted: Pending[] = [];
     for (const file of picked) {
-      if (!isReportType(file.type)) problems.push(`${file.name} isn't a PDF, JPEG, PNG or WebP file.`);
-      else if (file.size > MAX_REPORT_BYTES) problems.push(`${file.name} is larger than 20 MB.`);
+      if (!isPdfFile(file) && !isPhotoFile(file)) problems.push(`${file.name} isn't a PDF or a photo. Add ${FORMATS_TEXT} files.`);
+      else if (isPdfFile(file) && file.size > MAX_REPORT_BYTES) problems.push(`${file.name} is larger than 20 MB.`);
       else if (accepted.length >= room) problems.push(`${file.name} wasn't added: the limit is ${MAX_REPORT_FILES} files.`);
       else accepted.push({ id: randomId(), name: file.name.slice(0, 200), file, progress: 0, status: "uploading" });
     }
@@ -132,7 +133,7 @@ export function DealerReportUpload({
           <p id={`${id}-hint`} className="text-xs text-mute">
             {hint ?? (
               <>
-                PDF or photos of every page, up to {MAX_REPORT_FILES} files, 20 MB each. Only Biddr&apos;s team sees this
+                PDF or photos of every page ({FORMATS_TEXT}), up to {MAX_REPORT_FILES} files, 20 MB each. Only Biddr&apos;s team sees this
                 file. We&apos;ll publish a summary, not your personal details.
               </>
             )}
@@ -153,7 +154,7 @@ export function DealerReportUpload({
         <input
           ref={inputRef}
           type="file"
-          accept="application/pdf,image/jpeg,image/png,image/webp"
+          accept={ACCEPT_PHOTOS_AND_PDF}
           multiple
           className="sr-only"
           tabIndex={-1}

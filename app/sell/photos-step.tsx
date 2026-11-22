@@ -6,6 +6,7 @@ import { MAX_PHOTOS_PER_SECTION, photoSectionsFor, type PhotoSection, type SellE
 import { cn } from "@/lib/utils";
 import { Field, FieldError, StepHeading, fieldId, fieldProps } from "./field";
 import type { UploadItem, Uploads } from "./types";
+import { ACCEPT_PHOTOS } from "@/lib/file-types";
 
 export interface PhotosStepProps {
   uploads: Uploads;
@@ -161,7 +162,7 @@ function PhotoSectionBlock({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={ACCEPT_PHOTOS}
           multiple
           className="sr-only"
           tabIndex={-1}
