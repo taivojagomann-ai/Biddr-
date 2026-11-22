@@ -39,7 +39,7 @@ function StepStatus({ state }: { state: StepState }) {
     );
   }
   return (
-    <span data-step-status={state} className={cn("inline-flex shrink-0 items-center gap-1.5 text-sm", state === "needed" ? "font-semibold text-signal" : "text-mute")}>
+    <span data-step-status={state} className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-signal">
       <Circle aria-hidden className="size-5" />
       {state === "needed" ? "Needed" : "After approval"}
     </span>
