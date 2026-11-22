@@ -28,6 +28,8 @@ export interface VerificationRow {
   vin_photo_path: string | null;
   odometer_photo_path: string | null;
   photos_taken_at: string | null;
+  /** The code the photos were taken with (0033; null on older rows). */
+  photos_code?: string | null;
   extracted: Extracted | null;
   outcome: Outcome;
   outcome_reasons: string[];
@@ -221,7 +223,7 @@ export async function runListingChecks(db: Db, auctionId: string, { reextract }:
     sellerType: a.seller_type,
     dealerName: a.dealer_name,
     dealerReportMileageKm: priv?.dealer_inspection_provided ? (priv.dealer_inspection_mileage_km ?? null) : null,
-    issuedCode: v.challenge_code,
+    issuedCode: v.photos_code ?? v.challenge_code,
     sellerIsOwner: v.seller_is_owner,
     hasAuthorisation: v.authorisation_paths.length > 0,
     identity: { verified: seller?.identity_status === "verified", name: seller?.identity_verified_name ?? null },

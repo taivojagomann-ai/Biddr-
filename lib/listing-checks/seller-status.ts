@@ -4,6 +4,8 @@
 export interface SellerVerificationView {
   hasDocuments: boolean;
   hasPhotos: boolean;
+  /** The checks have run at least once (false after an error or a timeout). */
+  checked: boolean;
   outcome: "pending" | "green" | "yellow" | "red";
   reasons: string[];
   onHold: boolean;
@@ -25,9 +27,10 @@ export function sellerSummary(v: SellerVerificationView): { tone: "todo" | "ok" 
   }
   if (!v.hasDocuments || !v.hasPhotos) {
     const missing = [!v.hasDocuments ? "the registration certificate" : null, !v.hasPhotos ? "two photos at the car" : null].filter(Boolean);
-    return { tone: "todo", text: `Verify your car: add ${missing.join(" and ")}.` };
+    return { tone: "todo", text: `Verify your car: add ${missing.join(" and ")}. The checks start when both are added.` };
   }
   if (v.contentApproved && !v.identityVerified) return { tone: "todo", text: IDENTITY_REQUEST };
+  if (v.outcome === "pending" && !v.checked) return { tone: "todo", text: "We couldn't check your car yet. Run the checks again: your files are saved." };
   if (v.outcome === "pending") return { tone: "wait", text: "Checking your photos and documents." };
   if (v.outcome === "yellow" && !v.overridden) return { tone: "wait", text: "Biddr's team is taking a closer look at your photos and documents." };
   return { tone: "ok", text: "Your car is verified. Biddr's team is reviewing the listing." };
@@ -39,6 +42,7 @@ export function sellerView(
     registration_paths: string[];
     vin_photo_path: string | null;
     odometer_photo_path: string | null;
+    checked_at: string | null;
     outcome: SellerVerificationView["outcome"];
     outcome_reasons: string[];
     on_hold: boolean;
@@ -51,6 +55,7 @@ export function sellerView(
   return {
     hasDocuments: Boolean(v?.registration_paths.length),
     hasPhotos: Boolean(v?.vin_photo_path && v?.odometer_photo_path),
+    checked: Boolean(v?.checked_at),
     outcome: v?.outcome ?? "pending",
     reasons: v?.outcome === "red" ? v.outcome_reasons : [],
     onHold: Boolean(v?.on_hold),

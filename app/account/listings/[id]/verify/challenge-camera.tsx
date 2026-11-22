@@ -152,7 +152,17 @@ export function ChallengeCamera({
       paths[shot] = path;
     }
     setStatus("Checking the photos… This takes up to a minute.");
-    const r = await submitChallenge({ auctionId, vinPath: paths.vin, odometerPath: paths.odometer });
+    let r: Awaited<ReturnType<typeof submitChallenge>>;
+    try {
+      r = await submitChallenge({ auctionId, vinPath: paths.vin, odometerPath: paths.odometer });
+    } catch {
+      // A timeout or a lost connection: the photos may be saved; the page shows what is.
+      setBusy(false);
+      setStatus("");
+      setError("Something went wrong while checking. Reload the page: if your photos are saved, use \"Run the checks\" at the top.");
+      router.refresh();
+      return;
+    }
     setBusy(false);
     if (!r.ok) {
       setStatus("");
@@ -172,14 +182,14 @@ export function ChallengeCamera({
   return (
     <div className="space-y-4">
       <p className="rounded-md border border-line bg-asphalt/60 p-3 text-sm text-mute">{NO_UPLOAD_NOTE}</p>
-      {done && !code ? <p className="text-sm text-verified">Both photos are sent. You can take them again with a new code if needed.</p> : null}
+      {done && !code ? <p className="text-sm text-verified">Both photos are sent. You don&apos;t need to take them again.</p> : null}
 
       {!code || expired ? (
         <div className="space-y-2">
           {code && expired ? <p className="text-sm font-semibold text-signal">Your code has expired. Get a new code to take the photos.</p> : null}
           <Button type="button" onClick={() => void newCode()} disabled={busy} className="min-h-12 w-full sm:w-auto">
             {busy ? <Loader2 aria-hidden className="animate-spin" /> : null}
-            {code ? "Get a new code" : "Get a code"}
+            {code ? "Get a new code" : done ? "Get a new code to retake them" : "Get a code"}
           </Button>
           <p className="text-xs text-mute">Do this at the car: the code is valid for {CHALLENGE_MINUTES} minutes.</p>
         </div>

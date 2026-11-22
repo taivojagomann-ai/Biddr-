@@ -155,15 +155,22 @@ export function DocumentsForm({
   async function save() {
     setBusy(true);
     setResult(null);
-    const r = await saveDocuments({
-      auctionId,
-      registrationPaths: registration.map((d) => d.path),
-      sellerIsOwner,
-      authorisationPaths: authorisation.map((d) => d.path),
-    });
-    setBusy(false);
-    setResult(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
-    if (r.ok) router.refresh();
+    try {
+      const r = await saveDocuments({
+        auctionId,
+        registrationPaths: registration.map((d) => d.path),
+        sellerIsOwner,
+        authorisationPaths: authorisation.map((d) => d.path),
+      });
+      setResult(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error });
+      if (r.ok) router.refresh();
+    } catch {
+      // A timeout or a lost connection: the documents may be saved; the page shows what is.
+      setResult({ ok: false, text: "Something went wrong while checking. Reload the page: if your documents are saved, use \"Run the checks\" at the top." });
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
