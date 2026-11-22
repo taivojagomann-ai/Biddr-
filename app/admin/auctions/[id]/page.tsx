@@ -25,6 +25,7 @@ import { ScheduleForm } from "./schedule-form";
 import { Section } from "./section";
 import { StatusActions, type ApprovalCheck } from "./status-actions";
 import { ChecksSection } from "./checks-section";
+import { SellerEdits } from "./seller-edits";
 import { loadVerification } from "@/lib/listing-checks/run";
 
 export const metadata: Metadata = { title: "Review auction" };
@@ -298,6 +299,10 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
           intro="Read automatically from the seller's photos and documents (values only; the decision is made by these rules and by you)."
         >
           <ChecksSection db={ctx.db} auctionId={a.id} status={a.status} sellerId={a.seller_id} />
+        </Section>
+
+        <Section id="seller-edits" title="Seller's changes" intro="What the seller corrected on Edit listing after submitting, with the value before and after.">
+          <SellerEdits db={ctx.db} auctionId={a.id} />
         </Section>
 
         <Section id="seller" title="Seller">

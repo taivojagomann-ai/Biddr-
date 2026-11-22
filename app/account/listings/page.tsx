@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Car, ChevronRight, Eye, MessageCircleQuestion } from "lucide-react";
+import { Car, ChevronRight, Eye, MessageCircleQuestion, Pencil } from "lucide-react";
 import { LocalDateTime } from "@/components/local-date-time";
 import { Button } from "@/components/ui/button";
 import { formatEur } from "@/lib/format";
@@ -232,13 +232,24 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
                     Submitted <LocalDateTime iso={l.created_at} dateOnly />
                   </p>
                   {isPublic ? null : (
-                    <Link
-                      href={`/auctions/${l.id}`}
-                      className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-chalk underline underline-offset-4 hover:text-signal"
-                    >
-                      <Eye aria-hidden className="size-4" />
-                      Preview<span className="sr-only"> {l.title}</span>
-                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-5">
+                      <Link
+                        href={`/auctions/${l.id}`}
+                        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-chalk underline underline-offset-4 hover:text-signal"
+                      >
+                        <Eye aria-hidden className="size-4" />
+                        Preview<span className="sr-only"> {l.title}</span>
+                      </Link>
+                      {l.status === "draft" ? (
+                        <Link
+                          href={`/account/listings/${l.id}/edit`}
+                          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-chalk underline underline-offset-4 hover:text-signal"
+                        >
+                          <Pencil aria-hidden className="size-4" />
+                          Edit<span className="sr-only"> {l.title}</span>
+                        </Link>
+                      ) : null}
+                    </div>
                   )}
                 </div>
                 {isPublic ? <ChevronRight aria-hidden className="size-5 shrink-0 text-mute" /> : null}

@@ -4,7 +4,7 @@ import { ListEditor } from "@/components/listing/list-editor";
 import { ServiceHistoryEditor } from "@/components/listing/service-history-editor";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { AdminDetailsInput } from "@/lib/admin-schemas";
+import type { AdminDetailsInput, AdminResult } from "@/lib/admin-schemas";
 import {
   HIGHLIGHTS_MAX,
   NO_FLAWS_LABEL,
@@ -17,7 +17,18 @@ import { Label } from "./section";
 
 type Values = Omit<AdminDetailsInput, "auctionId">;
 
-export function DetailsForm({ auctionId, initial }: { auctionId: string; initial: Values }) {
+/** The details lists. Admins edit them here; sellers on "Edit listing" (`action`, `seller`). */
+export function DetailsForm({
+  auctionId,
+  initial,
+  seller = false,
+  action = updateDetails,
+}: {
+  auctionId: string;
+  initial: Values;
+  seller?: boolean;
+  action?: (input: unknown) => Promise<AdminResult>;
+}) {
   const [v, setV] = useState<Values>(initial);
   const { run, pending, result, fieldErrors: fe } = useAdminAction();
   const set = <K extends keyof Values>(k: K, value: Values[K]) => setV((p) => ({ ...p, [k]: value }));
@@ -27,14 +38,14 @@ export function DetailsForm({ auctionId, initial }: { auctionId: string; initial
       className="space-y-8"
       onSubmit={(e) => {
         e.preventDefault();
-        void run(updateDetails, { auctionId, ...v });
+        void run(action, { auctionId, ...v });
       }}
     >
       <ListEditor
         id="details-highlights"
         label="Highlights"
         itemNoun="highlight"
-        hint={`Up to ${HIGHLIGHTS_MAX}. Sellers must give at least 3.`}
+        hint={seller ? `At least 3, up to ${HIGHLIGHTS_MAX}.` : `Up to ${HIGHLIGHTS_MAX}. Sellers must give at least 3.`}
         items={v.highlights}
         onChange={(x) => set("highlights", x)}
         error={fe.highlights}
@@ -111,7 +122,7 @@ export function DetailsForm({ auctionId, initial }: { auctionId: string; initial
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save details"}
+          {pending ? "Saving…" : seller ? "Save changes" : "Save details"}
         </Button>
         <ActionMessage result={result} />
       </div>

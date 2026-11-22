@@ -66,6 +66,7 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   identity_verified: ShieldCheck,
   listing_on_hold: CircleSlash,
   listing_needs_check: FileWarning,
+  listing_edited: FileWarning,
   receipt_ready: Receipt,
 };
 

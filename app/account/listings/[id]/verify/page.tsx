@@ -124,7 +124,14 @@ export default async function VerifyPage({ params }: { params: { id: string } })
             ))}
           </ul>
           {view.canRetry ? (
-            <p className="mt-2 text-mute">You can try once more: correct the document or take the photos again with a new code.</p>
+            <p className="mt-2 text-mute">
+              You can try once more: correct the document or take the photos again with a new code. If the listing has a
+              typo (for example in the VIN or the mileage),{" "}
+              <Link href={`/account/listings/${auction.id}/edit`} className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+                edit the listing
+              </Link>
+              : the checks run again right away.
+            </p>
           ) : null}
         </div>
       ) : null}

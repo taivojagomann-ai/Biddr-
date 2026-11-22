@@ -6,7 +6,7 @@ import { MakeCombobox } from "@/components/ui/make-combobox";
 import { useModelSuggestions } from "@/hooks/use-model-suggestions";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import type { ListingInput } from "@/lib/admin-schemas";
+import type { AdminResult, ListingInput } from "@/lib/admin-schemas";
 import { COUNTRY_NAMES } from "@/lib/format";
 import { BODY_STYLES, REGISTRATION_OPTIONS, SELLER_TYPES } from "@/lib/listing-details";
 import { COUNTRIES, DRIVETRAINS } from "@/lib/sell";
@@ -14,34 +14,46 @@ import { updateListing } from "../../actions";
 import { ActionMessage, FieldNote, useAdminAction } from "./action-feedback";
 import { Label } from "./section";
 
-type Values = Omit<ListingInput, "auctionId">;
+type Values = Omit<ListingInput, "auctionId"> & { year?: string; vin?: string };
 
+/**
+ * The listing's car and text. Admins edit it here (the VIN and year stay as submitted);
+ * sellers correct it on "Edit listing" (`seller`), where the VIN and year can be fixed
+ * and the title follows the year, make, model and variant.
+ */
 export function ListingForm({
   auctionId,
   vin,
   restored,
   initial,
+  seller = false,
+  action = updateListing,
 }: {
   auctionId: string;
   vin: string;
   restored: boolean;
   initial: Values;
+  seller?: boolean;
+  action?: (input: unknown) => Promise<AdminResult>;
 }) {
   const [v, setV] = useState<Values>(initial);
   const { run, pending, result, fieldErrors: fe } = useAdminAction();
   const set = <K extends keyof Values>(k: K, value: Values[K]) => setV((p) => ({ ...p, [k]: value }));
   const models = useModelSuggestions(v.makeOther ? "" : v.make);
 
-  const text = (key: "title" | "variant" | "engine" | "transmission" | "exteriorColor" | "city" | "mileageKm" | "videoUrl" | "interiorColor" | "ownerCount" | "dealerName" | "dealerRegistryCode", label: string, opts: { optional?: boolean; wide?: boolean; inputMode?: "numeric" | "url" } = {}) => (
+  const text = (key: "title" | "year" | "vin" | "variant" | "engine" | "transmission" | "exteriorColor" | "city" | "mileageKm" | "videoUrl" | "interiorColor" | "ownerCount" | "dealerName" | "dealerRegistryCode", label: string, opts: { optional?: boolean; wide?: boolean; inputMode?: "numeric" | "url" } = {}) => (
     <div className={opts.wide ? "sm:col-span-2" : undefined}>
       <Label htmlFor={`listing-${key}`} optional={opts.optional}>
         {label}
       </Label>
       <Input
         id={`listing-${key}`}
-        value={v[key]}
+        value={v[key] ?? ""}
         onChange={(e) => set(key, e.target.value)}
         inputMode={opts.inputMode}
+        className={key === "vin" ? "font-mono uppercase tracking-wider" : undefined}
+        autoComplete={key === "vin" ? "off" : undefined}
+        spellCheck={key === "vin" ? false : undefined}
         aria-invalid={fe[key] ? true : undefined}
       />
       <FieldNote error={fe[key]} />
@@ -53,10 +65,10 @@ export function ListingForm({
       className="grid gap-4 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
-        void run(updateListing, { auctionId, ...v });
+        void run(action, { auctionId, ...v });
       }}
     >
-      {text("title", "Title", { wide: true })}
+      {seller ? null : text("title", "Title", { wide: true })}
       <div>
         <Label htmlFor="listing-make">Make</Label>
         <MakeCombobox
@@ -69,7 +81,13 @@ export function ListingForm({
         <div id="listing-make-note">
           <FieldNote
             error={fe.make}
-            hint={v.makeOther ? "Not in the make list: kept as typed. Add it to lib/data/car-makes.ts in a future update." : "Type to search the make list."}
+            hint={
+              v.makeOther
+                ? seller
+                  ? "Not in the make list: Biddr's team will check it."
+                  : "Not in the make list: kept as typed. Add it to lib/data/car-makes.ts in a future update."
+                : "Type to search the make list."
+            }
           />
         </div>
       </div>
@@ -90,10 +108,17 @@ export function ListingForm({
         </datalist>
         <FieldNote error={fe.model} />
       </div>
-      <div>
-        <p className="mb-1.5 text-sm font-semibold">VIN</p>
-        <p className="flex h-10 items-center rounded-md border border-line bg-asphalt/50 px-3 font-mono text-sm tracking-wider text-mute">{vin}</p>
-      </div>
+      {seller ? (
+        <>
+          {text("year", "Year", { inputMode: "numeric" })}
+          {text("vin", "VIN")}
+        </>
+      ) : (
+        <div>
+          <p className="mb-1.5 text-sm font-semibold">VIN</p>
+          <p className="flex h-10 items-center rounded-md border border-line bg-asphalt/50 px-3 font-mono text-sm tracking-wider text-mute">{vin}</p>
+        </div>
+      )}
       {text("variant", "Variant", { optional: true })}
       {text("engine", "Engine", { wide: true })}
       {text("transmission", "Transmission")}
@@ -190,7 +215,7 @@ export function ListingForm({
       {text("videoUrl", "Video link (YouTube or Vimeo)", { optional: true, wide: true, inputMode: "url" })}
       <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save listing details"}
+          {pending ? "Saving…" : seller ? "Save changes" : "Save listing details"}
         </Button>
         <ActionMessage result={result} />
       </div>

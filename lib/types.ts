@@ -253,7 +253,7 @@ export type NotificationType =
   | "premium_reminder" | "premium_unpaid" | "buyer_did_not_pay" | "second_chance_offer" | "second_chance_closed"
   | "bidding_unblocked" | "new_message" | "report_opened" | "report_resolved" | "account_blocked" | "selling_unblocked"
   | "viewing_update" | "conversation_reported" | "messaging_unblocked"
-  | "identity_required" | "identity_verified" | "listing_on_hold" | "listing_needs_check"
+  | "identity_required" | "identity_verified" | "listing_on_hold" | "listing_needs_check" | "listing_edited"
   | "receipt_ready";
 
 /** A row of public.notifications (0009) with the car title joined in. */
