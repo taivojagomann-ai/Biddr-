@@ -211,6 +211,12 @@ test.describe("photos first, certificate later", () => {
     await takeChallenge(page);
     await expect(page.getByText("Photos saved. Now add the registration certificate (step 1) to run the checks.")).toBeVisible();
     await expect(page.getByText("Your photos are saved. Add the registration certificate here to run the checks.")).toBeVisible();
+    // Each step shows its own state: the photos are done, the rest still needed.
+    const step = (name: string) => page.getByRole("region", { name }).locator("[data-step-status]");
+    await expect(step("2. Two photos at the car")).toHaveText("Done");
+    await expect(step("2. Two photos at the car")).toHaveAttribute("data-step-status", "done");
+    await expect(step("1. Registration certificate")).toHaveText("Needed");
+    await expect(step("3. Your identity")).toHaveText("After approval");
     const sent = await verification(a.id);
     expect(sent).toMatchObject({ outcome: "pending", run_count: 0, photos_code: sent!.challenge_code });
 
@@ -226,6 +232,7 @@ test.describe("photos first, certificate later", () => {
     await addRegistration(page);
     await expect(page.getByText("Saved. The automated checks passed.")).toBeVisible({ timeout: 60_000 });
     expect(await verification(a.id)).toMatchObject({ outcome: "green", run_count: 1 });
+    await expect(step("1. Registration certificate")).toHaveText("Done");
 
     // A run that didn't finish (an error or a timeout): the seller can run it again.
     await service().from("listing_verifications").update({ outcome: "pending", checked_at: null }).eq("auction_id", a.id);

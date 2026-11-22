@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Clock, ShieldCheck } from "lucide-react";
 import { CHALLENGE_MINUTES } from "@/lib/listing-checks/challenge";
 import { IDENTITY_COLUMNS, type IdentityRow } from "@/lib/identity";
 import { loadVerification } from "@/lib/listing-checks/run";
@@ -24,6 +24,26 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function fileName(path: string): string {
   const kind = path.includes("/authorisation-") ? "Authorisation" : "Registration certificate";
   return `${kind} (${path.split(".").pop()?.toUpperCase()})`;
+}
+
+type StepState = "done" | "needed" | "later";
+
+/** Each step's own state, next to its heading: a green tick when it's done. */
+function StepStatus({ state }: { state: StepState }) {
+  if (state === "done") {
+    return (
+      <span data-step-status="done" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-verified">
+        <CheckCircle2 aria-hidden className="size-5" />
+        Done
+      </span>
+    );
+  }
+  return (
+    <span data-step-status={state} className={cn("inline-flex shrink-0 items-center gap-1.5 text-sm", state === "needed" ? "font-semibold text-signal" : "text-mute")}>
+      <Circle aria-hidden className="size-5" />
+      {state === "needed" ? "Needed" : "After approval"}
+    </span>
+  );
 }
 
 /**
@@ -54,6 +74,9 @@ export default async function VerifyPage({ params }: { params: { id: string } })
   const inReview = auction.status === "draft";
   const locked = !inReview || (view.onHold && !view.canRetry) || Boolean(v?.files_purged_at);
   const codeValid = v?.challenge_code && v.challenge_expires_at && Date.parse(v.challenge_expires_at) > Date.now();
+  const docsStep: StepState = view.hasDocuments ? "done" : "needed";
+  const photosStep: StepState = view.hasPhotos ? "done" : "needed";
+  const identityStep: StepState = view.identityVerified ? "done" : view.contentApproved ? "needed" : "later";
   const Icon = summary.tone === "ok" ? CheckCircle2 : summary.tone === "bad" ? AlertTriangle : Clock;
 
   return (
@@ -108,10 +131,13 @@ export default async function VerifyPage({ params }: { params: { id: string } })
 
       {!inReview ? <p className="mt-5 text-sm text-mute">This listing isn&apos;t waiting for review, so nothing can be changed here.</p> : null}
 
-      <section aria-labelledby="docs-heading" className="mt-8 rounded-lg border border-line bg-panel p-4">
-        <h2 id="docs-heading" className="text-lg font-bold">
-          1. Registration certificate
-        </h2>
+      <section aria-labelledby="docs-heading" className={cn("mt-8 rounded-lg border border-line bg-panel p-4", docsStep === "done" && "border-verified/60")}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="docs-heading" className="text-lg font-bold">
+            1. Registration certificate
+          </h2>
+          <StepStatus state={docsStep} />
+        </div>
         {view.hasPhotos && !view.hasDocuments && !locked ? (
           <p className="mt-2 rounded-md border border-signal/60 bg-signal/10 p-3 text-sm font-semibold">
             Your photos are saved. Add the registration certificate here to run the checks.
@@ -131,10 +157,13 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         </div>
       </section>
 
-      <section aria-labelledby="photos-heading" className="mt-6 rounded-lg border border-line bg-panel p-4">
-        <h2 id="photos-heading" className="text-lg font-bold">
-          2. Two photos at the car
-        </h2>
+      <section aria-labelledby="photos-heading" className={cn("mt-6 rounded-lg border border-line bg-panel p-4", photosStep === "done" && "border-verified/60")}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="photos-heading" className="text-lg font-bold">
+            2. Two photos at the car
+          </h2>
+          <StepStatus state={photosStep} />
+        </div>
         <p className="mt-1 text-sm text-mute">
           You get a code, write it on a paper and take two photos with this page: the VIN plate and the odometer, each with the paper.
         </p>
@@ -158,10 +187,13 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         </div>
       </section>
 
-      <section aria-labelledby="identity-heading" className="mt-6 rounded-lg border border-line bg-panel p-4">
-        <h2 id="identity-heading" className="text-lg font-bold">
-          3. Your identity
-        </h2>
+      <section aria-labelledby="identity-heading" className={cn("mt-6 rounded-lg border border-line bg-panel p-4", identityStep === "done" && "border-verified/60")}>
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="identity-heading" className="text-lg font-bold">
+            3. Your identity
+          </h2>
+          <StepStatus state={identityStep} />
+        </div>
         {view.identityVerified ? (
           <p className="mt-2 flex items-center gap-2 text-sm text-verified">
             <ShieldCheck aria-hidden className="size-4" />
