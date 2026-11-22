@@ -23,7 +23,7 @@ const TYPES: readonly NotificationType[] = [
   "new_message", "report_opened", "report_resolved", "account_blocked", "selling_unblocked",
   "viewing_update", "conversation_reported", "messaging_unblocked",
   "identity_required", "identity_verified", "listing_on_hold", "listing_needs_check",
-  "receipt_ready",
+  "receipt_ready", "listing_edited",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -206,6 +206,8 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
           ? "Your listing is on hold. Biddr's team is reviewing it."
           : "Your listing is on hold: something didn't match. Check the details and try again.",
       );
+    case "listing_edited":
+      return titled(`${car}: the seller changed the listing after its content was approved. Review it again.`);
     case "listing_needs_check":
       return titled(`${car}: the automated checks ${n.data.outcome === "red" ? "failed twice" : "need a look"}`);
     case "selling_unblocked":
@@ -280,6 +282,8 @@ export function notificationHref(n: NotificationRow): string {
       return "/account/purchases";
     case "listing_needs_check":
       return a ? `/admin/auctions/${a}#checks` : "/admin?tab=checks";
+    case "listing_edited":
+      return a ? `/admin/auctions/${a}#seller-edits` : "/admin";
     case "conversation_reported":
       return str(n.data.conversation_id) ? `/admin/messages#conversation-${str(n.data.conversation_id)}` : "/admin/messages";
     case "premium_paid":

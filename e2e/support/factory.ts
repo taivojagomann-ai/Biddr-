@@ -109,6 +109,8 @@ export interface AuctionOptions {
   variant?: string | null;
   year?: number;
   mileageKm?: number;
+  /** A given VIN (default: a random one). */
+  vin?: string;
   city?: string;
   country?: string;
   startsAt?: string | null;
@@ -159,7 +161,7 @@ export async function createAuction(o: AuctionOptions): Promise<TestAuction> {
             ? iso(3 * DAY)
             : iso(-1 * HOUR)
         : null;
-  const vin = randomVin();
+  const vin = o.vin ?? randomVin();
   const restored = (o.condition ?? "clean") === "restored_accident";
   const { data, error } = await db
     .from("auctions")

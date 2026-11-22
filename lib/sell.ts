@@ -198,7 +198,7 @@ const optionalText = (label: string, max: number) =>
     .transform((v) => (v === "" ? null : v));
 
 /** Whole number typed as text. Spaces, dots and commas used as thousand separators are allowed. */
-const wholeNumber = (empty: string, min: number, max: number, range: string) =>
+export const wholeNumber = (empty: string, min: number, max: number, range: string) =>
   z
     .string()
     .transform((v) => v.replace(/[\s.,]/g, ""))
@@ -219,7 +219,7 @@ export function normalizeVin(raw: string): string {
   return raw.replace(/[\s-]/g, "").toUpperCase();
 }
 
-const vinSchema = z
+export const vinSchema = z
   .string()
   .transform(normalizeVin)
   .pipe(

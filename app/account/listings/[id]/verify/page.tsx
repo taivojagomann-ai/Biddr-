@@ -114,7 +114,7 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", summary.tone === "ok" ? "text-verified" : summary.tone === "bad" ? "text-signal" : "text-mute")} />
         {summary.text}
       </p>
-      {inReview && !locked && view.hasDocuments && view.hasPhotos && !view.checked ? <RunChecksButton auctionId={auction.id} /> : null}
+      {inReview && !locked && view.hasDocuments && view.hasPhotos ? <RunChecksButton auctionId={auction.id} needed={!view.checked} /> : null}
       {view.reasons.length ? (
         <div className="mt-3 rounded-md border border-signal/40 p-3 text-sm">
           <p className="font-semibold">What didn&apos;t match</p>
@@ -124,7 +124,14 @@ export default async function VerifyPage({ params }: { params: { id: string } })
             ))}
           </ul>
           {view.canRetry ? (
-            <p className="mt-2 text-mute">You can try once more: correct the document or take the photos again with a new code.</p>
+            <p className="mt-2 text-mute">
+              You can try once more: correct the document or take the photos again with a new code. If the listing has a
+              typo (for example in the VIN or the mileage),{" "}
+              <Link href={`/account/listings/${auction.id}/edit`} className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+                edit the listing
+              </Link>
+              : the checks run again right away.
+            </p>
           ) : null}
         </div>
       ) : null}
