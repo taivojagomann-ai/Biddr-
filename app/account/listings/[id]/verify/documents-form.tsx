@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ACCEPT_PHOTOS_AND_PDF, FORMATS_TEXT, isPdfFile, isPhotoFile } from "@/lib/file-types";
 import { verificationFolder } from "@/lib/listing-checks/challenge";
 import { PhotoError, resizePhoto } from "@/lib/photo-upload";
 import { getBrowserSupabase } from "@/lib/supabase/client";
@@ -49,15 +50,15 @@ function FileList({
         let blob: Blob = file;
         let ext = "pdf";
         let contentType = "application/pdf";
-        if (file.type === "application/pdf") {
+        if (isPdfFile(file)) {
           if (file.size > MAX_PDF_BYTES) throw new PhotoError(`${file.name} is larger than 20 MB.`);
-        } else if (file.type.startsWith("image/")) {
+        } else if (isPhotoFile(file)) {
           const photo = await resizePhoto(file);
           blob = photo.blob;
           ext = photo.ext;
           contentType = photo.contentType;
         } else {
-          throw new PhotoError(`${file.name} isn't a PDF or a photo.`);
+          throw new PhotoError(`${file.name} isn't a PDF or a photo. Add ${FORMATS_TEXT} files.`);
         }
         const path = `${folder}/${kind}-${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await supabase.storage.from("inspection-uploads").upload(path, blob, { contentType });
@@ -107,7 +108,7 @@ function FileList({
             ref={input}
             id={`${id}-input`}
             type="file"
-            accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
+            accept={ACCEPT_PHOTOS_AND_PDF}
             multiple
             className="sr-only"
             aria-labelledby={`${id}-label`}
@@ -170,7 +171,7 @@ export function DocumentsForm({
       <FileList
         kind="registration"
         label="Registration certificate"
-        hint="Both sides if it has two, as a PDF or clear photos. Only Biddr's team sees it, to check the VIN and the owner; it's deleted 30 days after the auction ends."
+        hint={`Both sides if it has two, as a PDF or clear photos (${FORMATS_TEXT}). Only Biddr's team sees it, to check the VIN and the owner; it's deleted 30 days after the auction ends.`}
         files={registration}
         onChange={setRegistration}
         folder={folder}

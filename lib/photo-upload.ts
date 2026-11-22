@@ -1,5 +1,6 @@
 // Browser-only helpers for /sell photo uploads. Imported by client components only;
 // nothing here runs at module load, so it is safe to keep outside a "use client" file.
+import { isHeicFile, isPhotoFile, PHOTO_FORMATS_TEXT } from "@/lib/file-types";
 import { MAX_SOURCE_FILE_BYTES, PHOTO_BUCKET, PHOTO_MAX_EDGE, PHOTO_QUALITY } from "@/lib/sell";
 
 export class PhotoError extends Error {}
@@ -12,7 +13,7 @@ export interface ResizedPhoto {
 
 /** Rejects files we can't use before doing any work. Returns an error message or null. */
 export function precheckFile(file: File): string | null {
-  if (!file.type.startsWith("image/")) return `${file.name} isn't a photo. Add JPEG, PNG, WebP or HEIC images.`;
+  if (!isPhotoFile(file)) return `${file.name} isn't a photo. Add ${PHOTO_FORMATS_TEXT} images.`;
   if (file.size > MAX_SOURCE_FILE_BYTES) return `${file.name} is larger than 25 MB. Export a smaller copy and try again.`;
   return null;
 }
@@ -21,14 +22,61 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promi
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
+const UNREADABLE = "We couldn't read this photo. Save it as a JPEG and try again.";
+
+/** Is this an HEIC photo (by its type, its name, or its first bytes)? The converter loads only when needed. */
+async function looksLikeHeic(file: File): Promise<boolean> {
+  if (isHeicFile(file)) return true;
+  try {
+    const head = new Uint8Array(await file.slice(4, 12).arrayBuffer());
+    const brand = String.fromCharCode(...head);
+    return /^ftyp(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(brand);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads a photo. Browsers read JPEG, PNG and WebP; Safari also reads HEIC. Elsewhere
+ * (Chrome, Edge, Firefox, Android) HEIC goes through heic-to (libheif), loaded on demand.
+ */
+export async function decodePhoto(file: File): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    if (!(await looksLikeHeic(file))) throw new PhotoError(UNREADABLE);
+  }
+  try {
+    const { heicTo } = await import("heic-to");
+    return await heicTo({ blob: file, type: "bitmap", options: { imageOrientation: "from-image" } });
+  } catch {
+    throw new PhotoError(UNREADABLE);
+  }
+}
+
+/**
+ * A file ready for an upload that keeps the original (reports): PDF, JPEG, PNG and WebP
+ * as they are; HEIC (or a photo of another type) as a JPEG.
+ */
+export async function uploadableFile(file: File): Promise<{ blob: Blob; contentType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp" }> {
+  if (file.type === "application/pdf" || (!file.type && /\.pdf$/i.test(file.name))) return { blob: file, contentType: "application/pdf" };
+  if (file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp") return { blob: file, contentType: file.type };
+  const bitmap = await decodePhoto(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new PhotoError("Your browser couldn't process this photo. Try another browser.");
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const jpeg = await toBlob(canvas, "image/jpeg", PHOTO_QUALITY);
+  if (!jpeg) throw new PhotoError("Your browser couldn't process this photo. Try another browser.");
+  return { blob: jpeg, contentType: "image/jpeg" };
+}
+
 /** Scales the longest edge down to 2560 px and encodes WebP (JPEG where the browser can't encode WebP). */
 export async function resizePhoto(file: File): Promise<ResizedPhoto> {
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  } catch {
-    throw new PhotoError("We couldn't read this photo. Save it as a JPEG and try again.");
-  }
+  const bitmap = await decodePhoto(file);
   const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
