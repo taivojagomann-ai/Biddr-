@@ -274,7 +274,7 @@ test.describe("yellow and red", () => {
 
     await signIn(context, seed.admin);
     await page.goto("/admin?tab=checks");
-    await expect(page.locator(`a[href="/admin/auctions/${a.id}"]`).first()).toBeVisible();
+    await expect(page.getByRole("main").locator(`a[href="/admin/auctions/${a.id}"]`).first()).toBeVisible();
   });
 
   test("yellow (mileage): needs a check with the values next to the photos; the admin overrides with a logged reason; approve still needs the identity", async ({ page, context, seed }) => {
@@ -290,7 +290,7 @@ test.describe("yellow and red", () => {
 
     await signIn(context, seed.admin);
     await page.goto("/admin?tab=checks");
-    await page.locator(`a[href="/admin/auctions/${a.id}"]`).first().click();
+    await page.getByRole("main").locator(`a[href="/admin/auctions/${a.id}"]`).first().click();
     await expect(page.locator("[data-checks-outcome]")).toHaveText("Yellow: needs a check");
     await expect(page.locator('[data-check="mileage"]')).toContainText("The odometer shows 30,000 km; the listing says 25,000 km");
     await expect(page.getByRole("img", { name: "Seller's photo: VIN plate with the code" })).toBeVisible();
