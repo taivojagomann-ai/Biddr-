@@ -39,21 +39,33 @@ function refresh(auctionId: string) {
   revalidatePath("/account/listings");
 }
 
-async function maybeRun(v: VerificationRow, auctionId: string): Promise<VerifyResult> {
+const COULD_NOT_CHECK = "We couldn't run the checks just now. Your files are saved: try again in a few minutes with \"Run the checks\".";
+
+/** Runs the checks when everything is in. Never throws: the files stay saved either way. */
+async function maybeRun(auctionId: string): Promise<VerifyResult & { ran?: boolean }> {
   const admin = getAdminSupabase();
-  const fresh = (await admin.from("listing_verifications").select("*").eq("auction_id", auctionId).single<VerificationRow>()).data ?? v;
-  if (!readyForChecks(fresh)) return { ok: true, message: "Saved." };
-  const r = await runListingChecks(admin, auctionId, { reextract: true });
-  if (!r.ok) return { ok: true, message: `Saved. ${r.error}` };
-  return {
-    ok: true,
-    message:
-      r.outcome === "green"
-        ? "Saved. The automated checks passed."
-        : r.outcome === "red"
-          ? "Saved. Something didn't match: see below."
-          : "Saved. Biddr's team will take a closer look.",
-  };
+  const fresh = (await admin.from("listing_verifications").select("*").eq("auction_id", auctionId).single<VerificationRow>()).data;
+  if (!fresh || !readyForChecks(fresh)) return { ok: true, message: "Saved.", ran: false };
+  try {
+    const r = await runListingChecks(admin, auctionId, { reextract: true });
+    if (!r.ok) {
+      console.error("listing checks: not run", auctionId, r.error);
+      return { ok: true, message: `Saved. ${r.error}`, ran: true };
+    }
+    return {
+      ok: true,
+      ran: true,
+      message:
+        r.outcome === "green"
+          ? "Saved. The automated checks passed."
+          : r.outcome === "red"
+            ? "Saved. Something didn't match: see above."
+            : "Saved. Biddr's team will take a closer look.",
+    };
+  } catch (e) {
+    console.error("listing checks: failed", auctionId, e);
+    return { ok: true, message: COULD_NOT_CHECK, ran: true };
+  }
 }
 
 const documentsSchema = z.object({
@@ -85,8 +97,11 @@ export async function saveDocuments(input: unknown): Promise<VerifyResult> {
       documents_uploaded_at: new Date().toISOString(),
     })
     .eq("auction_id", d.auctionId);
-  const result = await maybeRun(own.v, d.auctionId);
+  const result = await maybeRun(d.auctionId);
   refresh(d.auctionId);
+  if (result.ok && result.ran === false) {
+    return { ok: true, message: "Documents saved. Now take the two photos at the car (step 2) to run the checks." };
+  }
   return result;
 }
 
@@ -137,11 +152,27 @@ export async function submitChallenge(input: unknown): Promise<VerifyResult> {
   }
   await getAdminSupabase()
     .from("listing_verifications")
-    .update({ vin_photo_path: d.vinPath, odometer_photo_path: d.odometerPath, photos_taken_at: new Date().toISOString() })
+    .update({ vin_photo_path: d.vinPath, odometer_photo_path: d.odometerPath, photos_code: v.challenge_code, photos_taken_at: new Date().toISOString() })
     .eq("auction_id", d.auctionId);
-  const result = await maybeRun(v, d.auctionId);
+  const result = await maybeRun(d.auctionId);
   refresh(d.auctionId);
-  return result.ok && result.message === "Saved." ? { ok: true, message: "Photos saved. Add the registration certificate to run the checks." } : result;
+  if (result.ok && result.ran === false) {
+    return { ok: true, message: "Photos saved. Now add the registration certificate (step 1) to run the checks." };
+  }
+  return result;
+}
+
+/** Runs the checks again on the saved files, when they couldn't run before (an error or a timeout). */
+export async function runChecks(input: unknown): Promise<VerifyResult> {
+  const parsed = auctionOnly.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "This listing no longer exists." };
+  const own = await ownDraft(parsed.data.auctionId);
+  if ("ok" in own) return own;
+  if (!readyForChecks(own.v)) return { ok: false, error: "Add the registration certificate and the two photos first." };
+  if (own.v.checked_at) return { ok: false, error: "Your listing has already been checked." };
+  const result = await maybeRun(parsed.data.auctionId);
+  refresh(parsed.data.auctionId);
+  return result;
 }
 
 /** Stripe Identity: a document and a selfie on Stripe's page, once per member. */

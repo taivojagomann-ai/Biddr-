@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import { CHALLENGE_MINUTES } from "@/lib/listing-checks/challenge";
 import { IDENTITY_COLUMNS, type IdentityRow } from "@/lib/identity";
 import { loadVerification } from "@/lib/listing-checks/run";
 import { IDENTITY_REQUEST, sellerSummary, sellerView } from "@/lib/listing-checks/seller-status";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { ChallengeCamera } from "./challenge-camera";
 import { DocumentsForm } from "./documents-form";
 import { IdentityButton } from "./identity-button";
+import { RunChecksButton } from "./run-checks-button";
 
 export const metadata: Metadata = { title: "Verify your car", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -65,6 +67,19 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         Biddr checks every car automatically before it goes live: that you have the car, and that its VIN and mileage match
         the listing. It takes a few minutes at the car.
       </p>
+      <div className="mt-3 rounded-md border border-line bg-panel p-3 text-sm">
+        <p className="font-semibold">You need both, in any order:</p>
+        <ol className="mt-1 list-decimal space-y-1 pl-5">
+          <li>
+            <a href="#docs-heading" className="underline underline-offset-4 hover:text-signal">The registration certificate</a>: add it any time.
+          </li>
+          <li>
+            <a href="#photos-heading" className="underline underline-offset-4 hover:text-signal">Two photos at the car</a>: only these have a{" "}
+            {CHALLENGE_MINUTES}-minute code.
+          </li>
+        </ol>
+        <p className="mt-1 text-mute">The checks start automatically when both are added.</p>
+      </div>
 
       <p
         role="status"
@@ -76,6 +91,7 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", summary.tone === "ok" ? "text-verified" : summary.tone === "bad" ? "text-signal" : "text-mute")} />
         {summary.text}
       </p>
+      {inReview && !locked && view.hasDocuments && view.hasPhotos && !view.checked ? <RunChecksButton auctionId={auction.id} /> : null}
       {view.reasons.length ? (
         <div className="mt-3 rounded-md border border-signal/40 p-3 text-sm">
           <p className="font-semibold">What didn&apos;t match</p>
@@ -96,6 +112,11 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         <h2 id="docs-heading" className="text-lg font-bold">
           1. Registration certificate
         </h2>
+        {view.hasPhotos && !view.hasDocuments && !locked ? (
+          <p className="mt-2 rounded-md border border-signal/60 bg-signal/10 p-3 text-sm font-semibold">
+            Your photos are saved. Add the registration certificate here to run the checks.
+          </p>
+        ) : null}
         <div className="mt-3">
           <DocumentsForm
             auctionId={auction.id}
@@ -117,6 +138,11 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         <p className="mt-1 text-sm text-mute">
           You get a code, write it on a paper and take two photos with this page: the VIN plate and the odometer, each with the paper.
         </p>
+        {view.hasDocuments && !view.hasPhotos && !locked ? (
+          <p className="mt-2 rounded-md border border-signal/60 bg-signal/10 p-3 text-sm font-semibold">
+            Your documents are saved. Take the two photos at the car to run the checks.
+          </p>
+        ) : null}
         <div className="mt-3">
           {locked ? (
             <p className="text-sm text-mute">{view.hasPhotos ? "Both photos are sent." : "Photos can't be added now."}</p>

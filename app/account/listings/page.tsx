@@ -91,7 +91,7 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
       drafts.length
         ? admin
             .from("listing_verifications")
-            .select("auction_id, registration_paths, vin_photo_path, odometer_photo_path, outcome, outcome_reasons, on_hold, red_count, content_approved_at, override_at")
+            .select("auction_id, registration_paths, vin_photo_path, odometer_photo_path, checked_at, outcome, outcome_reasons, on_hold, red_count, content_approved_at, override_at")
             .in("auction_id", drafts)
             .eq("seller_id", user.id)
             .returns<(NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[]>()
