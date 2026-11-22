@@ -168,7 +168,7 @@ test("a full refund gets a refund receipt that refers to the receipt and the inv
   await expect(page.getByRole("link", { name: `Refund receipt ${refund.number} (PDF) for ${s.title} (opens in a new tab)` })).toBeVisible();
 });
 
-test("a partial refund made in Stripe's dashboard: a refund receipt for that amount, once; the premium stays paid; the email carries the PDF", async ({ request }) => {
+test("a partial refund made in Stripe's dashboard: a refund receipt for that amount, once; the premium stays paid; one paid email with both documents, and a refund email", async ({ request }) => {
   const s = await soldAuction(12_000, "ok");
   await settle(request);
   const [original] = await receiptsFor(s.paymentId);
@@ -186,20 +186,30 @@ test("a partial refund made in Stripe's dashboard: a refund receipt for that amo
   expect((await payment(s.paymentId)).status).toBe("paid");
   await expect.poll(async () => (await notificationsFor(s.winner, "receipt_ready")).map((n) => (n.data as { receipt_type?: string }).receipt_type).sort()).toEqual(["payment", "refund"]);
 
-  // Emails (to the local mail catcher): the receipt PDF is attached.
+  // Emails (to the local mail catcher): one "premium paid" email with the invoice and the
+  // receipt (no separate receipt email), and one for the refund with the refund receipt.
+  const refund = (await receiptsFor(s.paymentId)).find((r) => r.type === "refund")!;
+  const subjects = [`Buyer's premium paid: ${s.title}`, `Refund receipt ${refund.number}: ${s.title}`];
   await expect
     .poll(
       async () => {
         await request.get(`${APP_URL}/api/email/send`, { headers: { authorization: `Bearer ${CRON_SECRET}` } });
-        return (await emailsTo(s.winner.email)).some((m) => m.Subject === `Receipt ${original!.number}: buyer's premium for ${s.title}`);
+        const got = (await emailsTo(s.winner.email)).map((m) => m.Subject);
+        return subjects.every((x) => got.includes(x));
       },
       { timeout: 60_000 },
     )
     .toBe(true);
-  const mail = (await emailsTo(s.winner.email)).find((m) => m.Subject === `Receipt ${original!.number}: buyer's premium for ${s.title}`)!;
-  const pdf = mail.Attachments.find((a) => a.ContentType === "application/pdf");
-  expect(pdf?.FileName).toBe(`Biddr-receipt-${original!.number}.pdf`);
-  expect((await PDFDocument.load(await attachment(mail.ID, pdf!.PartID))).getTitle()).toBe(`Receipt ${original!.number}`);
+  const mails = await emailsTo(s.winner.email);
+  expect(mails.filter((m) => /^Receipt R-/.test(m.Subject))).toHaveLength(0);
+  const paid = mails.find((m) => m.Subject === subjects[0])!;
+  expect(paid.Attachments.map((a) => a.FileName).sort()).toEqual([expect.stringMatching(/^Biddr-invoice-BID-/), `Biddr-receipt-${original!.number}.pdf`]);
+  const receiptFile = paid.Attachments.find((a) => a.FileName === `Biddr-receipt-${original!.number}.pdf`)!;
+  expect((await PDFDocument.load(await attachment(paid.ID, receiptFile.PartID))).getTitle()).toBe(`Receipt ${original!.number}`);
+  // A partial refund: the refund receipt only (no credit note).
+  const refundMail = mails.find((m) => m.Subject === subjects[1])!;
+  expect(refundMail.Text).toContain("Your refund receipt is attached.");
+  expect(refundMail.Attachments.map((a) => a.FileName)).toEqual([`Biddr-refund-receipt-${refund.number}.pdf`]);
 });
 
 test("receipts can't be changed or deleted, and members can't write them", async ({ request }) => {

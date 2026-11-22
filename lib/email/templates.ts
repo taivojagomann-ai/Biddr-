@@ -2,9 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { partyContact, CONTACT_NOTE } from "@/lib/contacts";
 import { formatEur } from "@/lib/format";
-import { ensureInvoice, invoiceFileName } from "@/lib/invoice/issue";
+import { ensureCreditNote, ensureInvoice, invoiceFileName } from "@/lib/invoice/issue";
 import { renderInvoicePdf } from "@/lib/invoice/pdf";
-import { RECEIPT_BUCKET, receiptFileName } from "@/lib/receipts/issue";
+import { ensureReceipt, receiptPdf, type ReceiptRow } from "@/lib/receipts/issue";
 import { SELLER_PAYMENT_DAYS } from "@/lib/settlement-constants";
 import type { BuyerPaymentRow } from "@/lib/settlement";
 import { siteUrl } from "@/lib/site";
@@ -31,8 +31,10 @@ export function isEmailed(type: string, data: Record<string, unknown>): boolean 
     case "premium_paid":
     case "premium_unpaid":
     case "second_chance_offer":
-    case "receipt_ready":
       return true;
+    case "receipt_ready":
+      // A payment receipt goes with the "premium paid" email; refund receipts get their own.
+      return data.receipt_type === "refund";
     case "auction_ended":
       return data.status === "sold";
     case "buyer_did_not_pay":
@@ -166,21 +168,25 @@ export async function buildEmail(admin: SupabaseClient, n: EmailNotification, co
       } else {
         content = {
           subject: `Buyer's premium paid: ${car}`,
-          preview: "Your invoice and the seller's contact details.",
+          preview: "Your invoice, your receipt and the seller's contact details.",
           heading: "Thanks, the buyer's premium is paid",
           paragraphs: [
-            `The buyer's premium of ${formatEur(p.premium_amount)} for ${car} is paid. Your invoice is attached.`,
+            `The buyer's premium of ${formatEur(p.premium_amount)} for ${car} is paid. Your invoice and receipt are attached.`,
             `Here are the seller's contact details. ${CONTACT_NOTE}${payBy ? ` Please pay the seller for the car by ${payBy}.` : ""}`,
           ],
           details,
           button: message,
         };
-        // The invoice for the whole premium, as a PDF.
+        // Both documents in one email: the invoice for the whole premium, and the receipt
+        // for its payment (issued now if it isn't yet: the premium is paid).
+        attachments = [];
         const invoice = await ensureInvoice(admin, p.id).catch(() => null);
         if (invoice) {
           const pdf = await renderInvoicePdf(invoice, { testMode: !process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") });
-          attachments = [{ filename: invoiceFileName(invoice), content: Buffer.from(pdf), contentType: "application/pdf" }];
+          attachments.push({ filename: invoiceFileName(invoice), content: Buffer.from(pdf), contentType: "application/pdf" });
         }
+        const receipt = await ensureReceipt(admin, p.id).catch(() => null);
+        if (receipt) attachments.push(await receiptPdf(admin, receipt));
       }
       break;
     }
@@ -234,29 +240,27 @@ export async function buildEmail(admin: SupabaseClient, n: EmailNotification, co
       break;
     }
     case "receipt_ready": {
-      // The stored receipt PDF, attached.
+      // A refund: the refund receipt, and the credit note when the whole premium was refunded.
       const id = str(n.data.receipt_id);
-      const { data: receipt } = id
-        ? await admin.from("receipts").select("id, number, type, amount, pdf_path, buyer_id").eq("id", id).maybeSingle<{ id: string; number: string; type: "payment" | "refund"; amount: number; pdf_path: string | null; buyer_id: string }>()
-        : { data: null };
-      if (!receipt || receipt.buyer_id !== n.user_id) return null;
-      const refund = receipt.type === "refund";
+      const { data: receipt } = id ? await admin.from("receipts").select("*").eq("id", id).maybeSingle<ReceiptRow>() : { data: null };
+      if (!receipt || receipt.buyer_id !== n.user_id || receipt.type !== "refund") return null;
       const amount = formatEur(receipt.amount / 100);
+      const creditNote = await ensureCreditNote(admin, receipt.buyer_payment_id).catch(() => null);
       content = {
-        subject: refund ? `Refund receipt ${receipt.number}: ${car}` : `Receipt ${receipt.number}: buyer's premium for ${car}`,
-        preview: refund ? `${amount} refunded to your card.` : `${amount} paid in full. Thank you.`,
-        heading: refund ? "Your refund receipt" : "Your receipt",
+        subject: `Refund receipt ${receipt.number}: ${car}`,
+        preview: `${amount} refunded to your card.`,
+        heading: "Your refund",
         paragraphs: [
-          refund
-            ? `We've refunded ${amount} of the buyer's premium for ${car} to your card. Your refund receipt ${receipt.number} is attached.`
-            : `The buyer's premium of ${amount} for ${car} is paid in full. Your receipt ${receipt.number} is attached. Thank you.`,
-          "You can also open it, and your invoice, on My purchases.",
+          `We've refunded ${amount} of the buyer's premium for ${car} to your card. It can take 5–10 days to appear.`,
+          creditNote ? "Your refund receipt and the credit note for your invoice are attached." : "Your refund receipt is attached.",
+          "You can also open them on My purchases.",
         ],
         button: purchases,
       };
-      if (receipt.pdf_path) {
-        const { data: file } = await admin.storage.from(RECEIPT_BUCKET).download(receipt.pdf_path);
-        if (file) attachments = [{ filename: receiptFileName(receipt), content: Buffer.from(await file.arrayBuffer()), contentType: "application/pdf" }];
+      attachments = [await receiptPdf(admin, receipt)];
+      if (creditNote) {
+        const pdf = await renderInvoicePdf(creditNote, { testMode: !process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") });
+        attachments.push({ filename: invoiceFileName(creditNote), content: Buffer.from(pdf), contentType: "application/pdf" });
       }
       break;
     }

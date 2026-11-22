@@ -52,21 +52,19 @@ export async function soldAuction(winningBid: number, card: Card, o: { country?:
 }
 
 export async function settle(request: APIRequestContext) {
-  const res = await request.get(`${APP_URL}/api/stripe/settle`, { headers: { authorization: `Bearer ${CRON_SECRET}` } });
-  expect(res.status()).toBe(200);
-  // The sale also starts a settlement by itself (pg_net): if that attempt was still
-  // running, this call skipped the row. Wait until no attempt is in flight.
+  // The sale also starts a settlement by itself (pg_net). If that attempt was running,
+  // a call skips the row; if it hadn't started yet, it may start just after. So call the
+  // job until no recent payment is still pending (none is left pending on purpose here).
+  const recent = () => new Date(Date.now() - 10 * 60_000).toISOString();
   await expect
     .poll(
       async () => {
-        const { count } = await service()
-          .from("buyer_payments")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "pending")
-          .gt("last_attempt_at", new Date(Date.now() - 2 * 60_000).toISOString());
+        const res = await request.get(`${APP_URL}/api/stripe/settle`, { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+        expect(res.status()).toBe(200);
+        const { count } = await service().from("buyer_payments").select("id", { count: "exact", head: true }).eq("status", "pending").gt("created_at", recent());
         return count ?? 0;
       },
-      { timeout: 30_000 },
+      { timeout: 30_000, intervals: [250, 500, 1000] },
     )
     .toBe(0);
 }

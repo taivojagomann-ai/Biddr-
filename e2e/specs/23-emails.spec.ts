@@ -51,14 +51,18 @@ test("a paid sale: the winner gets 'You won' and 'premium paid' with the invoice
 
   const paid = await waitForEmail(request, s.winner.email, new RegExp(`^Buyer's premium paid: ${s.title}$`));
   expect(paid.Text).toContain("The buyer's premium of €600");
-  expect(paid.Text).toContain("Your invoice is attached.");
+  expect(paid.Text).toContain("Your invoice and receipt are attached.");
   expect(paid.Text).toContain("Seller: Sella Seller");
   expect(paid.Text).toContain("Phone: +37255512345");
   expect(paid.Text).toContain("Arrange payment for the car and the handover directly with each other.");
   expect(paid.Text).toMatch(/Please pay the seller for the car by \d{1,2} \w+ \d{4}/);
   expect(paid.Text).toMatch(/Message the seller: http.*\/account\/messages\//);
-  const pdf = paid.Attachments.find((a) => a.ContentType === "application/pdf");
-  expect(pdf?.FileName).toMatch(/^Biddr-invoice-BID-\d{4}-\d{5}\.pdf$/);
+  // Both documents in the one email: the invoice and the receipt.
+  const pdfs = paid.Attachments.filter((a) => a.ContentType === "application/pdf");
+  expect(pdfs.map((a) => a.FileName).sort()).toEqual([expect.stringMatching(/^Biddr-invoice-BID-\d{4}-\d{5}\.pdf$/), expect.stringMatching(/^Biddr-receipt-R-\d{4}-\d{4,}\.pdf$/)]);
+  const pdf = pdfs.find((a) => a.FileName.startsWith("Biddr-invoice-"));
+  const receiptFile = pdfs.find((a) => a.FileName.startsWith("Biddr-receipt-"))!;
+  expect((await PDFDocument.load(await attachment(paid.ID, receiptFile.PartID))).getTitle()).toMatch(/^Receipt R-\d{4}-\d{4,}$/);
   const doc = await PDFDocument.load(await attachment(paid.ID, pdf!.PartID));
   expect(doc.getTitle()).toMatch(/^Invoice BID-\d{4}-\d{5}$/);
 
