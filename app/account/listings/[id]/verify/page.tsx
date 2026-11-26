@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Circle, Clock, XCircle } from "lucide-react";
+import { STATUS_BOX_CLASS, StatusIcon, type StatusKind } from "@/components/status-icon";
+import { Button } from "@/components/ui/button";
+import { syncIdentityOnReturn } from "@/lib/identity";
 import { CHALLENGE_MINUTES } from "@/lib/listing-checks/challenge";
-import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
-import { sellerChecklist, type CheckRow, type SellerCheckState } from "@/lib/listing-checks/seller-checklist";
-import { IdentityPanel } from "@/components/identity-panel";
+import { loadVerificationModels } from "@/lib/listing-checks/load-model";
 import { loadVerification } from "@/lib/listing-checks/run";
-import { IDENTITY_REQUEST, sellerSummary, sellerView } from "@/lib/listing-checks/seller-status";
+import type { ResultStatus, RowStatus } from "@/lib/listing-checks/verification-model";
 import { loginPath } from "@/lib/login";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { ChallengeCamera } from "./challenge-camera";
 import { DocumentsForm } from "./documents-form";
-import { RunChecksButton } from "./run-checks-button";
+import { IdentityButton } from "./identity-button";
+import { InputList } from "./input-list";
+import { SubmitForChecking } from "./submit-for-checking";
 
 export const metadata: Metadata = { title: "Verify your car", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -27,39 +29,14 @@ function fileName(path: string): string {
   return `${kind} (${path.split(".").pop()?.toUpperCase()})`;
 }
 
-const CHECK_STATE_LABELS: Record<SellerCheckState, string> = { pass: "matches", look: "Biddr's team takes a look", fail: "doesn't match", waiting: "waiting" };
-
-function CheckIcon({ state }: { state: SellerCheckState }) {
-  const cls = "mt-0.5 size-5 shrink-0";
-  if (state === "pass") return <CheckCircle2 aria-hidden className={cn(cls, "text-verified")} />;
-  if (state === "fail") return <XCircle aria-hidden className={cn(cls, "text-signal")} />;
-  if (state === "waiting") return <Clock aria-hidden className={cn(cls, "text-mute")} />;
-  return <AlertTriangle aria-hidden className={cn(cls, "text-signal")} />;
-}
-
-type StepState = "done" | "needed" | "later";
-
-/** Each step's own state, next to its heading: a green tick when it's done. */
-function StepStatus({ state }: { state: StepState }) {
-  if (state === "done") {
-    return (
-      <span data-step-status="done" className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-verified">
-        <CheckCircle2 aria-hidden className="size-5" />
-        Done
-      </span>
-    );
-  }
-  return (
-    <span data-step-status={state} className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-signal">
-      <Circle aria-hidden className="size-5" />
-      {state === "needed" ? "Needed" : "After approval"}
-    </span>
-  );
-}
+const RESULT_KIND: Record<ResultStatus, StatusKind> = { checking: "waiting", passed: "passed", approved: "passed", attention: "attention", failed: "failed" };
+const ROW_KIND: Record<RowStatus, StatusKind> = { waiting: "waiting", passed: "passed", attention: "attention", failed: "failed" };
+const ROW_WORD: Record<RowStatus, string> = { waiting: "Waiting", passed: "Passed", attention: "Needs attention", failed: "Failed" };
 
 /**
- * "Verify your car" (DECISIONS.md point 16): the registration certificate, two photos at
- * the car with a live code, and, once the listing is approved, the seller's identity.
+ * "Verify your car" (DECISIONS.md points 16 and 18), in three separate blocks: how it
+ * works, what we need from you (inputs: added or not), and the check results (only after
+ * submitting). Adding something is never shown as passing.
  */
 export default async function VerifyPage({ params, searchParams }: { params: { id: string }; searchParams?: { identity?: string } }) {
   if (!UUID_RE.test(params.id)) notFound();
@@ -69,38 +46,55 @@ export default async function VerifyPage({ params, searchParams }: { params: { i
 
   const { data: auction } = await supabase
     .from("auctions")
-    .select("id, title, status, seller_id")
+    .select("id, title, status, seller_id, created_at")
     .eq("id", params.id)
-    .maybeSingle<{ id: string; title: string; status: string; seller_id: string }>();
+    .maybeSingle<{ id: string; title: string; status: string; seller_id: string; created_at: string }>();
   if (!auction || auction.seller_id !== user.id) notFound();
 
   const admin = getAdminSupabase();
   // Back from Stripe's identity page: read its state first.
   if (searchParams?.identity === "return") await syncIdentityOnReturn(admin, user.id);
-  const [v, { data: me }, { data: checkRows }] = await Promise.all([
-    loadVerification(admin, auction.id),
-    admin.from("profiles").select(IDENTITY_COLUMNS).eq("id", user.id).maybeSingle<IdentityRow>(),
-    admin
-      .from("listing_checks")
-      .select("run_id, check_name, status, extracted, reason")
-      .eq("auction_id", auction.id)
-      .order("checked_at", { ascending: false })
-      .limit(12)
-      .returns<(CheckRow & { run_id: string })[]>(),
-  ]);
-  // The latest run only.
-  const latestRun = checkRows?.[0]?.run_id;
-  const checklist = sellerChecklist((checkRows ?? []).filter((r) => r.run_id === latestRun));
-  const identityStatus = me?.identity_status ?? "none";
-  const view = sellerView(v, identityStatus);
-  const summary = sellerSummary(view);
-  const inReview = auction.status === "draft";
-  const locked = !inReview || (view.onHold && !view.canRetry) || Boolean(v?.files_purged_at);
+  const [v, models] = await Promise.all([loadVerification(admin, auction.id), loadVerificationModels(admin, user.id, [auction])]);
+  const model = models.get(auction.id)!;
   const codeValid = v?.challenge_code && v.challenge_expires_at && Date.parse(v.challenge_expires_at) > Date.now();
-  const docsStep: StepState = view.hasDocuments ? "done" : "needed";
-  const photosStep: StepState = view.hasPhotos ? "done" : "needed";
-  const identityStep: StepState = view.identityVerified ? "done" : view.contentApproved ? "needed" : "later";
-  const Icon = summary.tone === "ok" ? CheckCircle2 : summary.tone === "bad" ? AlertTriangle : Clock;
+  const returnTo = `/account/listings/${auction.id}/verify`;
+
+  const results = model.result ? (
+    <section aria-labelledby="results-heading" data-result={model.result.status} className="rounded-lg border border-line bg-panel p-4">
+      <h2 id="results-heading" className="text-lg font-bold">
+        Check results
+      </h2>
+      <div role="status" className={cn("mt-3 rounded-md border p-3", STATUS_BOX_CLASS[RESULT_KIND[model.result.status]])}>
+        <p className="flex items-start gap-3">
+          <StatusIcon kind={RESULT_KIND[model.result.status]} animate className="mt-0.5 size-5" />
+          <span>
+            <span className="block font-semibold">{model.result.title}</span>
+            <span className="block text-sm">{model.result.text}</span>
+          </span>
+        </p>
+        {model.result.action ? (
+          <Button asChild className="mt-3 min-h-11 w-full sm:w-auto">
+            <Link href={model.result.action.href}>{model.result.action.label}</Link>
+          </Button>
+        ) : null}
+      </div>
+      {model.rows.length ? (
+        <ul className="mt-3 divide-y divide-line">
+          {model.rows.map((r) => (
+            <li key={r.key} data-check={r.key} data-state={r.status} className="flex gap-3 py-2.5 text-sm">
+              <StatusIcon kind={ROW_KIND[r.status]} className="mt-0.5 size-5" />
+              <div className="min-w-0">
+                <p className="font-semibold">
+                  {r.label}: <span className="font-normal">{ROW_WORD[r.status]}</span>
+                </p>
+                <p className="text-mute">{r.text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  ) : null;
 
   return (
     <main className="container max-w-2xl py-8">
@@ -109,156 +103,73 @@ export default async function VerifyPage({ params, searchParams }: { params: { i
       </Link>
       <h1 className="mt-1 font-wide text-2xl font-extrabold tracking-tight sm:text-3xl">Verify your car</h1>
       <p className="mt-1 text-sm text-mute">{auction.title}</p>
-      <p className="mt-3 text-sm">
-        Biddr checks every car automatically before it goes live: that you have the car, and that its VIN and mileage match
-        the listing. It takes a few minutes at the car.
-      </p>
-      <div className="mt-3 rounded-md border border-line bg-panel p-3 text-sm">
-        <p className="font-semibold">You need both, in any order:</p>
-        <ol className="mt-1 list-decimal space-y-1 pl-5">
-          <li>
-            <a href="#docs-heading" className="underline underline-offset-4 hover:text-signal">The registration certificate</a>: add it any time.
-          </li>
-          <li>
-            <a href="#photos-heading" className="underline underline-offset-4 hover:text-signal">Two photos at the car</a>: only these have a{" "}
-            {CHALLENGE_MINUTES}-minute code.
-          </li>
-        </ol>
-        <p className="mt-1 text-mute">The checks start automatically when both are added.</p>
-      </div>
 
-      <p
-        role="status"
-        className={cn(
-          "mt-5 flex gap-2 rounded-md border p-3 text-sm",
-          summary.tone === "ok" ? "border-verified/60 bg-verified/10" : summary.tone === "bad" ? "border-signal/60 bg-signal/10" : "border-line bg-panel",
-        )}
-      >
-        <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", summary.tone === "ok" ? "text-verified" : summary.tone === "bad" ? "text-signal" : "text-mute")} />
-        {summary.text}
-      </p>
-      {inReview && !locked && view.hasDocuments && view.hasPhotos ? <RunChecksButton auctionId={auction.id} needed={!view.checked} /> : null}
-      {view.reasons.length ? (
-        <div className="mt-3 rounded-md border border-signal/40 p-3 text-sm">
-          <p className="font-semibold">What didn&apos;t match</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            {view.reasons.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-          {view.canRetry ? (
-            <p className="mt-2 text-mute">
-              You can try once more: correct the document or take the photos again with a new code. If the listing has a
-              typo (for example in the VIN or the mileage),{" "}
-              <Link href={`/account/listings/${auction.id}/edit`} className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
-                edit the listing
-              </Link>
-              : the checks run again right away.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+      {/* "Checking…" appears here while the checks run; after submitting, the results come first. */}
+      <div id="check-results-slot" className="mt-5 scroll-mt-20 empty:hidden" />
+      {results ? <div className="mt-5">{results}</div> : null}
 
-      {checklist.length && view.checked ? (
-        <section aria-labelledby="checks-heading" className="mt-6 rounded-lg border border-line bg-panel p-4">
-          <h2 id="checks-heading" className="text-lg font-bold">
-            What we checked
-          </h2>
-          <ul className="mt-3 divide-y divide-line">
-            {checklist.map((c) => (
-              <li key={c.key} data-seller-check={c.key} data-state={c.state} className="flex gap-3 py-2.5 text-sm">
-                <CheckIcon state={c.state} />
-                <div className="min-w-0">
-                  <p className="font-semibold">
-                    {c.label}
-                    <span className="sr-only">: {CHECK_STATE_LABELS[c.state]}</span>
-                  </p>
-                  <p className="text-mute">{c.text}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {!inReview ? <p className="mt-5 text-sm text-mute">This listing isn&apos;t waiting for review, so nothing can be changed here.</p> : null}
-
-      <section aria-labelledby="docs-heading" className={cn("mt-8 rounded-lg border border-line bg-panel p-4", docsStep === "done" && "border-verified/60")}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="docs-heading" className="text-lg font-bold">
-            1. Registration certificate
-          </h2>
-          <StepStatus state={docsStep} />
-        </div>
-        {view.hasPhotos && !view.hasDocuments && !locked ? (
-          <p className="mt-2 rounded-md border border-signal/60 bg-signal/10 p-3 text-sm font-semibold">
-            Your photos are saved. Add the registration certificate here to run the checks.
-          </p>
-        ) : null}
-        <div className="mt-3">
-          <DocumentsForm
-            auctionId={auction.id}
-            userId={user.id}
-            locked={locked}
-            initial={{
-              registration: (v?.registration_paths ?? []).map((p) => ({ path: p, name: fileName(p) })),
-              sellerIsOwner: v?.seller_is_owner ?? true,
-              authorisation: (v?.authorisation_paths ?? []).map((p) => ({ path: p, name: fileName(p) })),
-            }}
-          />
-        </div>
-      </section>
-
-      <section aria-labelledby="photos-heading" className={cn("mt-6 rounded-lg border border-line bg-panel p-4", photosStep === "done" && "border-verified/60")}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="photos-heading" className="text-lg font-bold">
-            2. Two photos at the car
-          </h2>
-          <StepStatus state={photosStep} />
-        </div>
-        <p className="mt-1 text-sm text-mute">
-          You get a code, write it on a paper and take two photos with this page: the VIN plate and the odometer, each with the paper.
+      <section aria-labelledby="how-heading" className="mt-6 rounded-lg border border-line bg-panel p-4">
+        <h2 id="how-heading" className="text-lg font-bold">
+          How verification works
+        </h2>
+        <p className="mt-2 text-sm">
+          We check that the car exists, that you own it and that its details match your listing. It protects buyers and
+          helps your car sell. It usually takes a few minutes.
         </p>
-        {view.hasDocuments && !view.hasPhotos && !locked ? (
-          <p className="mt-2 rounded-md border border-signal/60 bg-signal/10 p-3 text-sm font-semibold">
-            Your documents are saved. Take the two photos at the car to run the checks.
-          </p>
-        ) : null}
-        <div className="mt-3">
-          {locked ? (
-            <p className="text-sm text-mute">{view.hasPhotos ? "Both photos are sent." : "Photos can't be added now."}</p>
-          ) : (
-            <ChallengeCamera
-              auctionId={auction.id}
-              userId={user.id}
-              initialCode={codeValid ? v!.challenge_code : null}
-              initialExpiresAt={codeValid ? v!.challenge_expires_at : null}
-              done={view.hasPhotos}
-            />
-          )}
-        </div>
+        <p className="mt-2 text-sm text-mute">Your documents are only seen by Biddr. Buyers see a Verified seller badge.</p>
       </section>
 
-      <section aria-labelledby="identity-heading" className={cn("mt-6 rounded-lg border border-line bg-panel p-4", identityStep === "done" && "border-verified/60")}>
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="identity-heading" className="text-lg font-bold">
-            3. Your identity
-          </h2>
-          <StepStatus state={identityStep} />
-        </div>
-        <div className="mt-2">
-          <IdentityPanel
-            me={me ?? null}
-            returnTo={`/account/listings/${auction.id}/verify`}
-            intro={
-              view.contentApproved ? (
-                <p className="font-semibold text-chalk">{IDENTITY_REQUEST}</p>
-              ) : (
-                "Needed when Biddr approves your listing. You can also do it now: once, for all your listings."
-              )
-            }
+      <section id="what-we-need" aria-labelledby="need-heading" className="mt-6 scroll-mt-20 space-y-4 rounded-lg border border-line bg-panel p-4">
+        <h2 id="need-heading" className="text-lg font-bold">
+          What we need from you
+        </h2>
+        <p className="text-sm text-mute">
+          Add these in any order. The two photos are taken here at the car with a code that&apos;s valid for {CHALLENGE_MINUTES} minutes;
+          everything else can be added any time.
+        </p>
+        <InputList
+          items={model.items}
+          editable={model.editable}
+          identityAction={<IdentityButton label="Start" returnTo={returnTo} />}
+          panels={{
+            registration: (
+              <DocumentsForm
+                auctionId={auction.id}
+                userId={user.id}
+                locked={!model.editable}
+                initial={{
+                  registration: (v?.registration_paths ?? []).map((p) => ({ path: p, name: fileName(p) })),
+                  sellerIsOwner: v?.seller_is_owner ?? true,
+                  authorisation: (v?.authorisation_paths ?? []).map((p) => ({ path: p, name: fileName(p) })),
+                }}
+              />
+            ),
+            photos: (
+              <ChallengeCamera
+                auctionId={auction.id}
+                userId={user.id}
+                initialCode={codeValid ? v!.challenge_code : null}
+                initialExpiresAt={codeValid ? v!.challenge_expires_at : null}
+                done={Boolean(v?.vin_photo_path && v?.odometer_photo_path)}
+              />
+            ),
+          }}
+        />
+        {model.locked ? (
+          <p className="text-sm text-mute">
+            {auction.status !== "draft" ? "This listing isn't waiting for review, so nothing can be changed here." : "These can't be changed now."}
+          </p>
+        ) : !model.submitted ? (
+          <SubmitForChecking
+            auctionId={auction.id}
+            ready={model.ready}
+            progress={`${model.requiredAdded} of ${model.requiredTotal} required items added`}
           />
-        </div>
+        ) : model.editable ? (
+          <p className="text-sm text-mute">Change what the result asks for, then submit for checking again.</p>
+        ) : (
+          <p className="text-sm text-mute">Submitted for checking. These can&apos;t be changed unless a result asks for it.</p>
+        )}
       </section>
     </main>
   );

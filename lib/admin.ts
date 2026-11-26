@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
+import { getVerifiedUser } from "@/lib/supabase/verified-user";
 
 export interface AdminContext {
   adminId: string;
@@ -21,13 +22,12 @@ export type AdminAccess =
  */
 export async function getAdminAccess(): Promise<AdminAccess> {
   const supabase = getServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, aal } = await getVerifiedUser(supabase);
   if (!user) return { status: "none" };
   const { data } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>();
   if (data?.role !== "admin") return { status: "none" };
-  // A token that can't be read counts as "not verified" (fail closed).
-  const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel().then((r) => r.data, () => null);
-  return aal?.currentLevel === "aal2" ? { status: "ok", adminId: user.id } : { status: "needs_2fa", userId: user.id };
+  // A token that can't be verified or read counts as "not verified" (fail closed).
+  return aal === "aal2" ? { status: "ok", adminId: user.id } : { status: "needs_2fa", userId: user.id };
 }
 
 /** The signed-in admin's id, only after two-step verification; otherwise null. */

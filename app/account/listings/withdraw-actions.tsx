@@ -47,7 +47,7 @@ export function WithdrawActions({
   if (option === "requested") {
     return outcome ?? (
       <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
-        <Clock aria-hidden className="size-4 text-signal" />
+        <Clock aria-hidden className="size-4 text-status-neutral" />
         Withdrawal requested
         <span className="font-normal text-mute">· waiting for the Biddr team</span>
       </p>

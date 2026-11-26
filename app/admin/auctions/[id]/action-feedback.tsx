@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { CircleX, CircleCheck } from "lucide-react";
 import type { AdminResult } from "@/lib/admin-schemas";
 import { cn } from "@/lib/utils";
 
@@ -35,13 +35,13 @@ export function useAdminAction() {
 export function ActionMessage({ result, className }: { result: AdminResult | null; className?: string }) {
   if (!result) return null;
   return result.ok ? (
-    <p role="status" className={cn("flex items-start gap-2 text-sm text-verified", className)}>
-      <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0" />
+    <p role="status" className={cn("flex items-start gap-2 text-sm text-status-success", className)}>
+      <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
       {result.message}
     </p>
   ) : (
-    <p role="alert" className={cn("flex items-start gap-2 text-sm text-signal", className)}>
-      <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" />
+    <p role="alert" className={cn("flex items-start gap-2 text-sm text-status-danger", className)}>
+      <CircleX aria-hidden className="mt-0.5 size-4 shrink-0" />
       {result.error}
     </p>
   );

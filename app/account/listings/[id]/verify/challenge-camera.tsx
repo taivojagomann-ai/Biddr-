@@ -151,7 +151,7 @@ export function ChallengeCamera({
       }
       paths[shot] = path;
     }
-    setStatus("Checking the photos… This takes up to a minute.");
+    setStatus("Saving the photos…");
     let r: Awaited<ReturnType<typeof submitChallenge>>;
     try {
       r = await submitChallenge({ auctionId, vinPath: paths.vin, odometerPath: paths.odometer });
@@ -159,7 +159,7 @@ export function ChallengeCamera({
       // A timeout or a lost connection: the photos may be saved; the page shows what is.
       setBusy(false);
       setStatus("");
-      setError("Something went wrong while checking. Reload the page: if your photos are saved, use \"Run the checks\" at the top.");
+      setError("Something went wrong while saving. Reload the page: if your photos are saved, submit them for checking.");
       router.refresh();
       return;
     }

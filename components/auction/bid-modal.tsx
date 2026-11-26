@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stripeAppearance, stripePromise } from "@/lib/stripe-client";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
-import { CheckCircle2, Loader2, Lock } from "lucide-react";
+import { CircleCheck, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -196,7 +196,7 @@ export function BidModal(props: BidModalProps) {
 
         {step.kind === "success" && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <CheckCircle2 className="size-10 text-verified" aria-hidden />
+            <CircleCheck className="size-10 text-status-success" aria-hidden />
             <DialogTitle>You have the high bid</DialogTitle>
             <DialogDescription id="bid-modal-desc">
               Your bid of {formatEur(step.result.current_bid)} is in.

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MAX_AUCTION_DAYS, MAX_AUCTION_MS } from "@/lib/admin-schemas";
@@ -113,8 +113,8 @@ export function ScheduleForm({ auctionId, startsAt, endsAt }: { auctionId: strin
         </p>
       ) : null}
 
-      <p className={tooLong ? "flex gap-2 text-sm text-signal" : "flex gap-2 text-xs text-mute"}>
-        <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <p className={tooLong ? "flex gap-2 text-sm text-status-warning" : "flex gap-2 text-xs text-mute"}>
+        <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
         Card holds expire after about 7 days, so the end must be at most {MAX_AUCTION_DAYS} days after the start.
       </p>
 

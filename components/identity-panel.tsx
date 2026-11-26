@@ -1,4 +1,5 @@
-import { CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+import { CircleCheck } from "lucide-react";
+import { StatusIcon } from "@/components/status-icon";
 import { IdentityButton } from "@/app/account/listings/[id]/verify/identity-button";
 import { LocalDateTime } from "@/components/local-date-time";
 import type { IdentityRow } from "@/lib/identity";
@@ -13,8 +14,8 @@ export function IdentityPanel({ me, returnTo, intro }: { me: Pick<IdentityRow, "
   if (status === "verified") {
     return (
       <div data-identity-state="verified" className="space-y-1 text-sm">
-        <p className="flex items-center gap-2 font-semibold text-verified">
-          <CheckCircle2 aria-hidden className="size-5" />
+        <p className="flex items-center gap-2 font-semibold text-status-success">
+          <CircleCheck aria-hidden className="size-5" />
           Verified
         </p>
         <p>
@@ -41,8 +42,8 @@ export function IdentityPanel({ me, returnTo, intro }: { me: Pick<IdentityRow, "
   return (
     <div data-identity-state={state} className="space-y-3 text-sm">
       {intro ? <div className="text-mute">{intro}</div> : null}
-      <p className={state === "failed" ? "flex gap-2 text-signal" : "flex gap-2"}>
-        {state === "checking" ? <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-mute" /> : <ShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-mute" />}
+      <p className={state === "failed" ? "flex gap-2 text-status-warning" : "flex gap-2"}>
+        <StatusIcon kind={state === "checking" ? "waiting" : state === "failed" ? "attention" : state === "unfinished" ? "added" : "not-added"} className="mt-0.5 size-4" />
         {text}
       </p>
       <IdentityButton label={label} returnTo={returnTo} />

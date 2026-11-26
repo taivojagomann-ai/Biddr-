@@ -166,7 +166,7 @@ export function DocumentsForm({
       if (r.ok) router.refresh();
     } catch {
       // A timeout or a lost connection: the documents may be saved; the page shows what is.
-      setResult({ ok: false, text: "Something went wrong while checking. Reload the page: if your documents are saved, use \"Run the checks\" at the top." });
+      setResult({ ok: false, text: "Something went wrong while saving. Reload the page: if your documents are saved, submit them for checking." });
       router.refresh();
     } finally {
       setBusy(false);

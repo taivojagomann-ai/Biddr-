@@ -1,27 +1,24 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
-import { sellerSummary, type SellerVerificationView } from "@/lib/listing-checks/seller-status";
+import { STATUS_BOX_CLASS, StatusIcon, type StatusKind } from "@/components/status-icon";
+import { verificationSummary, type VerificationModel } from "@/lib/listing-checks/verification-model";
 import { cn } from "@/lib/utils";
 
-/** The listing's verification on My listings: one line and a link to the verify page. */
-export function VerifyStatus({ auctionId, title, view }: { auctionId: string; title: string; view: SellerVerificationView }) {
-  const s = sellerSummary(view);
-  const Icon = s.tone === "ok" ? CheckCircle2 : s.tone === "bad" ? AlertTriangle : s.tone === "wait" ? Clock : ShieldCheck;
+const KIND = { todo: "not-added", checking: "waiting", passed: "passed", approved: "passed", attention: "attention", failed: "failed" } as const satisfies Record<string, StatusKind>;
+
+/** The listing's verification on My listings: one line (icon and words) and a link to "Verify your car". */
+export function VerifyStatus({ auctionId, title, model }: { auctionId: string; title: string; model: VerificationModel }) {
+  const s = verificationSummary(model);
+  const kind = KIND[s.status];
+  const act = s.status === "todo" || s.status === "attention" || (s.status === "failed" && model.editable);
   return (
-    <div
-      data-verify-status={s.tone}
-      className={cn(
-        "flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border p-2.5 text-sm",
-        s.tone === "ok" ? "border-verified/50" : s.tone === "bad" ? "border-signal/60 bg-signal/10" : s.tone === "todo" ? "border-signal/40" : "border-line",
-      )}
-    >
-      <Icon aria-hidden className={cn("size-4 shrink-0", s.tone === "ok" ? "text-verified" : s.tone === "wait" ? "text-mute" : "text-signal")} />
+    <div data-verify-status={s.status} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border p-2.5 text-sm", STATUS_BOX_CLASS[kind])}>
+      <StatusIcon kind={kind} className="size-4" />
       <span className="min-w-0 flex-1">{s.text}</span>
       <Link
         href={`/account/listings/${auctionId}/verify`}
         className="inline-flex min-h-11 items-center font-semibold text-chalk underline underline-offset-4 hover:text-signal"
       >
-        {s.tone === "todo" || (s.tone === "bad" && view.canRetry) ? "Verify your car" : "Details"}
+        {act ? "Verify your car" : "Details"}
         <span className="sr-only"> for {title}</span>
       </Link>
     </div>

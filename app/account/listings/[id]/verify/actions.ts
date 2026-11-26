@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { startIdentityVerification } from "@/lib/identity";
 import { CHALLENGE_MINUTES, CHALLENGE_PATH_RE, DOCUMENT_PATH_RE, verificationFolder } from "@/lib/listing-checks/challenge";
+import { identityAdded } from "@/lib/listing-checks/verification-model";
 import { BUCKET, ensureVerification, issueChallenge, readyForChecks, runListingChecks, type VerificationRow } from "@/lib/listing-checks/run";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
@@ -38,7 +39,7 @@ function refresh(auctionId: string) {
   revalidatePath("/account/listings");
 }
 
-const COULD_NOT_CHECK = "We couldn't run the checks just now. Your files are saved: try again in a few minutes with \"Run the checks\".";
+const COULD_NOT_CHECK = "We couldn't run the checks just now. Your files are saved: try \"Submit for checking\" again in a few minutes.";
 
 /** Runs the checks when everything is in. Never throws: the files stay saved either way. */
 async function maybeRun(auctionId: string): Promise<VerifyResult & { ran?: boolean }> {
@@ -49,17 +50,17 @@ async function maybeRun(auctionId: string): Promise<VerifyResult & { ran?: boole
     const r = await runListingChecks(admin, auctionId, { reextract: true });
     if (!r.ok) {
       console.error("listing checks: not run", auctionId, r.error);
-      return { ok: true, message: `Saved. ${r.error}`, ran: true };
+      return { ok: true, message: r.error, ran: true };
     }
     return {
       ok: true,
       ran: true,
       message:
         r.outcome === "green"
-          ? "Saved. The automated checks passed."
+          ? "Checked: all checks passed."
           : r.outcome === "red"
-            ? "Saved. Something didn't match: see above."
-            : "Saved. Biddr's team will take a closer look.",
+            ? "Checked: something needs your attention. See Check results."
+            : "Checked. See Check results.",
     };
   } catch (e) {
     console.error("listing checks: failed", auctionId, e);
@@ -96,12 +97,8 @@ export async function saveDocuments(input: unknown): Promise<VerifyResult> {
       documents_uploaded_at: new Date().toISOString(),
     })
     .eq("auction_id", d.auctionId);
-  const result = await maybeRun(d.auctionId);
   refresh(d.auctionId);
-  if (result.ok && result.ran === false) {
-    return { ok: true, message: "Documents saved. Now take the two photos at the car (step 2) to run the checks." };
-  }
-  return result;
+  return { ok: true, message: "Saved. Submit for checking when everything required is added." };
 }
 
 const auctionOnly = z.object({ auctionId: z.string().uuid() });
@@ -153,22 +150,28 @@ export async function submitChallenge(input: unknown): Promise<VerifyResult> {
     .from("listing_verifications")
     .update({ vin_photo_path: d.vinPath, odometer_photo_path: d.odometerPath, photos_code: v.challenge_code, photos_taken_at: new Date().toISOString() })
     .eq("auction_id", d.auctionId);
-  const result = await maybeRun(d.auctionId);
   refresh(d.auctionId);
-  if (result.ok && result.ran === false) {
-    return { ok: true, message: "Photos saved. Now add the registration certificate (step 1) to run the checks." };
-  }
-  return result;
+  return { ok: true, message: "Photos saved. Submit for checking when everything required is added." };
 }
 
-/** Runs the checks again on the saved files, when they couldn't run before (an error or a timeout). */
-export async function runChecks(input: unknown): Promise<VerifyResult> {
+/**
+ * "Submit for checking": runs the checks on what the seller added. Every required input
+ * must be in (the identity at least submitted to Stripe), and something must have changed
+ * since the last check (or there wasn't one, or it didn't finish).
+ */
+export async function submitForChecking(input: unknown): Promise<VerifyResult> {
   const parsed = auctionOnly.safeParse(input);
   if (!parsed.success) return { ok: false, error: "This listing no longer exists." };
   const own = await ownDraft(parsed.data.auctionId);
   if ("ok" in own) return own;
-  if (!readyForChecks(own.v)) return { ok: false, error: "Add the registration certificate and the two photos first." };
-  if (own.v.checked_at) return { ok: false, error: "Your listing has already been checked." };
+  const v = own.v;
+  if (!readyForChecks(v)) return { ok: false, error: "Add every required item first." };
+  const { data: me } = await getAdminSupabase().from("profiles").select("identity_status").eq("id", own.userId).maybeSingle<{ identity_status: string }>();
+  if (!identityAdded(me?.identity_status ?? "none")) return { ok: false, error: "Start the identity check first." };
+  const newer = (a: string | null) => Boolean(a && v.checked_at && Date.parse(a) > Date.parse(v.checked_at));
+  if (v.checked_at && !newer(v.documents_uploaded_at) && !newer(v.photos_taken_at)) {
+    return { ok: false, error: "Nothing has changed since the last check." };
+  }
   const result = await maybeRun(parsed.data.auctionId);
   refresh(parsed.data.auctionId);
   return result;
