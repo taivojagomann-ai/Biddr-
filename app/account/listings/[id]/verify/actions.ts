@@ -1,13 +1,12 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { startIdentityVerification } from "@/lib/identity";
 import { CHALLENGE_MINUTES, CHALLENGE_PATH_RE, DOCUMENT_PATH_RE, verificationFolder } from "@/lib/listing-checks/challenge";
 import { BUCKET, ensureVerification, issueChallenge, readyForChecks, runListingChecks, type VerificationRow } from "@/lib/listing-checks/run";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
-export type VerifyResult = { ok: true; message: string; code?: string; expiresAt?: string } | { ok: false; error: string; expired?: boolean };
+export type VerifyResult = { ok: true; message: string; code?: string; expiresAt?: string; url?: string } | { ok: false; error: string; expired?: boolean };
 
 const SESSION_EXPIRED: VerifyResult = { ok: false, error: "Your session has expired. Sign in again." };
 
@@ -183,5 +182,6 @@ export async function verifyIdentity(input?: unknown): Promise<VerifyResult> {
   const returnTo = z.object({ returnTo: z.string().max(200) }).safeParse(input);
   const r = await startIdentityVerification(getAdminSupabase(), user.id, returnTo.success ? returnTo.data.returnTo : undefined);
   if ("error" in r) return { ok: false, error: r.error };
-  redirect(r.url);
+  // The browser goes to Stripe's page itself (a full page load there and back).
+  return { ok: true, message: "Opening Stripe…", url: r.url };
 }

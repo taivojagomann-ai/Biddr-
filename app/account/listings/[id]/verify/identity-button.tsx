@@ -19,14 +19,16 @@ export function IdentityButton({ label = "Verify your identity", returnTo = "/ac
           setError(null);
           try {
             const r = await verifyIdentity({ returnTo });
-            // On success the server redirects to Stripe; only errors come back here.
-            if (r && !r.ok) setError(r.error);
-          } catch (e) {
-            // The redirect to Stripe surfaces as a navigation, not an error; anything else is.
-            if (!(e instanceof Error && e.message === "NEXT_REDIRECT")) setError("The identity check couldn't start. Try again in a moment.");
-          } finally {
-            setBusy(false);
+            if (r.ok && r.url) {
+              // Stays busy while the browser goes to Stripe's page.
+              window.location.assign(r.url);
+              return;
+            }
+            setError(r.ok ? "The identity check couldn't start. Try again in a moment." : r.error);
+          } catch {
+            setError("The identity check couldn't start. Try again in a moment.");
           }
+          setBusy(false);
         }}
       >
         {busy ? <Loader2 aria-hidden className="animate-spin" /> : <ShieldCheck aria-hidden />}

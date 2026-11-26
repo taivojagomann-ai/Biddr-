@@ -117,6 +117,8 @@ test.describe("the seller verifies the car", () => {
     await expect(checked.locator('[data-seller-check="mileage"]')).toHaveAttribute("data-state", "pass");
     await expect(checked.locator('[data-seller-check="owner"]')).toHaveAttribute("data-state", "waiting");
     await expect(checked.locator("[data-seller-check]")).toHaveCount(5);
+    // From the top, as a person arriving on the page (the sticky header doesn't cover buttons there).
+    await page.evaluate(() => window.scrollTo(0, 0));
     await expectAccessible(page, "Verify your car: what we checked");
     if (isMobile) await expectNoHorizontalScroll(page, "Verify your car on a phone");
 
