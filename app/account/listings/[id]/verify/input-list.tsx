@@ -93,10 +93,10 @@ export function InputList({
                     className="min-h-11 w-full sm:w-auto"
                     aria-expanded={open === panel}
                     aria-controls={`panel-${panel}`}
+                    aria-label={`${label}: ${item.label}`}
                     onClick={() => setOpen((o) => (o === panel ? null : panel!))}
                   >
                     {label}
-                    <span className="sr-only">: {item.label}</span>
                   </Button>
                 )
               ) : null}
