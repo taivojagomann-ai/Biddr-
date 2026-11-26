@@ -221,13 +221,13 @@ export default function HowItWorksPage() {
               cars are welcome either way.
             </li>
             <li>
-              <strong>Verify your car.</strong> Add the registration certificate and take two photos at the car with a
-              code we give you: the VIN plate and the odometer. Biddr checks them automatically.
+              <strong>Verify your car.</strong> Verify your identity with Stripe (once, for all your listings), add the
+              registration certificate and take two photos at the car with a code we give you: the VIN plate and the
+              dashboard. Then submit them, and Biddr checks them automatically.
             </li>
             <li>
               <strong>We review the listing</strong> (and check the dealer&apos;s report, if there is one). Once it&apos;s
-              approved, you verify your identity with Stripe (once, for all your listings) and we agree the auction dates
-              with you.
+              approved, we agree the auction dates with you.
             </li>
             <li>
               <strong>Your auction runs</strong> for up to 7 days. If you set a reserve, the car only sells if bidding reaches

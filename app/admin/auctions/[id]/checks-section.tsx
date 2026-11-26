@@ -4,6 +4,7 @@ import { BUCKET, loadVerification, readyForChecks, type VerificationRow } from "
 import { formatUsd } from "@/lib/listing-checks/costs";
 import { cn } from "@/lib/utils";
 import { ChecksActions } from "./checks-panel";
+import { STATUS_BOX_CLASS, STATUS_TEXT_CLASS, StatusIcon, type StatusKind } from "@/components/status-icon";
 
 const SIGNED_SECONDS = 600;
 
@@ -16,6 +17,8 @@ const CHECK_LABELS: Record<string, string> = {
   images: "Reverse image search",
 };
 const OUTCOME_LABELS = { pending: "Not run yet", green: "Green", yellow: "Yellow: needs a check", red: "Red" } as const;
+const OUTCOME_KIND = { pending: "waiting", green: "passed", yellow: "attention", red: "failed" } as const satisfies Record<string, StatusKind>;
+const CHECK_KIND = { pass: "passed", warn: "attention", fail: "failed" } as const satisfies Record<string, StatusKind>;
 
 type CheckRow = { run_id: string; check_name: string; status: "pass" | "warn" | "fail"; extracted: Record<string, unknown>; confidence: string | null; reason: string | null; checked_at: string };
 type CostRow = { provider: string; model: string | null; input_tokens: number; output_tokens: number; units: number; cost_usd: number; created_at: string };
@@ -61,15 +64,13 @@ export async function ChecksSection({ db, auctionId, status, sellerId }: { db: S
       <div className="flex flex-wrap items-center gap-2">
         <span
           data-checks-outcome={outcome}
-          className={cn(
-            "rounded-sm border px-2 py-1 font-semibold",
-            outcome === "green" ? "border-verified text-verified" : outcome === "red" ? "border-signal bg-signal/10 text-signal" : outcome === "yellow" ? "border-yellow-400 text-yellow-300" : "border-field text-mute",
-          )}
+          className={cn("inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-semibold", STATUS_BOX_CLASS[OUTCOME_KIND[outcome]], STATUS_TEXT_CLASS[OUTCOME_KIND[outcome]])}
         >
+          <StatusIcon kind={OUTCOME_KIND[outcome]} className="size-4" />
           {OUTCOME_LABELS[outcome]}
         </span>
         {v?.waiting_for_identity ? <span className="text-mute">Owner check waits for the seller&apos;s identity.</span> : null}
-        {v?.on_hold ? <span className="font-semibold text-signal">On hold</span> : null}
+        {v?.on_hold ? <span className="font-semibold text-status-danger">On hold</span> : null}
         {v && v.red_count > 0 ? <span className="text-mute">Red results: {v.red_count}</span> : null}
         {v?.checked_at ? (
           <span className="text-mute">
@@ -134,8 +135,11 @@ export async function ChecksSection({ db, auctionId, status, sellerId }: { db: S
               {checks.map((c) => (
                 <tr key={c.check_name} data-check={c.check_name}>
                   <th scope="row" className="py-2 pr-3 align-top font-semibold">{CHECK_LABELS[c.check_name] ?? c.check_name}</th>
-                  <td className={cn("py-2 pr-3 align-top font-semibold", c.status === "pass" ? "text-verified" : c.status === "fail" ? "text-signal" : "text-yellow-300")}>
-                    {c.status === "pass" ? "Pass" : c.status === "fail" ? "Fail" : "Check"}
+                  <td className={cn("py-2 pr-3 align-top font-semibold", STATUS_TEXT_CLASS[CHECK_KIND[c.status]])}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <StatusIcon kind={CHECK_KIND[c.status]} className="size-4" />
+                      {c.status === "pass" ? "Pass" : c.status === "fail" ? "Fail" : "Check"}
+                    </span>
                     {c.confidence ? <span className="block text-xs font-normal text-mute">{c.confidence} confidence</span> : null}
                   </td>
                   <td className="break-words py-2 pr-3 align-top">{show(c.extracted)}</td>

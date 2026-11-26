@@ -16,6 +16,14 @@ const config: Config = {
         chalk: "#F4F4F5",
         mute: "#A1A1AA",
         verified: "#5EEAD4",
+        // Status colours (DECISIONS.md point 18). Each is AA (4.5:1+) as text on asphalt and panel,
+        // and is always paired with an icon and a word. Brand orange (signal) is for actions only.
+        status: {
+          neutral: "#A1A1AA", // not added, added, waiting
+          success: "#5EEAD4", // passed (the verified teal)
+          warning: "#FBBF24", // needs attention (amber, not the brand orange)
+          danger: "#F87171", // failed
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

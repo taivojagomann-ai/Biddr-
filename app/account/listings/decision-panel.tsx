@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Loader2, Upload } from "lucide-react";
+import { TriangleAlert, CircleCheck, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -61,8 +61,8 @@ export function DecisionPanel({
 
   if (done) {
     return (
-      <p ref={doneRef} tabIndex={-1} role="status" className="flex items-start gap-2 text-sm font-semibold text-verified outline-none">
-        <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0" />
+      <p ref={doneRef} tabIndex={-1} role="status" className="flex items-start gap-2 text-sm font-semibold text-status-success outline-none">
+        <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0" />
         {done}
       </p>
     );
@@ -82,7 +82,7 @@ export function DecisionPanel({
   return (
     <section aria-labelledby={headingId} className="rounded-lg border border-signal/60 bg-asphalt/60 p-4">
       <h2 id={headingId} className="flex items-center gap-2 font-semibold">
-        <AlertTriangle aria-hidden className="size-4 shrink-0 text-signal" />
+        <TriangleAlert aria-hidden className="size-4 shrink-0 text-status-warning" />
         Waiting for your decision
       </h2>
       <p className="mt-2 text-sm">

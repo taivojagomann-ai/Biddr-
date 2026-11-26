@@ -24,7 +24,9 @@ import { WithdrawActions } from "./withdraw-actions";
 import { IdentityPanel } from "@/components/identity-panel";
 import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
 import { VerifyStatus } from "./verify-status";
-import { IDENTITY_REQUEST, sellerView } from "@/lib/listing-checks/seller-status";
+import { IDENTITY_REQUEST } from "@/lib/listing-checks/seller-status";
+import { loadVerificationModels } from "@/lib/listing-checks/load-model";
+import type { VerificationModel } from "@/lib/listing-checks/verification-model";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
@@ -84,29 +86,28 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
   // Fake-listing checks for listings in review (admin-only tables: the service role,
   // strictly for this seller's own drafts) and the seller's identity status.
   const drafts = listings.filter((l) => l.status === "draft").map((l) => l.id);
-  const verifications = new Map<string, Parameters<typeof sellerView>[0]>();
   let identityStatus = "none";
   let identity: IdentityRow | null = null;
+  let models = new Map<string, VerificationModel>();
+  const approved = new Set<string>();
   {
     const admin = getAdminSupabase();
     // Back from Stripe's page: read its state first.
     if (searchParams?.identity === "return") await syncIdentityOnReturn(admin, user.id);
-    const [{ data: vRows }, { data: me }] = await Promise.all([
-      drafts.length
-        ? admin
-            .from("listing_verifications")
-            .select("auction_id, registration_paths, vin_photo_path, odometer_photo_path, checked_at, outcome, outcome_reasons, on_hold, red_count, content_approved_at, override_at")
-            .in("auction_id", drafts)
-            .eq("seller_id", user.id)
-            .returns<(NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[]>()
-        : Promise.resolve({ data: [] as (NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[] }),
+    const draftRows = listings.filter((l) => l.status === "draft");
+    const [loaded, { data: me }, { data: approvals }] = await Promise.all([
+      loadVerificationModels(admin, user.id, draftRows.map((l) => ({ id: l.id, status: l.status, created_at: l.created_at }))),
       admin.from("profiles").select(IDENTITY_COLUMNS).eq("id", user.id).maybeSingle<IdentityRow>(),
+      drafts.length
+        ? admin.from("listing_verifications").select("auction_id").in("auction_id", drafts).eq("seller_id", user.id).not("content_approved_at", "is", null).returns<{ auction_id: string }[]>()
+        : Promise.resolve({ data: [] as { auction_id: string }[] }),
     ]);
-    for (const r of vRows ?? []) verifications.set(r.auction_id, r);
+    models = loaded;
+    for (const r of approvals ?? []) approved.add(r.auction_id);
     identity = me ?? null;
     identityStatus = me?.identity_status ?? "none";
   }
-  const identityRequested = identityStatus !== "verified" && [...verifications.values()].some((v) => v?.content_approved_at);
+  const identityRequested = identityStatus !== "verified" && identityStatus !== "pending" && approved.size > 0;
 
   // Sold cars: the buyer's premium, the buyer's contact details once it's paid, and what
   // the seller can do when the buyer didn't pay (DECISIONS.md point 12).
@@ -271,7 +272,7 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
                 )}
                 {/* Outside the link: no buttons inside links. */}
                 <div className="space-y-3 px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
-                  {l.status === "draft" ? <VerifyStatus auctionId={l.id} title={l.title} view={sellerView(verifications.get(l.id) ?? null, identityStatus)} /> : null}
+                  {l.status === "draft" ? <VerifyStatus auctionId={l.id} title={l.title} model={models.get(l.id)!} /> : null}
                   {l.status === "draft" && (deciding || priv?.seller_decision) ? (
                     <DecisionPanel
                       auctionId={l.id}

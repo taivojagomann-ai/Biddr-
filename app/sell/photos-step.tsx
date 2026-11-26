@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ArrowRight, ImagePlus, Loader2, RotateCw, Star, X } from "lucide-react";
+import { CircleX, ArrowLeft, ArrowRight, ImagePlus, Loader2, RotateCw, Star, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MAX_PHOTOS_PER_SECTION, photoSectionsFor, type PhotoSection, type SellErrors } from "@/lib/sell";
@@ -294,7 +294,7 @@ function StatusOverlay({ item, onRetry }: { item: UploadItem; onRetry: () => voi
   if (item.status === "error") {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-asphalt/80 p-2 text-center">
-        <AlertCircle aria-hidden className="size-5 text-signal" />
+        <CircleX aria-hidden className="size-5 text-status-danger" />
         <p className="text-[11px] leading-tight">{item.error ?? "Upload failed."}</p>
         {item.file ? (
           <Button type="button" size="sm" variant="secondary" onClick={onRetry}>

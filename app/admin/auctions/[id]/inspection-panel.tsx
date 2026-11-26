@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { AlertTriangle, ExternalLink, FileText, Loader2, Plus, Upload, X } from "lucide-react";
+import { TriangleAlert, ExternalLink, FileText, Loader2, Plus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -126,7 +126,7 @@ export function InspectionPanel({
           <ul className="space-y-2">
             {report.warnings.map((w) => (
               <li key={w} className="flex gap-2 rounded-md border border-signal/60 px-3 py-2 text-sm">
-                <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0 text-signal" />
+                <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-status-warning" />
                 <span>
                   <span className="font-semibold">Check: </span>
                   {w}

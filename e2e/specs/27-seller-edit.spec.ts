@@ -77,7 +77,8 @@ test.describe("Edit listing", () => {
     await signIn(context, seller);
 
     await page.goto("/account/listings");
-    await expect(page.locator("[data-verify-status]").first()).toContainText("On hold");
+    await expect(page.locator("[data-verify-status]").first()).toHaveAttribute("data-verify-status", "failed");
+    await expect(page.locator("[data-verify-status]").first()).toContainText("Couldn't verify");
     await page.getByRole("link", { name: `Edit ${a.title}` }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Edit listing" })).toBeVisible();
     await expect(page.getByText("Photos can't be changed here")).toBeVisible();
@@ -104,7 +105,8 @@ test.describe("Edit listing", () => {
     expect(edits).toEqual([{ changes: { vin: { from: typo, to: realVin } }, rechecked: true, approval_undone: false }]);
 
     await page.goto("/account/listings");
-    await expect(page.locator("[data-verify-status]").first()).not.toContainText("On hold");
+    await expect(page.locator("[data-verify-status]").first()).toHaveAttribute("data-verify-status", "passed");
+    await expect(page.locator("[data-verify-status]").first()).toContainText("All checks passed");
 
     if (isMobile) return; // the admin part runs on desktop
     await signIn(context, seed.admin);

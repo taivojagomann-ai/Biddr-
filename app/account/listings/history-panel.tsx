@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useId, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -46,7 +46,7 @@ export function HistoryRejectedPanel({
   return (
     <section aria-labelledby={`${id}-heading`} className="rounded-lg border border-signal/60 bg-panel p-4">
       <h2 id={`${id}-heading`} className="flex items-center gap-2 text-sm font-bold">
-        <AlertTriangle aria-hidden className="size-4 shrink-0 text-signal" />
+        <TriangleAlert aria-hidden className="size-4 shrink-0 text-status-warning" />
         Vehicle history report not accepted
       </h2>
       <p className="mt-2 text-sm">

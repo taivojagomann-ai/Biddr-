@@ -17,9 +17,9 @@ export const SHOTS: Record<ChallengeShot, { title: string; hint: string; guide: 
     guide: "Fit the VIN plate and the paper inside the frame",
   },
   odometer: {
-    title: "Photo 2: odometer with the code",
+    title: "Photo 2: dashboard with the code",
     hint: "The dashboard with the ignition on, showing the total mileage, and the same paper next to it.",
-    guide: "Fit the odometer and the paper inside the frame",
+    guide: "Fit the dashboard mileage and the paper inside the frame",
   },
 };
 

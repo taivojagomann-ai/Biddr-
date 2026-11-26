@@ -108,7 +108,7 @@ export function StatusActions({
           </ul>
           {waitingForSeller ? (
             <p className="flex items-start gap-2 rounded-md border border-signal/60 px-3 py-2 text-sm">
-              <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-signal" />
+              <Clock aria-hidden className="mt-0.5 size-4 shrink-0 text-status-neutral" />
               <span>
                 Waiting for the seller to choose: new report or list without an inspection.{" "}
                 <span className="text-mute">

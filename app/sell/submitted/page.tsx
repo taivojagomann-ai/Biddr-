@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
@@ -52,7 +52,7 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
 
   return (
     <main className="container max-w-2xl py-12 sm:py-20">
-      <CheckCircle2 aria-hidden className="size-10 text-verified" />
+      <CircleCheck aria-hidden className="size-10 text-status-success" />
       <h1 className="mt-4 font-wide text-3xl font-extrabold tracking-tight">Thanks, your car is submitted</h1>
       <p className="mt-2 text-mute">
         {title ? (
@@ -71,8 +71,8 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
             Next: verify your car
           </h2>
           <p className="mt-1 text-sm text-mute">
-            Add the registration certificate and take two photos at the car with a code we give you. It takes a few minutes
-            and is needed before the auction can be scheduled.
+            Add what we need (your identity check, the registration certificate and two photos at the car with a code we give
+            you), then submit it for checking. It usually takes a few minutes and is needed before the auction can be scheduled.
           </p>
           <Button asChild className="mt-3">
             <Link href={`/account/listings/${id}/verify`}>Verify your car</Link>
