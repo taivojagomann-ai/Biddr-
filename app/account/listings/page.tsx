@@ -23,6 +23,7 @@ import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
 import { IdentityPanel } from "@/components/identity-panel";
 import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
+import { ListingTiming } from "./listing-timing";
 import { VerifyStatus } from "./verify-status";
 import { IDENTITY_REQUEST } from "@/lib/listing-checks/seller-status";
 import { loadVerificationModels } from "@/lib/listing-checks/load-model";
@@ -33,7 +34,7 @@ export const dynamic = "force-dynamic";
 
 type ListingRow = Pick<
   Auction,
-  "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "damage_history_summary"
+  "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "starts_at" | "ends_at" | "damage_history_summary"
 > & { relisted_from: string | null };
 
 type PrivateRow = Pick<
@@ -58,10 +59,12 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(loginPath("/account/listings"));
+  // The first render's clock for the time-left chips (they then follow the server-corrected clock).
+  const now = Date.now();
 
   const { data } = await supabase
     .from("auctions")
-    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, damage_history_summary, relisted_from")
+    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, starts_at, ends_at, damage_history_summary, relisted_from")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
@@ -236,6 +239,7 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
                   <p className="mt-1 text-xs text-mute">
                     Submitted <LocalDateTime iso={l.created_at} dateOnly />
                   </p>
+                  <ListingTiming id={l.id} initial={{ status: l.status, starts_at: l.starts_at, ends_at: l.ends_at }} initialNow={now} />
                   {isPublic ? null : (
                     <div className="mt-1 flex flex-wrap items-center gap-x-5">
                       <Link
