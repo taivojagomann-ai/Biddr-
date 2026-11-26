@@ -71,7 +71,10 @@ async function photoPanel(page: Page) {
 /** The live challenge: a code, two camera photos, send. */
 async function takeChallenge(page: Page, { newCode = true, expectSaved = true } = {}) {
   const photos = await photoPanel(page);
-  if (newCode) await photos.getByRole("button", { name: /^Get (a|a new) code( to retake them)?$/ }).click();
+  // A code that is still valid is offered again (retakes within 15 minutes use it).
+  if (newCode && !(await photos.getByLabel(/^Code: /).isVisible())) {
+    await photos.getByRole("button", { name: /^Get (a|a new) code( to retake them)?$/ }).click();
+  }
   await expect(photos.getByLabel(/^Code: /)).toBeVisible();
   await shoot(page, /^Open the camera for Photo 1/);
   await expect(photos.getByRole("img", { name: /Your photo: Photo 1/ })).toBeVisible();
