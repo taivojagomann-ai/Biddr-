@@ -63,7 +63,9 @@ export async function startIdentityVerification(
  */
 export async function syncIdentityOnReturn(db: SupabaseClient, userId: string): Promise<void> {
   try {
-    const { data: me } = await db.from("profiles").select(IDENTITY_COLUMNS).eq("id", userId).maybeSingle<IdentityRow>();
+    // Its own query (with "id"): Next memoizes identical requests within a render, and the
+    // page reads IDENTITY_COLUMNS again after this, which must see the updated row.
+    const { data: me } = await db.from("profiles").select(`id, ${IDENTITY_COLUMNS}`).eq("id", userId).maybeSingle<IdentityRow>();
     if (!me?.identity_session_id || me.identity_status === "verified") return;
     const session = await stripe.identity.verificationSessions.retrieve(me.identity_session_id, { expand: ["verified_outputs", "last_verification_report"] });
     if (session.metadata?.user_id !== userId) return;
