@@ -6,6 +6,8 @@ import { isProfileComplete } from "@/lib/profile";
 import { safeNext } from "@/lib/redirect";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import type { Country } from "@/lib/types";
+import { IdentityPanel } from "@/components/identity-panel";
+import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
 import { SetupForm } from "./setup-form";
 
 export const metadata: Metadata = { title: "Your profile" };
@@ -21,7 +23,7 @@ type OwnProfile = {
 type TermsStatus = { bidding_terms_version: string | null; bidding_terms_accepted_at: string | null };
 
 
-export default async function AccountSetupPage({ searchParams }: { searchParams: { next?: string | string[] } }) {
+export default async function AccountSetupPage({ searchParams }: { searchParams: { next?: string | string[]; identity?: string } }) {
   const next = safeNext(searchParams.next);
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -37,6 +39,10 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
     .maybeSingle<OwnProfile>();
 
   const isNew = !isProfileComplete(profile);
+
+  // Identity (Stripe Identity): back from Stripe's page, read its state first.
+  if (searchParams.identity === "return") await syncIdentityOnReturn(getAdminSupabase(), user.id);
+  const { data: identity } = await getAdminSupabase().from("profiles").select(IDENTITY_COLUMNS).eq("id", user.id).maybeSingle<IdentityRow>();
 
   // Read separately, so the profile form still works if 0008 hasn't been run yet.
   const [{ data: terms }, { data: currentVersion }] = await Promise.all([
@@ -96,6 +102,21 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
             phone: profile?.phone ?? "",
           }}
         />
+
+        {isNew ? null : (
+          <section aria-labelledby="identity-heading" className="mt-10 border-t border-line pt-6">
+            <h2 id="identity-heading" className="text-sm font-semibold">
+              Identity
+            </h2>
+            <div className="mt-2">
+              <IdentityPanel
+                me={identity ?? null}
+                returnTo="/account/setup"
+                intro="Sellers verify their identity once, with Stripe. You can do it now, or when Biddr approves your first listing."
+              />
+            </div>
+          </section>
+        )}
 
         <section aria-labelledby="terms-status-heading" className="mt-10 border-t border-line pt-6">
           <h2 id="terms-status-heading" className="text-sm font-semibold">

@@ -66,6 +66,8 @@ function writeIdentity(userId: string, result: Record<string, string>) {
 /** The seller starts Stripe Identity from My listings, then Stripe's webhook says verified. */
 async function verifyIdentity(page: Page, request: Parameters<typeof sendWebhook>[0], seller: TestUser, name = { first: "E2E Private", last: "Name" }) {
   await page.goto("/account/listings");
+  // Stripe's page: the seller submits the documents (Stripe is now checking them).
+  writeIdentity(seller.id, { status: "processing" });
   await page.getByRole("button", { name: "Verify your identity" }).click();
   await expect(page).toHaveURL(/\/account\/listings\?identity=return/);
   await expect(page.getByText(/Stripe is checking your identity/)).toBeVisible();
@@ -108,6 +110,16 @@ test.describe("the seller verifies the car", () => {
     await expect(photos).toContainText("Uploading photos from your gallery isn't possible here");
     await takeChallenge(page);
     await expect(page.getByText("Saved. The automated checks passed.")).toBeVisible({ timeout: 60_000 });
+    // What we checked: one line per check; the owner waits for the identity; no image search line.
+    const checked = page.getByRole("region", { name: "What we checked" });
+    await expect(checked.locator('[data-seller-check="code"]')).toHaveAttribute("data-state", "pass");
+    await expect(checked.locator('[data-seller-check="vin"]')).toHaveAttribute("data-state", "pass");
+    await expect(checked.locator('[data-seller-check="mileage"]')).toHaveAttribute("data-state", "pass");
+    await expect(checked.locator('[data-seller-check="owner"]')).toHaveAttribute("data-state", "waiting");
+    await expect(checked.locator("[data-seller-check]")).toHaveCount(5);
+    // From the top, as a person arriving on the page (the sticky header doesn't cover buttons there).
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expectAccessible(page, "Verify your car: what we checked");
     if (isMobile) await expectNoHorizontalScroll(page, "Verify your car on a phone");
 
     const v = await verification(a.id);
@@ -285,6 +297,9 @@ test.describe("yellow and red", () => {
     await expect(page.getByText("Saved. Something didn't match: see above.")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/The VIN on the plate \(WBA00000000000000\) doesn't match the listing's VIN/)).toBeVisible();
     await expect(page.getByText("You can try once more")).toBeVisible();
+    const vinLine = page.getByRole("region", { name: "What we checked" }).locator('[data-seller-check="vin"]');
+    await expect(vinLine).toHaveAttribute("data-state", "fail");
+    await expect(vinLine).toContainText("the plate reads WBA00000000000000");
     expect(await verification(a.id)).toMatchObject({ outcome: "red", on_hold: true, red_count: 1, needs_admin: false });
     expect((await notificationsFor(seller, "listing_on_hold"))[0]?.data).toMatchObject({ retry: true });
 
@@ -368,8 +383,11 @@ test.describe("yellow and red", () => {
     await page.goto(`/account/listings/${stolen.id}/verify`);
     await addRegistration(page);
     await takeChallenge(page);
-    await expect(page.getByText(/Listing photos appear on other car sites: https:\/\/suchen\.mobile\.de/)).toBeVisible({ timeout: 60_000 });
+    // The seller is told in general terms only; where the photos were found stays with the admins.
+    await expect(page.getByText("Biddr's team is checking your listing photos.")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/suchen\.mobile\.de/)).toHaveCount(0);
     expect(await verification(stolen.id)).toMatchObject({ outcome: "red", on_hold: true });
+    expect((await verification(stolen.id))!.outcome_reasons).toEqual([expect.stringMatching(/^Listing photos appear on other car sites: https:\/\/suchen\.mobile\.de/)]);
 
     // Green until the identity is verified; then the owner's name doesn't match: red.
     await page.goto(`/account/listings/${otherOwner.id}/verify`);
