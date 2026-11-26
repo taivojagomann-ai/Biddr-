@@ -25,7 +25,10 @@ export interface IdentityRow {
 export const IDENTITY_COLUMNS = "identity_status, identity_verified_name, identity_document_country, identity_verified_at, identity_session_id";
 
 /** Where the member comes back to after Stripe's page: their profile, My listings or a listing's verify page. */
-const RETURN_PATH_RE = /^\/account\/(setup|listings(\/[0-9a-f-]{36}\/verify)?)$/;
+export const RETURN_PATH_RE = /^\/account\/(setup|listings(\/[0-9a-f-]{36}\/verify)?)$/;
+
+/** Only http(s) origins without a path (the address the member is using right now). */
+const ORIGIN_RE = /^https?:\/\/[a-z0-9.-]+(:\d+)?$/i;
 
 /**
  * Starts a verification (a document and a matching selfie on Stripe's page) and returns where
@@ -36,6 +39,8 @@ export async function startIdentityVerification(
   db: SupabaseClient,
   userId: string,
   returnPath = "/account/listings",
+  /** The site address the member started from, so they come back to the same one (signed in). */
+  origin?: string,
 ): Promise<{ url: string } | { error: string }> {
   const { data: me } = await db.from("profiles").select(IDENTITY_COLUMNS).eq("id", userId).maybeSingle<IdentityRow>();
   if (me?.identity_status === "verified") return { error: "Your identity is already verified." };
@@ -45,7 +50,9 @@ export async function startIdentityVerification(
       type: "document",
       options: { document: { require_matching_selfie: true, require_live_capture: true } },
       metadata: { user_id: userId },
-      return_url: `${siteUrl()}${back}?identity=return`,
+      // Back through /identity/return, which works signed out too (for example when the
+      // documents were taken on a phone after "Continue on your phone").
+      return_url: `${origin && ORIGIN_RE.test(origin) ? origin : siteUrl()}/identity/return?to=${encodeURIComponent(back)}`,
     });
     await db.from("profiles").update({ identity_session_id: session.id }).eq("id", userId).neq("identity_status", "verified");
     if (!session.url) return { error: "Stripe didn't return a verification page. Try again." };

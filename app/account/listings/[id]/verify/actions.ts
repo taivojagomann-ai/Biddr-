@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { startIdentityVerification } from "@/lib/identity";
 import { CHALLENGE_MINUTES, CHALLENGE_PATH_RE, DOCUMENT_PATH_RE, verificationFolder } from "@/lib/listing-checks/challenge";
@@ -183,7 +184,11 @@ export async function verifyIdentity(input?: unknown): Promise<VerifyResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return SESSION_EXPIRED;
   const returnTo = z.object({ returnTo: z.string().max(200) }).safeParse(input);
-  const r = await startIdentityVerification(getAdminSupabase(), user.id, returnTo.success ? returnTo.data.returnTo : undefined);
+  // The address the member is on right now (Next checks that a server action's Origin matches its host).
+  const h = headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const origin = h.get("origin") ?? (host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}` : undefined);
+  const r = await startIdentityVerification(getAdminSupabase(), user.id, returnTo.success ? returnTo.data.returnTo : undefined, origin);
   if ("error" in r) return { ok: false, error: r.error };
   // The browser goes to Stripe's page itself (a full page load there and back).
   return { ok: true, message: "Opening Stripe…", url: r.url };

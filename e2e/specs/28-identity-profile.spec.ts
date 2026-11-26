@@ -65,6 +65,18 @@ test.describe("identity on the profile", () => {
     await expect(section.getByRole("button")).toHaveCount(0);
   });
 
+  test("back from Stripe on a device that isn't signed in (e.g. the phone after \"Continue on your phone\"): a confirmation, not the sign-in page", async ({ page }) => {
+    await page.goto("/identity/return?to=%2Faccount%2Fsetup");
+    await expect(page).toHaveURL(/\/identity\/return/);
+    await expect(page.getByRole("heading", { level: 1, name: "Thanks, your documents are sent" })).toBeVisible();
+    await expect(page.getByText("If you started on another device, you can close this page and continue there.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in to Biddr on this device" })).toHaveAttribute("href", /\/login\?next=%2Faccount%2Fsetup/);
+    await expectAccessible(page, "Identity return, signed out");
+    // An address that isn't one of ours is never used.
+    await page.goto("/identity/return?to=https%3A%2F%2Fevil.example");
+    await expect(page.getByRole("link", { name: "Sign in to Biddr on this device" })).toHaveAttribute("href", /next=%2Faccount%2Flistings/);
+  });
+
   test("a check left \"in progress\" by the old flow can be continued", async ({ page, context }) => {
     const seller = await createUser({ role: "seller" });
     await service().from("profiles").update({ identity_status: "pending", identity_session_id: "vs_e2e_stale" }).eq("id", seller.id);
