@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getVerifiedUser } from "@/lib/supabase/verified-user";
 
 const PROTECTED = ["/admin", "/sell", "/account", "/two-factor"];
 
@@ -21,7 +22,7 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, aal } = await getVerifiedUser(supabase);
 
   const { pathname, search } = request.nextUrl;
   if (!user && PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
@@ -39,8 +40,7 @@ export async function middleware(request: NextRequest) {
   // it goes to /two-factor and comes back to the same page. Non-admins fall
   // through to the admin layout, which answers 404.
   if (user && (pathname === "/admin" || pathname.startsWith("/admin/"))) {
-    const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel().then((r) => r.data, () => null);
-    if (aal?.currentLevel !== "aal2") {
+    if (aal !== "aal2") {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle<{ role: string }>();
       if (profile?.role === "admin") {
         const url = request.nextUrl.clone();
