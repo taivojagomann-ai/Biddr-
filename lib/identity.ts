@@ -24,23 +24,57 @@ export interface IdentityRow {
 
 export const IDENTITY_COLUMNS = "identity_status, identity_verified_name, identity_document_country, identity_verified_at, identity_session_id";
 
-/** Starts a verification (a document and a matching selfie on Stripe's page) and returns where to send the member. */
-export async function startIdentityVerification(db: SupabaseClient, userId: string): Promise<{ url: string } | { error: string }> {
+/** Where the member comes back to after Stripe's page: their profile, My listings or a listing's verify page. */
+const RETURN_PATH_RE = /^\/account\/(setup|listings(\/[0-9a-f-]{36}\/verify)?)$/;
+
+/**
+ * Starts a verification (a document and a matching selfie on Stripe's page) and returns where
+ * to send the member. The status stays as it is until Stripe says the documents were
+ * submitted ("processing"), so a member who closes Stripe's page can simply continue.
+ */
+export async function startIdentityVerification(
+  db: SupabaseClient,
+  userId: string,
+  returnPath = "/account/listings",
+): Promise<{ url: string } | { error: string }> {
   const { data: me } = await db.from("profiles").select(IDENTITY_COLUMNS).eq("id", userId).maybeSingle<IdentityRow>();
   if (me?.identity_status === "verified") return { error: "Your identity is already verified." };
+  const back = RETURN_PATH_RE.test(returnPath) ? returnPath : "/account/listings";
   try {
     const session = await stripe.identity.verificationSessions.create({
       type: "document",
       options: { document: { require_matching_selfie: true, require_live_capture: true } },
       metadata: { user_id: userId },
-      return_url: `${siteUrl()}/account/listings?identity=return`,
+      return_url: `${siteUrl()}${back}?identity=return`,
     });
-    await db.from("profiles").update({ identity_status: "pending", identity_session_id: session.id }).eq("id", userId);
+    await db.from("profiles").update({ identity_session_id: session.id }).eq("id", userId).neq("identity_status", "verified");
     if (!session.url) return { error: "Stripe didn't return a verification page. Try again." };
     return { url: session.url };
   } catch (e) {
     console.error("identity: couldn't start a verification", e);
     return { error: "The identity check couldn't start. Try again in a moment." };
+  }
+}
+
+/**
+ * When the member comes back from Stripe's page: read the session's state from Stripe, so
+ * the page shows the right thing before the webhook arrives. Submitted: "pending"
+ * (checking). Not finished (closed early): unchanged, so they can continue. Never throws.
+ */
+export async function syncIdentityOnReturn(db: SupabaseClient, userId: string): Promise<void> {
+  try {
+    const { data: me } = await db.from("profiles").select(IDENTITY_COLUMNS).eq("id", userId).maybeSingle<IdentityRow>();
+    if (!me?.identity_session_id || me.identity_status === "verified") return;
+    const session = await stripe.identity.verificationSessions.retrieve(me.identity_session_id, { expand: ["verified_outputs", "last_verification_report"] });
+    if (session.metadata?.user_id !== userId) return;
+    if (session.status === "verified") return await applyVerified(db, userId, session);
+    const next: IdentityStatus | null =
+      session.status === "processing" ? "pending" : session.status === "canceled" ? "canceled" : session.status === "requires_input" && session.last_error ? "requires_input" : null;
+    if (next && next !== me.identity_status) {
+      await db.from("profiles").update({ identity_status: next }).eq("id", userId).eq("identity_session_id", session.id).neq("identity_status", "verified");
+    }
+  } catch (e) {
+    console.error("identity: couldn't read the verification on return", e);
   }
 }
 
@@ -74,11 +108,16 @@ export async function handleIdentityEvent(db: SupabaseClient, event: Stripe.Even
   const session = await stripe.identity.verificationSessions.retrieve(object.id, { expand: ["verified_outputs", "last_verification_report"] });
   // Trust Stripe's current state, not only the event.
   if (session.status !== "verified") return;
+  await applyVerified(db, userId, session);
+}
+
+/** Saves a verified session (once: a second call for the same member does nothing). */
+async function applyVerified(db: SupabaseClient, userId: string, session: Stripe.Identity.VerificationSession): Promise<void> {
   const outputs = session.verified_outputs;
   const name = [outputs?.first_name, outputs?.last_name].filter(Boolean).join(" ").trim() || null;
   const report = session.last_verification_report;
   const country = typeof report === "object" && report ? (report.document?.issuing_country ?? null) : null;
-  const { error } = await db
+  const { data, error } = await db
     .from("profiles")
     .update({
       identity_status: "verified",
@@ -87,8 +126,11 @@ export async function handleIdentityEvent(db: SupabaseClient, event: Stripe.Even
       identity_verified_at: new Date().toISOString(),
       identity_session_id: session.id,
     })
-    .eq("id", userId);
+    .eq("id", userId)
+    .neq("identity_status", "verified")
+    .select("id");
   if (error) throw new Error(error.message);
+  if (!data?.length) return;
   await db.from("notifications").insert({ user_id: userId, type: "identity_verified", data: {} });
   // The owner check waited for this: compare again with the verified name.
   await rerunOwnerChecks(db, userId);

@@ -1,6 +1,8 @@
 // What the seller sees about their listing's verification (My listings and the verify
 // page). Admin details (extracted values, confidence) stay on the admin side.
 
+import { sellerReasons } from "./seller-checklist";
+
 export interface SellerVerificationView {
   hasDocuments: boolean;
   hasPhotos: boolean;
@@ -57,7 +59,7 @@ export function sellerView(
     hasPhotos: Boolean(v?.vin_photo_path && v?.odometer_photo_path),
     checked: Boolean(v?.checked_at),
     outcome: v?.outcome ?? "pending",
-    reasons: v?.outcome === "red" ? v.outcome_reasons : [],
+    reasons: v?.outcome === "red" ? sellerReasons(v.outcome_reasons) : [],
     onHold: Boolean(v?.on_hold),
     canRetry: Boolean(v?.on_hold) && (v?.red_count ?? 0) < 2,
     contentApproved: Boolean(v?.content_approved_at),

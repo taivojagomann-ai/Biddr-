@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Circle, Clock, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Clock, XCircle } from "lucide-react";
 import { CHALLENGE_MINUTES } from "@/lib/listing-checks/challenge";
-import { IDENTITY_COLUMNS, type IdentityRow } from "@/lib/identity";
+import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
+import { sellerChecklist, type CheckRow, type SellerCheckState } from "@/lib/listing-checks/seller-checklist";
+import { IdentityPanel } from "@/components/identity-panel";
 import { loadVerification } from "@/lib/listing-checks/run";
 import { IDENTITY_REQUEST, sellerSummary, sellerView } from "@/lib/listing-checks/seller-status";
 import { loginPath } from "@/lib/login";
@@ -11,7 +13,6 @@ import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { ChallengeCamera } from "./challenge-camera";
 import { DocumentsForm } from "./documents-form";
-import { IdentityButton } from "./identity-button";
 import { RunChecksButton } from "./run-checks-button";
 
 export const metadata: Metadata = { title: "Verify your car", robots: { index: false } };
@@ -24,6 +25,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 function fileName(path: string): string {
   const kind = path.includes("/authorisation-") ? "Authorisation" : "Registration certificate";
   return `${kind} (${path.split(".").pop()?.toUpperCase()})`;
+}
+
+const CHECK_STATE_LABELS: Record<SellerCheckState, string> = { pass: "matches", look: "Biddr's team takes a look", fail: "doesn't match", waiting: "waiting" };
+
+function CheckIcon({ state }: { state: SellerCheckState }) {
+  const cls = "mt-0.5 size-5 shrink-0";
+  if (state === "pass") return <CheckCircle2 aria-hidden className={cn(cls, "text-verified")} />;
+  if (state === "fail") return <XCircle aria-hidden className={cn(cls, "text-signal")} />;
+  if (state === "waiting") return <Clock aria-hidden className={cn(cls, "text-mute")} />;
+  return <AlertTriangle aria-hidden className={cn(cls, "text-signal")} />;
 }
 
 type StepState = "done" | "needed" | "later";
@@ -50,7 +61,7 @@ function StepStatus({ state }: { state: StepState }) {
  * "Verify your car" (DECISIONS.md point 16): the registration certificate, two photos at
  * the car with a live code, and, once the listing is approved, the seller's identity.
  */
-export default async function VerifyPage({ params }: { params: { id: string } }) {
+export default async function VerifyPage({ params, searchParams }: { params: { id: string }; searchParams?: { identity?: string } }) {
   if (!UUID_RE.test(params.id)) notFound();
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
@@ -64,10 +75,22 @@ export default async function VerifyPage({ params }: { params: { id: string } })
   if (!auction || auction.seller_id !== user.id) notFound();
 
   const admin = getAdminSupabase();
-  const [v, { data: me }] = await Promise.all([
+  // Back from Stripe's identity page: read its state first.
+  if (searchParams?.identity === "return") await syncIdentityOnReturn(admin, user.id);
+  const [v, { data: me }, { data: checkRows }] = await Promise.all([
     loadVerification(admin, auction.id),
     admin.from("profiles").select(IDENTITY_COLUMNS).eq("id", user.id).maybeSingle<IdentityRow>(),
+    admin
+      .from("listing_checks")
+      .select("run_id, check_name, status, extracted, reason")
+      .eq("auction_id", auction.id)
+      .order("checked_at", { ascending: false })
+      .limit(12)
+      .returns<(CheckRow & { run_id: string })[]>(),
   ]);
+  // The latest run only.
+  const latestRun = checkRows?.[0]?.run_id;
+  const checklist = sellerChecklist((checkRows ?? []).filter((r) => r.run_id === latestRun));
   const identityStatus = me?.identity_status ?? "none";
   const view = sellerView(v, identityStatus);
   const summary = sellerSummary(view);
@@ -136,6 +159,28 @@ export default async function VerifyPage({ params }: { params: { id: string } })
         </div>
       ) : null}
 
+      {checklist.length && view.checked ? (
+        <section aria-labelledby="checks-heading" className="mt-6 rounded-lg border border-line bg-panel p-4">
+          <h2 id="checks-heading" className="text-lg font-bold">
+            What we checked
+          </h2>
+          <ul className="mt-3 divide-y divide-line">
+            {checklist.map((c) => (
+              <li key={c.key} data-seller-check={c.key} data-state={c.state} className="flex gap-3 py-2.5 text-sm">
+                <CheckIcon state={c.state} />
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {c.label}
+                    <span className="sr-only">: {CHECK_STATE_LABELS[c.state]}</span>
+                  </p>
+                  <p className="text-mute">{c.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {!inReview ? <p className="mt-5 text-sm text-mute">This listing isn&apos;t waiting for review, so nothing can be changed here.</p> : null}
 
       <section aria-labelledby="docs-heading" className={cn("mt-8 rounded-lg border border-line bg-panel p-4", docsStep === "done" && "border-verified/60")}>
@@ -201,27 +246,19 @@ export default async function VerifyPage({ params }: { params: { id: string } })
           </h2>
           <StepStatus state={identityStep} />
         </div>
-        {view.identityVerified ? (
-          <p className="mt-2 flex items-center gap-2 text-sm text-verified">
-            <ShieldCheck aria-hidden className="size-4" />
-            Your identity is verified. Buyers see &quot;Verified seller&quot; on your listings.
-          </p>
-        ) : view.contentApproved ? (
-          <div className="mt-2 space-y-3">
-            <p className="text-sm font-semibold">{IDENTITY_REQUEST}</p>
-            <p className="text-sm text-mute">
-              On Stripe&apos;s page you take a photo of your ID and a selfie. It takes about two minutes and is done once for all
-              your listings. Biddr keeps only your verified name and the document&apos;s country.
-            </p>
-            {identityStatus === "pending" ? <p className="text-sm text-mute">Your identity check is in progress.</p> : null}
-            {identityStatus === "requires_input" ? <p className="text-sm text-signal">The last check didn&apos;t go through. Please try again.</p> : null}
-            {identityStatus !== "pending" ? <IdentityButton /> : null}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-mute">
-            When Biddr approves your listing, we&apos;ll ask you to verify your identity with Stripe (once, for all your listings).
-          </p>
-        )}
+        <div className="mt-2">
+          <IdentityPanel
+            me={me ?? null}
+            returnTo={`/account/listings/${auction.id}/verify`}
+            intro={
+              view.contentApproved ? (
+                <p className="font-semibold text-chalk">{IDENTITY_REQUEST}</p>
+              ) : (
+                "Needed when Biddr approves your listing. You can also do it now: once, for all your listings."
+              )
+            }
+          />
+        </div>
       </section>
     </main>
   );

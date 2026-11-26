@@ -21,7 +21,8 @@ import { SalePanel, type SaleState } from "./sale-panel";
 import type { ReportStatus } from "@/lib/reports";
 import { DecisionPanel } from "./decision-panel";
 import { WithdrawActions } from "./withdraw-actions";
-import { IdentityButton } from "./[id]/verify/identity-button";
+import { IdentityPanel } from "@/components/identity-panel";
+import { IDENTITY_COLUMNS, syncIdentityOnReturn, type IdentityRow } from "@/lib/identity";
 import { VerifyStatus } from "./verify-status";
 import { IDENTITY_REQUEST, sellerView } from "@/lib/listing-checks/seller-status";
 
@@ -85,8 +86,11 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
   const drafts = listings.filter((l) => l.status === "draft").map((l) => l.id);
   const verifications = new Map<string, Parameters<typeof sellerView>[0]>();
   let identityStatus = "none";
+  let identity: IdentityRow | null = null;
   {
     const admin = getAdminSupabase();
+    // Back from Stripe's page: read its state first.
+    if (searchParams?.identity === "return") await syncIdentityOnReturn(admin, user.id);
     const [{ data: vRows }, { data: me }] = await Promise.all([
       drafts.length
         ? admin
@@ -96,9 +100,10 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
             .eq("seller_id", user.id)
             .returns<(NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[]>()
         : Promise.resolve({ data: [] as (NonNullable<Parameters<typeof sellerView>[0]> & { auction_id: string })[] }),
-      admin.from("profiles").select("identity_status").eq("id", user.id).maybeSingle<{ identity_status: string }>(),
+      admin.from("profiles").select(IDENTITY_COLUMNS).eq("id", user.id).maybeSingle<IdentityRow>(),
     ]);
     for (const r of vRows ?? []) verifications.set(r.auction_id, r);
+    identity = me ?? null;
     identityStatus = me?.identity_status ?? "none";
   }
   const identityRequested = identityStatus !== "verified" && [...verifications.values()].some((v) => v?.content_approved_at);
@@ -162,19 +167,18 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
         </Button>
       </div>
 
-      {searchParams?.identity === "return" && identityStatus !== "verified" ? (
+      {searchParams?.identity === "return" && identityStatus === "pending" ? (
         <p role="status" className="mt-6 rounded-md border border-line bg-panel p-3 text-sm">
           Thanks. Stripe is checking your identity; this page updates when it&apos;s done (usually within a few minutes).
         </p>
       ) : null}
-      {identityRequested && identityStatus !== "pending" ? (
+      {identityRequested ? (
         <section aria-labelledby="identity-request" className="mt-6 rounded-lg border border-signal/50 bg-panel p-4">
           <h2 id="identity-request" className="font-bold">
             {IDENTITY_REQUEST}
           </h2>
-          <p className="mt-1 text-sm text-mute">With Stripe: a photo of your ID and a selfie, once for all your listings.</p>
           <div className="mt-3">
-            <IdentityButton />
+            <IdentityPanel me={identity} returnTo="/account/listings" />
           </div>
         </section>
       ) : null}

@@ -4,8 +4,8 @@ import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { verifyIdentity } from "./actions";
 
-/** Starts Stripe Identity (the browser goes to Stripe's page and comes back). */
-export function IdentityButton({ label = "Verify your identity" }: { label?: string }) {
+/** Starts (or continues) Stripe Identity: the browser goes to Stripe's page and comes back to `returnTo`. */
+export function IdentityButton({ label = "Verify your identity", returnTo = "/account/listings" }: { label?: string; returnTo?: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -17,10 +17,16 @@ export function IdentityButton({ label = "Verify your identity" }: { label?: str
         onClick={async () => {
           setBusy(true);
           setError(null);
-          const r = await verifyIdentity();
-          // On success the server redirects to Stripe; only errors come back here.
-          setBusy(false);
-          if (r && !r.ok) setError(r.error);
+          try {
+            const r = await verifyIdentity({ returnTo });
+            // On success the server redirects to Stripe; only errors come back here.
+            if (r && !r.ok) setError(r.error);
+          } catch (e) {
+            // The redirect to Stripe surfaces as a navigation, not an error; anything else is.
+            if (!(e instanceof Error && e.message === "NEXT_REDIRECT")) setError("The identity check couldn't start. Try again in a moment.");
+          } finally {
+            setBusy(false);
+          }
         }}
       >
         {busy ? <Loader2 aria-hidden className="animate-spin" /> : <ShieldCheck aria-hidden />}

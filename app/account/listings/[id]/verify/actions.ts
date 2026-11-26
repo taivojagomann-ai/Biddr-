@@ -175,12 +175,13 @@ export async function runChecks(input: unknown): Promise<VerifyResult> {
   return result;
 }
 
-/** Stripe Identity: a document and a selfie on Stripe's page, once per member. */
-export async function verifyIdentity(): Promise<VerifyResult> {
+/** Stripe Identity: a document and a selfie on Stripe's page, once per member. `returnTo`: where to come back. */
+export async function verifyIdentity(input?: unknown): Promise<VerifyResult> {
   const supabase = getServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return SESSION_EXPIRED;
-  const r = await startIdentityVerification(getAdminSupabase(), user.id);
+  const returnTo = z.object({ returnTo: z.string().max(200) }).safeParse(input);
+  const r = await startIdentityVerification(getAdminSupabase(), user.id, returnTo.success ? returnTo.data.returnTo : undefined);
   if ("error" in r) return { ok: false, error: r.error };
   redirect(r.url);
 }
