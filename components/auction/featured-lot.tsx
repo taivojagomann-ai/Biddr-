@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
-import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
+import { DemoBadge, FeaturedBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
 import { isDealerInspected } from "@/lib/inspection";
 import { useMinuteNow } from "@/hooks/use-minute-now";
 import { isNewListing } from "@/lib/feed";
@@ -37,20 +37,14 @@ export function FeaturedLot({
         <div className="absolute left-3 top-3 flex gap-1">
           {auction.is_demo && <DemoBadge />}
           {isNewListing(auction, now) && <NewBadge />}
+          {premium && <FeaturedBadge />}
           <ReserveBadge hasReserve={auction.has_reserve} reserveMet={auction.reserve_met} />
         </div>
       </div>
 
       <div className="flex flex-col justify-between gap-6 p-5 md:p-7">
         <div>
-          <p className="flex flex-wrap items-center gap-2 text-sm text-mute">
-            {premium ? (
-              <span data-featured-label className="rounded-sm border border-chalk/60 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-chalk">
-                Featured
-              </span>
-            ) : null}
-            {premium ? null : <span>Ending within 24 hours</span>}
-          </p>
+          {premium ? null : <p className="text-sm text-mute">Ending within 24 hours</p>}
           <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">
             <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
               {auction.title}
