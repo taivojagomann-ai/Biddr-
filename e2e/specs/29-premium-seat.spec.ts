@@ -176,14 +176,16 @@ test.describe("premium seat", () => {
     const removeRow = page.locator(`[data-seat-purchase="${(await purchaseOf(removed.id)).id}"]`);
     await removeRow.getByLabel("Reason (kept in the admin log)").fill("Photos don't match the car");
     await removeRow.getByRole("button", { name: `Remove seat for ${removed.title}` }).click();
-    await expect(removeRow.getByText("Premium seat removed and the seller's payment refunded.")).toBeVisible();
+    // The list refreshes: the row now says it was refunded, with the reason.
+    await expect(removeRow).toContainText("Refunded");
+    await expect(removeRow).toContainText("(Photos don't match the car)");
     expect((await purchaseOf(removed.id)).status).toBe("refunded");
     expect(await getAuction<{ premium_seat_until: string | null }>(removed.id)).toMatchObject({ premium_seat_until: null });
 
     const liveRow = page.locator(`[data-seat-purchase="${(await purchaseOf(live.id)).id}"]`);
     await liveRow.getByLabel("Reason (kept in the admin log)").fill("Goodwill after the withdrawal");
     await liveRow.getByRole("button", { name: `Refund the premium seat for ${live.title}` }).click();
-    await expect(liveRow.getByText(/^Refunded, and the seat removed\./)).toBeVisible();
+    await expect(liveRow).toContainText("(Goodwill after the withdrawal)");
     expect((await purchaseOf(live.id)).status).toBe("refunded");
     const { data: log } = await service().from("admin_actions").select("action").in("auction_id", [removed.id, live.id]);
     expect(log!.map((l) => l.action)).toEqual(expect.arrayContaining(["premium_seat.remove", "premium_seat.refund"]));
