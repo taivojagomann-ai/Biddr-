@@ -133,14 +133,18 @@ export function FeaturedCarousel({
   const playing =
     visible.length > 1 && !touching && (mode === "playing" || (mode === "auto" && !reducedMotion && !hovering && !focusInside));
   const showsPlaying = mode === "playing" || (mode === "auto" && !reducedMotion);
+  // The clock re-renders the carousel every second (and with it goTo), so the timer must
+  // depend only on whether it plays and which slide is shown, or it would restart forever.
+  const goToRef = useRef(goTo);
+  goToRef.current = goTo;
   useEffect(() => {
     if (!playing) return;
     const t = setTimeout(() => {
       setUserMoved(false);
-      goTo(current + 1, false);
+      goToRef.current(current + 1, false);
     }, FEATURED_AUTOPLAY_MS);
     return () => clearTimeout(t);
-  }, [playing, current, goTo]);
+  }, [playing, current]);
 
   // Swipes and scrolls (scroll snap) set the current slide.
   const onScroll = () => {
