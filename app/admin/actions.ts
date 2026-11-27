@@ -23,6 +23,7 @@ import {
   reportSchema,
   scheduleSchema,
   auctionIdSchema,
+  premiumSeatSchema,
   type AdminResult,
 } from "@/lib/admin-schemas";
 import { formatDateTime, fromZonedInputs } from "@/lib/zoned-time";
@@ -844,4 +845,33 @@ export async function deleteComment(input: unknown): Promise<AdminResult> {
   });
   refresh(v.auctionId);
   return { ok: true, message: "Comment deleted." };
+}
+
+// -----------------------------------------------------------------------------
+// Premium seat (0035): admins set it by hand for now; always labelled "Featured".
+// -----------------------------------------------------------------------------
+export async function setPremiumSeat(input: unknown): Promise<AdminResult> {
+  const g = await guard(premiumSeatSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const { data: a } = await ctx.db
+    .from("auctions")
+    .select("id, status, ends_at, premium_seat_until, premium_seat_source")
+    .eq("id", v.auctionId)
+    .maybeSingle<{ id: string; status: string; ends_at: string | null; premium_seat_until: string | null; premium_seat_source: string | null }>();
+  if (!a) return NOT_FOUND;
+  if (v.on) {
+    if ((a.status !== "upcoming" && a.status !== "live") || !a.ends_at) {
+      return { ok: false, error: "Only a scheduled or live auction can have a premium seat." };
+    }
+    const { error } = await ctx.db.from("auctions").update({ premium_seat_until: a.ends_at, premium_seat_source: "admin" }).eq("id", a.id);
+    if (error) return { ok: false, error: dbMessage(error) };
+    await logAdminAction(ctx, a.id, "premium_seat.set", { reason: v.reason, until: a.ends_at });
+  } else {
+    const { error } = await ctx.db.from("auctions").update({ premium_seat_until: null, premium_seat_source: null }).eq("id", a.id);
+    if (error) return { ok: false, error: dbMessage(error) };
+    await logAdminAction(ctx, a.id, "premium_seat.remove", { reason: v.reason, source: a.premium_seat_source });
+  }
+  refresh(a.id);
+  return { ok: true, message: v.on ? "Premium seat on: the car is featured (labelled \"Featured\") until the auction ends." : "Premium seat removed." };
 }

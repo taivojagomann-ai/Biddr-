@@ -41,7 +41,7 @@ export function BidBox({ auction, amount, setAmount, onPlaceBid, isLeading, wasO
   const tooLow = amount < minNext;
 
   return (
-    <section aria-labelledby="bid-heading" className="rounded-xl border border-line bg-panel">
+    <section id="bid" aria-labelledby="bid-heading" className="scroll-mt-24 rounded-xl border border-line bg-panel">
       <h2 id="bid-heading" className="sr-only">Bidding</h2>
       {preview ? null : (
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">

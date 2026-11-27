@@ -426,7 +426,7 @@ test.describe("newly listed", () => {
     await expect(page).toHaveURL(/\?status=newest/);
     await expect(page.getByRole("link", { name: "Newly listed" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("heading", { name: /^Newly listed \(\d+\)$/ })).toBeVisible();
-    await expect(page.getByText("Ending next")).toHaveCount(0); // no featured block on this tab
+    await expect(page.locator("[data-featured-carousel]")).toHaveCount(0); // no featured carousel on this tab
     await expect(page.getByRole("status").filter({ hasText: /^Newly listed: \d+ auctions?\.$/ })).toHaveCount(1);
     const fresh = page.locator("article.auction-card", { hasText: "Black Series" });
     await expect(fresh.getByText("New", { exact: true })).toBeVisible();
@@ -782,12 +782,12 @@ test.describe("search", () => {
 
   test("typing searches after a pause; results get a heading, no featured car, and an announcement", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Ending next")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Featured cars" })).toBeVisible();
     await box(page).click();
     await box(page).pressSequentially("bmw");
     await expect(page).toHaveURL(/q=bmw/);
     await expect(page.getByRole("heading", { name: "Results for “bmw” (1)" })).toBeVisible();
-    await expect(page.getByText("Ending next")).toHaveCount(0);
+    await expect(page.locator("[data-featured-carousel]")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: "Live: 1 result for “bmw”." })).toHaveCount(1);
     await expect(page.locator("article.auction-card")).toHaveCount(1);
 
@@ -1229,10 +1229,24 @@ test.describe("consistency with DECISIONS.md", () => {
   });
 });
 
-test("the featured box explains itself: Ending next, and what the countdown means", async ({ page }) => {
+test("the featured carousel: a labelled region of slides, Featured disclosed, controls named, and the countdown explained", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  const featured = page.locator("article", { hasText: "Ending next" }).first();
-  await expect(featured).toContainText("Ending next: the next live auction to close");
-  await expect(featured.getByText("Ends in", { exact: true })).toBeVisible();
-  await expectNoSeriousViolations(page, "Featured box");
+  const carousel = page.getByRole("region", { name: "Featured cars" });
+  await expect(carousel).toHaveAttribute("aria-roledescription", "carousel");
+  await expect(carousel.locator('[aria-roledescription="slide"]')).toHaveCount(2);
+  await expect(carousel.locator('[aria-roledescription="slide"]').first()).toHaveAttribute("aria-label", "Slide 1 of 2");
+  // The premium seat is always labelled.
+  await expect(carousel.locator("[data-featured-label]")).toHaveText("Featured");
+  await expect(carousel.getByRole("button", { name: "Previous featured car" })).toBeVisible();
+  await expect(carousel.getByRole("button", { name: "Next featured car" })).toBeVisible();
+  // Reduced motion: it doesn't play by itself, and the button offers Play.
+  await expect(carousel.getByRole("button", { name: "Play featured cars automatically" })).toBeVisible();
+  await expect(carousel.locator("[data-carousel-position]")).toHaveText("1 / 2");
+  const shown = carousel.locator('[aria-roledescription="slide"]:not([aria-hidden="true"])');
+  await expect(shown.getByText("Ends in", { exact: true })).toBeVisible();
+  await expectNoSeriousViolations(page, "Featured carousel");
+  await carousel.getByRole("button", { name: "Next featured car" }).click();
+  await expect(carousel.locator("[data-carousel-position]")).toHaveText("2 / 2");
+  await expect(carousel.getByText(/^Slide 2 of 2: /)).toBeAttached();
 });

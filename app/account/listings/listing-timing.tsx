@@ -60,7 +60,7 @@ export function ListingTiming({ id, initial, initialNow }: { id: string; initial
       <p className="flex flex-wrap items-center gap-x-1.5 text-sm">
         <span
           className={cn(
-            "inline-flex max-w-full items-center gap-1 rounded-sm border border-line bg-asphalt px-1.5 py-0.5 text-[13px] font-semibold leading-tight",
+            "inline-flex max-w-full items-center gap-1 rounded-sm border border-line bg-asphalt px-1.5 py-0.5 text-sm font-semibold leading-tight",
             underHour && "text-signal",
           )}
         >
@@ -68,7 +68,7 @@ export function ListingTiming({ id, initial, initialNow }: { id: string; initial
           {left > 0 ? (
             <>
               <span aria-hidden>{label}</span>
-              <time dateTime={target} aria-hidden data-time-left className="font-wide tabular">
+              <time dateTime={target} aria-hidden data-time-left className="tabular">
                 {formatTimeLeft(left)}
               </time>
               <span className="sr-only">

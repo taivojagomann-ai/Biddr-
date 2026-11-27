@@ -3,11 +3,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
 import { AuctionCard } from "./auction-card";
-import { FeaturedLot } from "./featured-lot";
+import { FeaturedCarousel } from "./featured-carousel";
 import { setWatchCount } from "@/lib/client/watch-store";
 import { compareForTab, tabLabel, type FeedStatus } from "@/lib/feed";
 import { noResultsText, resultsCountText } from "@/lib/search";
 import { getBrowserSupabase } from "@/lib/supabase/client";
+import type { FeaturedCard } from "@/lib/featured";
 import type { Auction, AuctionCard as AuctionCardData } from "@/lib/types";
 
 /** An active search (?q=), worked out on the server. */
@@ -23,7 +24,7 @@ export interface FeedSearch {
 export function AuctionFeed({
   initial,
   initialNow,
-  featureFirst = false,
+  featured = null,
   userId,
   watchedIds,
   status,
@@ -39,7 +40,8 @@ export function AuctionFeed({
   status: FeedStatus;
   /** Total matches for the tab and filters (the grid shows up to 48). */
   total: number;
-  featureFirst?: boolean;
+  /** The featured carousel's cars (Live tab without search or filters), or null. */
+  featured?: FeaturedCard[] | null;
   search?: FeedSearch | null;
 }) {
   const [auctions, setAuctions] = useState(initial);
@@ -139,14 +141,13 @@ export function AuctionFeed({
     );
   }
 
-  const [first, ...rest] = auctions;
-  const featured = featureFirst && !search && status === "live" && first?.status === "live" ? first : null;
-  const grid = featured ? rest : auctions;
+  const showCarousel = Boolean(featured?.length) && !search && status === "live";
+  const grid = auctions;
 
   return (
     <div className="flex flex-col gap-6">
       {liveRegion}
-      {featured && <FeaturedLot auction={featured} initialNow={initialNow} userId={userId} watching={watched.has(featured.id)} />}
+      {showCarousel ? <FeaturedCarousel initial={featured!} initialNow={initialNow} userId={userId} watchedIds={watchedIds} /> : null}
       {grid.length > 0 &&
         (search ? (
           <h2 className="font-wide text-lg font-bold">
@@ -157,7 +158,7 @@ export function AuctionFeed({
             Newly listed <span className="text-mute tabular">({total})</span>
           </h2>
         ) : (
-          <h2 className="sr-only">{featured ? "More auctions" : "Auctions"}</h2>
+          <h2 className="sr-only">{showCarousel ? "More auctions" : "Auctions"}</h2>
         ))}
       {grid.length > 0 && (
         // Two per row on phones (12px gap), 3 from 1024px, 4 from 1280px.

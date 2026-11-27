@@ -102,6 +102,9 @@ export interface Auction {
   seller_notes: string | null;
   created_at: string;
   updated_at: string;
+  /** 0035: premium seat in the featured carousel (labelled "Featured"). */
+  premium_seat_until?: string | null;
+  premium_seat_source?: "paid" | "admin" | null;
 }
 
 /** Admin-only row in auction_private. Never select this with the browser client. */
