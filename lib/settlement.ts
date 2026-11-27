@@ -47,6 +47,7 @@ export interface BuyerPaymentRow {
 }
 
 import { PAYMENT_DUE_HOURS, REMINDER_HOURS, SECOND_CHANCE_HOURS } from "@/lib/settlement-constants";
+import { notifyFreedSeats } from "@/lib/premium-seat";
 export { PAYMENT_DUE_HOURS, REMINDER_HOURS, SECOND_CHANCE_HOURS, SELLER_PAYMENT_DAYS } from "@/lib/settlement-constants";
 /** A claimed attempt older than this is considered abandoned and can be retried. */
 const CLAIM_MS = 2 * 60 * 1000;
@@ -266,6 +267,7 @@ export async function settlePending(
   deadlines: { reminded: number; expired: number; offersExpired: number };
   invoices: number;
   receipts: number;
+  seatsAvailable: number;
 }> {
   const { data } = await admin
     .from("buyer_payments")
@@ -285,7 +287,9 @@ export async function settlePending(
   const invoices = await issueMissingInvoices(admin);
   // Receipts likewise (only for premiums paid in full).
   const receipts = await issueMissingReceipts(admin);
-  return { attempted: data?.length ?? 0, results, deadlines, invoices, receipts };
+  // Featured places freed by auctions that ended: tell the sellers who asked.
+  const seatsAvailable = await notifyFreedSeats(admin);
+  return { attempted: data?.length ?? 0, results, deadlines, invoices, receipts, seatsAvailable };
 }
 
 /**

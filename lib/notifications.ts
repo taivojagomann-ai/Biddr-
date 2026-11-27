@@ -24,6 +24,7 @@ const TYPES: readonly NotificationType[] = [
   "viewing_update", "conversation_reported", "messaging_unblocked",
   "identity_required", "identity_verified", "listing_on_hold", "listing_needs_check",
   "receipt_ready", "listing_edited",
+  "premium_seat_paid", "premium_seat_refunded", "premium_seat_available",
 ];
 
 export function isNotificationType(v: unknown): v is NotificationType {
@@ -206,6 +207,12 @@ export function notificationCopy(n: NotificationRow, tz = "UTC"): NotificationCo
           ? "Your listing is on hold. Biddr's team is reviewing it."
           : "Your listing is on hold: something didn't match. Check the details and try again.",
       );
+    case "premium_seat_paid":
+      return titled(`${car} is featured on the home page, labelled "Featured", until the auction ends. Your invoice and receipt are on My listings.`);
+    case "premium_seat_refunded":
+      return titled(`Your premium seat for ${car} was refunded${str(n.data.reason) ? `: ${str(n.data.reason)}` : "."}`);
+    case "premium_seat_available":
+      return titled(`A featured place is free: you can feature ${car} now.`);
     case "listing_edited":
       return titled(`${car}: the seller changed the listing after its content was approved. Review it again.`);
     case "listing_needs_check":
@@ -284,6 +291,10 @@ export function notificationHref(n: NotificationRow): string {
       return a ? `/admin/auctions/${a}#checks` : "/admin?tab=checks";
     case "listing_edited":
       return a ? `/admin/auctions/${a}#seller-edits` : "/admin";
+    case "premium_seat_paid":
+    case "premium_seat_refunded":
+    case "premium_seat_available":
+      return "/account/listings";
     case "conversation_reported":
       return str(n.data.conversation_id) ? `/admin/messages#conversation-${str(n.data.conversation_id)}` : "/admin/messages";
     case "premium_paid":

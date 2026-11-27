@@ -28,13 +28,16 @@ import { VerifyStatus } from "./verify-status";
 import { IDENTITY_REQUEST } from "@/lib/listing-checks/seller-status";
 import { loadVerificationModels } from "@/lib/listing-checks/load-model";
 import type { VerificationModel } from "@/lib/listing-checks/verification-model";
+import { Suspense } from "react";
+import { activePaidSeats, seatSettings } from "@/lib/premium-seat";
+import { FeatureCar, SeatPaymentReturn, type FeatureOffer } from "./feature-car";
 
 export const metadata: Metadata = { title: "My listings" };
 export const dynamic = "force-dynamic";
 
 type ListingRow = Pick<
   Auction,
-  "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "starts_at" | "ends_at" | "damage_history_summary"
+  "id" | "title" | "make" | "status" | "current_bid" | "bid_count" | "gallery_urls" | "created_at" | "starts_at" | "ends_at" | "damage_history_summary" | "premium_seat_until"
 > & { relisted_from: string | null };
 
 type PrivateRow = Pick<
@@ -64,7 +67,7 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
 
   const { data } = await supabase
     .from("auctions")
-    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, starts_at, ends_at, damage_history_summary, relisted_from")
+    .select("id, title, make, status, current_bid, bid_count, gallery_urls, created_at, starts_at, ends_at, premium_seat_until, damage_history_summary, relisted_from")
     .eq("seller_id", user.id)
     .order("created_at", { ascending: false })
     .returns<ListingRow[]>();
@@ -110,6 +113,51 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
     identity = me ?? null;
     identityStatus = me?.identity_status ?? "none";
   }
+  // Premium seats (0036): "Feature this car" for scheduled and live auctions.
+  const offers = new Map<string, FeatureOffer>();
+  const seatable = listings.filter((l) => l.status === "upcoming" || l.status === "live");
+  {
+    const admin = getAdminSupabase();
+    const ids = listings.map((l) => l.id);
+    const [settings, active, { data: seats }, { data: waiting }] = await Promise.all([
+      seatSettings(admin),
+      activePaidSeats(admin),
+      ids.length
+        ? admin.from("premium_seat_purchases").select("id, auction_id").in("auction_id", ids).eq("seller_id", user.id).in("status", ["paid"]).returns<{ id: string; auction_id: string }[]>()
+        : Promise.resolve({ data: [] as { id: string; auction_id: string }[] }),
+      seatable.length
+        ? admin.from("premium_seat_waitlist").select("auction_id").in("auction_id", seatable.map((l) => l.id)).is("notified_at", null).returns<{ auction_id: string }[]>()
+        : Promise.resolve({ data: [] as { auction_id: string }[] }),
+    ]);
+    const purchaseIds = (seats ?? []).map((p) => p.id);
+    const [{ data: invoiceRows }, { data: receiptRows }] = purchaseIds.length
+      ? await Promise.all([
+          supabase.from("invoices").select("id, number, buyer_payment_id").in("buyer_payment_id", purchaseIds).eq("kind", "invoice").returns<{ id: string; number: string; buyer_payment_id: string }[]>(),
+          supabase.from("receipts").select("id, number, buyer_payment_id").in("buyer_payment_id", purchaseIds).eq("type", "payment").returns<{ id: string; number: string; buyer_payment_id: string }[]>(),
+        ])
+      : [{ data: [] as { id: string; number: string; buyer_payment_id: string }[] }, { data: [] as { id: string; number: string; buyer_payment_id: string }[] }];
+    const seatOf = new Map((seats ?? []).map((p) => [p.auction_id, p.id]));
+    const waitingSet = new Set((waiting ?? []).map((w) => w.auction_id));
+    for (const l of listings) {
+      const purchaseId = seatOf.get(l.id);
+      const until = l.premium_seat_until && Date.parse(l.premium_seat_until) > now ? l.premium_seat_until : null;
+      if (until && (l.status === "upcoming" || l.status === "live")) {
+        const inv = (invoiceRows ?? []).find((r) => r.buyer_payment_id === purchaseId);
+        const rec = (receiptRows ?? []).find((r) => r.buyer_payment_id === purchaseId);
+        offers.set(l.id, {
+          state: "featured",
+          priceEur: settings.priceEur,
+          until,
+          paid: Boolean(purchaseId),
+          invoice: inv ? { id: inv.id, number: inv.number } : null,
+          receipt: rec ? { id: rec.id, number: rec.number } : null,
+        });
+      } else if ((l.status === "upcoming" || l.status === "live") && l.ends_at && Date.parse(l.ends_at) > now) {
+        offers.set(l.id, active >= settings.limit ? { state: "full", priceEur: settings.priceEur, waitlisted: waitingSet.has(l.id) } : { state: "available", priceEur: settings.priceEur });
+      }
+    }
+  }
+
   const identityRequested = identityStatus !== "verified" && identityStatus !== "pending" && approved.size > 0;
 
   // Sold cars: the buyer's premium, the buyer's contact details once it's paid, and what
@@ -176,6 +224,9 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
           Thanks. Stripe is checking your identity; this page updates when it&apos;s done (usually within a few minutes).
         </p>
       ) : null}
+      <Suspense>
+        <SeatPaymentReturn />
+      </Suspense>
       {identityRequested ? (
         <section aria-labelledby="identity-request" className="mt-6 rounded-lg border border-signal/50 bg-panel p-4">
           <h2 id="identity-request" className="font-bold">
@@ -277,6 +328,7 @@ export default async function MyListingsPage({ searchParams }: { searchParams?: 
                 {/* Outside the link: no buttons inside links. */}
                 <div className="space-y-3 px-3 pb-3 empty:hidden sm:pl-[9.25rem]">
                   {l.status === "draft" ? <VerifyStatus auctionId={l.id} title={l.title} model={models.get(l.id)!} /> : null}
+                  {offers.has(l.id) ? <FeatureCar auctionId={l.id} title={l.title} offer={offers.get(l.id)!} /> : null}
                   {l.status === "draft" && (deciding || priv?.seller_decision) ? (
                     <DecisionPanel
                       auctionId={l.id}
