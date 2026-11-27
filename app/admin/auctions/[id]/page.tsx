@@ -20,6 +20,7 @@ import { InspectionPanel, type DealerReportView } from "./inspection-panel";
 import { WithdrawalRequest } from "./withdrawal-request";
 import { ListingForm } from "./listing-form";
 import { PhotosPanel } from "./photos-panel";
+import { PremiumSeatForm } from "./premium-seat-form";
 import { PricingForm } from "./pricing-form";
 import { ScheduleForm } from "./schedule-form";
 import { Section } from "./section";
@@ -455,6 +456,15 @@ export default async function AdminAuctionPage({ params }: { params: { id: strin
               reserve: priv?.reserve_price ?? null,
               hasReserve: a.has_reserve,
             }}
+          />
+        </Section>
+
+        <Section id="premium-seat" title="Premium seat" intro='Shows the car in the home page’s featured carousel until the auction ends, always labelled "Featured".'>
+          <PremiumSeatForm
+            auctionId={a.id}
+            until={a.premium_seat_until ?? null}
+            source={a.premium_seat_source ?? null}
+            canSet={(a.status === "upcoming" || a.status === "live") && Boolean(a.ends_at)}
           />
         </Section>
 

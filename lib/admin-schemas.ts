@@ -83,6 +83,13 @@ const wholeEuros = (empty: string, min: number, max: number, range: string) =>
 // Schemas
 // -----------------------------------------------------------------------------
 export const auctionIdSchema = z.object({ auctionId: id });
+
+/** Premium seat on or off by hand (0035), always with a reason for the log. */
+export const premiumSeatSchema = z.object({
+  auctionId: id,
+  on: z.boolean(),
+  reason: text("reason", 3, 300),
+});
 /** Approving: the admin's time zone only words the confirmation message. */
 export const approveSchema = z.object({ auctionId: id, tz: timeZone.optional() });
 

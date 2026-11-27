@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { Countdown } from "./countdown";
 import { WatchButton } from "./watch-button";
 import { DemoBadge, InspectionBadge, NewBadge, ReserveBadge, RestoredBadge } from "./badges";
@@ -10,17 +11,20 @@ import { isNewListing } from "@/lib/feed";
 import { formatEur, formatKm } from "@/lib/format";
 import type { AuctionCard } from "@/lib/types";
 
-/** The lot closing soonest, shown large: the clock is the headline. */
+/** One featured car, shown large in the home page carousel: the clock is the headline. */
 export function FeaturedLot({
   auction,
   initialNow,
   userId,
   watching,
+  premium = false,
 }: {
   auction: AuctionCard;
   initialNow: number;
   userId: string | null;
   watching: boolean;
+  /** A paid or admin-set premium seat: always labelled "Featured" (DECISIONS.md point 9). */
+  premium?: boolean;
 }) {
   const cover = auction.gallery_urls.exterior[0];
   const now = useMinuteNow(initialNow);
@@ -39,8 +43,13 @@ export function FeaturedLot({
 
       <div className="flex flex-col justify-between gap-6 p-5 md:p-7">
         <div>
-          <p className="text-sm text-mute">
-            <span className="font-semibold text-chalk">Ending next</span>: the next live auction to close
+          <p className="flex flex-wrap items-center gap-2 text-sm text-mute">
+            {premium ? (
+              <span data-featured-label className="rounded-sm border border-chalk/60 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-chalk">
+                Featured
+              </span>
+            ) : null}
+            <span>{premium ? "Paid placement" : "Ending within 24 hours"}</span>
           </p>
           <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">
             <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
@@ -70,6 +79,12 @@ export function FeaturedLot({
             </span>
             <span className="font-wide text-2xl font-bold tabular">{formatEur(auction.current_bid ?? auction.starting_bid)}</span>
           </div>
+          {/* Above the card's full-size link, so it's its own target. */}
+          <Button asChild className="relative z-10 mt-4 min-h-11 w-full sm:w-auto">
+            <Link href={`/auctions/${auction.id}#bid`}>
+              Place bid<span className="sr-only"> on {auction.title}</span>
+            </Link>
+          </Button>
         </div>
       </div>
       <div className="absolute right-3 top-3 z-10">

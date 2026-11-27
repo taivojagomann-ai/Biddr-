@@ -76,6 +76,8 @@ const AUCTIONS = [
     inspection_highlights: ["Chassis measured within factory tolerance"], gallery_urls: gallery("rs4"),
     before_photos_urls: [photo("rs4-before-1"), photo("rs4-before-2")], starting_bid: 30000, has_reserve: false,
     starts_at: iso(-2 * 24 * H), ends_at: iso(30 * H), status: "live",
+    // A premium seat (0035): featured although it ends in more than 24 hours.
+    premium_seat_until: iso(30 * H), premium_seat_source: "admin",
   },
   {
     ...base, id: "10000000-0000-4000-8000-000000000003", seller_id: SELLER, title: "2021 Porsche 911 Carrera S",

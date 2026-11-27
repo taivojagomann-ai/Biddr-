@@ -99,14 +99,14 @@ export function AuctionCard({
           </div>
           <div className="ac-meta min-w-0">
             <p className="text-[11px] leading-tight text-mute sm:text-xs">{bids}</p>
-            {/* A chip on phones; plain large text from 640px, as before. */}
-            <span className="inline-flex max-w-full rounded-sm border border-line bg-asphalt px-1.5 py-0.5 text-[13px] font-semibold leading-tight sm:border-0 sm:bg-transparent sm:p-0">
+            {/* A chip on phones, plain text from 640px; body size, semibold, tabular digits (the large clock is only in the featured carousel). */}
+            <span className="inline-flex max-w-full rounded-sm border border-line bg-asphalt px-1.5 py-0.5 text-sm font-semibold leading-tight sm:border-0 sm:bg-transparent sm:p-0 sm:text-[15px]">
               <Countdown
                 endsAt={auction.ends_at}
                 startsAt={auction.starts_at}
                 status={auction.status}
                 initialNow={initialNow}
-                className="break-words sm:font-wide sm:text-lg sm:font-bold"
+                className="break-words"
               />
             </span>
           </div>

@@ -8,6 +8,7 @@ import { parseSearchQuery } from "@/lib/search";
 import { SITE_INTRO } from "@/lib/site";
 import { getServerSupabase } from "@/lib/supabase/server";
 import { AUCTION_CARD_COLUMNS, type AuctionCard, type AuctionSearchRow, type Country } from "@/lib/types";
+import { FEATURED_COLUMNS, FEATURED_WINDOW_MS, pickFeatured, type FeaturedCard } from "@/lib/featured";
 
 export const dynamic = "force-dynamic";
 
@@ -99,10 +100,29 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     ({ data, error, count } = res);
   }
 
+  // The featured carousel (Live tab without search or filters): premium seats and cars
+  // ending within 24 hours (DECISIONS.md point 9).
+  const hasAnyFilter = Boolean(q || country || condition);
+  let featured: FeaturedCard[] | null = null;
+  if (status === "live" && !hasAnyFilter && !error) {
+    const nowIso = new Date(now).toISOString();
+    const { data: rows } = await supabase
+      .from("auctions")
+      .select(FEATURED_COLUMNS)
+      .eq("status", "live")
+      .gt("ends_at", nowIso)
+      .or(`ends_at.lte.${new Date(now + FEATURED_WINDOW_MS).toISOString()},premium_seat_until.gt.${nowIso}`)
+      .order("bid_count", { ascending: false })
+      .order("ends_at", { ascending: true })
+      .limit(60)
+      .returns<FeaturedCard[]>();
+    featured = pickFeatured(rows ?? [], now);
+  }
+
   // Which of the shown cars the signed-in user watches (RLS: own rows only).
   const { data: { user } } = await supabase.auth.getUser();
   let watchedIds: string[] = [];
-  const shownIds = (data ?? []).map((a) => a.id);
+  const shownIds = [...new Set([...(data ?? []).map((a) => a.id), ...(featured ?? []).map((a) => a.id)])];
   if (user && shownIds.length) {
     const { data: rows } = await supabase.from("watchlist").select("auction_id").in("auction_id", shownIds);
     watchedIds = (rows ?? []).map((r) => r.auction_id as string);
@@ -155,7 +175,7 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
           status={status}
           total={count ?? (data ?? []).length}
           initialNow={now}
-          featureFirst={status === "live" && !hasFilters}
+          featured={featured}
           search={search}
           userId={user?.id ?? null}
           watchedIds={watchedIds}
