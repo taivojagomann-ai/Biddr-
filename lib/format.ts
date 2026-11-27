@@ -19,6 +19,32 @@ export function formatCountdown(ms: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+/**
+ * Time left in whole minutes, for places that tick once a minute (My listings):
+ * "2d 4h" over a day, "5h 12m" under a day, "42m" under an hour. Rounds up, so the last
+ * minute reads "1m", never "0m".
+ */
+export function formatTimeLeft(ms: number): string {
+  const { d, h, m } = minuteParts(ms);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+/** The same, spelled out for screen readers: "2 days 4 hours", "5 hours 12 minutes", "42 minutes". */
+export function formatTimeLeftSpoken(ms: number): string {
+  const { d, h, m } = minuteParts(ms);
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (d > 0) return `${unit(d, "day")} ${unit(h, "hour")}`;
+  if (h > 0) return `${unit(h, "hour")} ${unit(m, "minute")}`;
+  return unit(m, "minute");
+}
+
+function minuteParts(ms: number): { d: number; h: number; m: number } {
+  const total = Math.max(1, Math.ceil(ms / 60_000));
+  return { d: Math.floor(total / 1440), h: Math.floor((total % 1440) / 60), m: total % 60 };
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
