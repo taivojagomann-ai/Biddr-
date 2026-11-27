@@ -93,7 +93,7 @@ test.describe("premium seat", () => {
     const docs = await documentsOf(purchase.id);
     expect(docs.invoices).toEqual([expect.objectContaining({ kind: "invoice", total_cents: 2900, buyer_id: seller.id, details: expect.objectContaining({ product: "premium_seat" }) })]);
     expect(docs.receipts).toEqual([expect.objectContaining({ type: "payment", amount: 2900, buyer_id: seller.id })]);
-    expect(await notificationsFor(seller, "premium_seat_paid")).toHaveLength(1);
+    await expect.poll(async () => (await notificationsFor(seller, "premium_seat_paid")).length).toBe(1);
     // Confirming again changes nothing.
     expect(await (await page.request.post("/api/premium-seat/confirm", { data: { paymentIntentId: pi } })).json()).toEqual({ status: "paid" });
 
@@ -158,10 +158,10 @@ test.describe("premium seat", () => {
     await page.getByRole("dialog", { name: "Withdraw this listing?" }).getByRole("button", { name: "Withdraw listing" }).click();
     await expect.poll(async () => (await purchaseOf(scheduled.id)).status).toBe("refunded");
     expect(await getAuction<{ premium_seat_until: string | null }>(scheduled.id)).toMatchObject({ premium_seat_until: null });
-    const docs = await documentsOf((await purchaseOf(scheduled.id)).id);
-    expect(docs.invoices.map((i) => i.kind).sort()).toEqual(["credit_note", "invoice"]);
-    expect(docs.receipts.map((r) => r.type).sort()).toEqual(["payment", "refund"]);
-    expect(await notificationsFor(seller, "premium_seat_refunded")).toHaveLength(1);
+    const purchaseId = (await purchaseOf(scheduled.id)).id;
+    await expect.poll(async () => (await documentsOf(purchaseId)).receipts.map((r) => r.type).sort()).toEqual(["payment", "refund"]);
+    expect((await documentsOf(purchaseId)).invoices.map((i) => i.kind).sort()).toEqual(["credit_note", "invoice"]);
+    await expect.poll(async () => (await notificationsFor(seller, "premium_seat_refunded")).length).toBe(1);
 
     // A live auction withdrawn by an admin: no automatic refund.
     await asAdmin(context, seed.admin);
