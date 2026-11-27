@@ -13,7 +13,10 @@ export type InvoiceKind = "invoice" | "credit_note";
 export interface InvoiceDetails {
   issuer: { name: string; registryCode: string; vatNumber: string; addressLines: string[]; email: string };
   buyer: { name: string; email: string | null };
-  line: { description: string; winningBid: number; basis: string; carCountry: string };
+  /** Buyer's premium: the winning bid and the basis. A premium seat: no winning bid. */
+  line: { description: string; winningBid: number | null; basis: string; carCountry: string };
+  /** What was paid for (absent: the buyer's premium). */
+  product?: "premium_seat";
   /** How the premium was paid (invoices) or refunded (credit notes). */
   payments: { label: string; amountCents: number; reference: string | null }[];
   paidAt: string | null;
@@ -48,11 +51,11 @@ async function existing(admin: Admin, paymentId: string, kind: InvoiceKind): Pro
   return data ?? null;
 }
 
-async function issue(
+export async function issueInvoiceRow(
   admin: Admin,
   args: {
     kind: InvoiceKind;
-    payment: BuyerPaymentRow;
+    payment: Pick<BuyerPaymentRow, "id" | "auction_id" | "winner_id">;
     creditedId: string | null;
     totalCents: number;
     vat: { country: string; rate: number };
@@ -107,7 +110,7 @@ export async function ensureInvoice(admin: Admin, paymentId: string): Promise<In
   if (fromHold > 0) payments.push({ label: "Taken from the card hold", amountCents: fromHold * 100, reference: payment.hold_payment_intent_id });
   if (rest > 0) payments.push({ label: "Charged to the card", amountCents: rest * 100, reference: payment.remainder_payment_intent_id });
 
-  return issue(admin, {
+  return issueInvoiceRow(admin, {
     kind: "invoice",
     payment,
     creditedId: null,
@@ -139,7 +142,7 @@ export async function ensureCreditNote(admin: Admin, paymentId: string): Promise
   const { data: payment } = await admin.from("buyer_payments").select("*").eq("id", paymentId).maybeSingle<BuyerPaymentRow>();
   if (!payment || payment.status !== "refunded") return null;
 
-  return issue(admin, {
+  return issueInvoiceRow(admin, {
     kind: "credit_note",
     payment,
     creditedId: invoice.id,

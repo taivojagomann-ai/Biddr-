@@ -84,6 +84,18 @@ const wholeEuros = (empty: string, min: number, max: number, range: string) =>
 // -----------------------------------------------------------------------------
 export const auctionIdSchema = z.object({ auctionId: id });
 
+/** Premium seat settings (0036): price in whole euros (VAT included) and how many paid seats at once. */
+export const premiumSettingsSchema = z.object({
+  priceEur: wholeEuros("Enter the price.", 1, 10_000, "Enter a price from €1 to €10,000."),
+  limit: z.coerce.number({ invalid_type_error: "Enter a whole number." }).int("Enter a whole number.").min(1, "At least 1.").max(50, "At most 50."),
+});
+
+/** Refund (and remove) a paid premium seat, with a reason for the log. */
+export const premiumRefundSchema = z.object({
+  purchaseId: id,
+  reason: text("reason", 3, 300),
+});
+
 /** Premium seat on or off by hand (0035), always with a reason for the log. */
 export const premiumSeatSchema = z.object({
   auctionId: id,

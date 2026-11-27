@@ -38,7 +38,10 @@ export interface ReceiptDetails {
   payee: { name: string; registryCode: string; vatNumber: string; addressLines: string[]; email: string };
   payer: { name: string; email: string | null };
   reference: { invoiceNumber: string | null; auctionTitle: string; vin: string | null; auctionEndedAt: string | null };
-  line: { description: string; winningBid: number; basis: string; premium: number };
+  /** Buyer's premium: the winning bid and the basis. A premium seat: no winning bid. */
+  line: { description: string; winningBid: number | null; basis: string; premium: number };
+  /** What was paid for (absent: the buyer's premium). */
+  product?: "premium_seat";
   /** Refund receipts: the payment receipt and invoice they refer to. */
   refunds?: { receiptNumber: string; invoiceNumber: string | null };
 }
@@ -74,7 +77,7 @@ export const receiptTitle = (type: ReceiptType) => (type === "refund" ? "Refund 
 export const receiptFileName = (r: Pick<ReceiptRow, "number" | "type">) => `Biddr-${r.type === "refund" ? "refund-receipt" : "receipt"}-${r.number}.pdf`;
 
 /** The card used for a PaymentIntent's charge: brand, last 4, the charge id and when it happened. Best effort. */
-async function cardOf(paymentIntent: string | null): Promise<{ charge: string | null; brand: string | null; last4: string | null; at: string | null }> {
+export async function cardOf(paymentIntent: string | null): Promise<{ charge: string | null; brand: string | null; last4: string | null; at: string | null }> {
   const none = { charge: null, brand: null, last4: null, at: null };
   if (!paymentIntent) return none;
   try {
@@ -112,7 +115,7 @@ async function context(admin: Admin, payment: BuyerPaymentRow, invoice: InvoiceR
  * Stores the PDF and, for the caller that stored it, tells the winner (bell, and email
  * when email is set up). Returns the receipt with its path.
  */
-async function storeAndNotify(admin: Admin, receipt: ReceiptRow): Promise<ReceiptRow> {
+export async function storeAndNotify(admin: Admin, receipt: ReceiptRow): Promise<ReceiptRow> {
   if (receipt.pdf_path) return receipt;
   const pdf = await renderReceiptPdf(receipt, { testMode: testMode() });
   const path = `${receipt.buyer_id}/${receipt.number}.pdf`;

@@ -24,6 +24,8 @@ import {
   scheduleSchema,
   auctionIdSchema,
   premiumSeatSchema,
+  premiumRefundSchema,
+  premiumSettingsSchema,
   type AdminResult,
 } from "@/lib/admin-schemas";
 import { formatDateTime, fromZonedInputs } from "@/lib/zoned-time";
@@ -32,6 +34,7 @@ import { releaseAuctionHolds } from "@/lib/holds";
 import { detailsColumns } from "@/lib/listing-details";
 import { PHOTO_BUCKET, publicBucketPrefix } from "@/lib/sell";
 import type { Auction, AuctionStatus, GalleryUrls } from "@/lib/types";
+import { notifyFreedSeats, paidSeatOf, refundSeat, refundSeatOnWithdrawal, seatSettings } from "@/lib/premium-seat";
 
 // -----------------------------------------------------------------------------
 // Helpers (not exported: a "use server" file may only export async actions)
@@ -809,6 +812,8 @@ export async function withdrawAuction(input: unknown): Promise<AdminResult> {
   if (changed !== "ok") return { ok: false, error: changed.error };
 
   const holds = await releaseAuctionHolds(ctx.db, v.auctionId);
+  // Withdrawn before it went live: a paid premium seat is refunded automatically.
+  await refundSeatOnWithdrawal(ctx.db, v.auctionId, a.status);
   await logAdminAction(ctx, v.auctionId, "status.withdraw", { from: a.status, bid_count: a.bid_count, holds });
   refresh(v.auctionId);
 
@@ -860,6 +865,7 @@ export async function setPremiumSeat(input: unknown): Promise<AdminResult> {
     .eq("id", v.auctionId)
     .maybeSingle<{ id: string; status: string; ends_at: string | null; premium_seat_until: string | null; premium_seat_source: string | null }>();
   if (!a) return NOT_FOUND;
+  let refunded = false;
   if (v.on) {
     if ((a.status !== "upcoming" && a.status !== "live") || !a.ends_at) {
       return { ok: false, error: "Only a scheduled or live auction can have a premium seat." };
@@ -868,10 +874,52 @@ export async function setPremiumSeat(input: unknown): Promise<AdminResult> {
     if (error) return { ok: false, error: dbMessage(error) };
     await logAdminAction(ctx, a.id, "premium_seat.set", { reason: v.reason, until: a.ends_at });
   } else {
+    // A paid seat that an admin removes is refunded automatically.
+    const paid = a.premium_seat_source === "paid" ? await paidSeatOf(ctx.db, a.id) : null;
+    if (paid) {
+      const r = await refundSeat(ctx.db, paid.id, { reason: v.reason, by: ctx.adminId });
+      if ("error" in r) return { ok: false, error: r.error };
+      refunded = true;
+    }
     const { error } = await ctx.db.from("auctions").update({ premium_seat_until: null, premium_seat_source: null }).eq("id", a.id);
     if (error) return { ok: false, error: dbMessage(error) };
-    await logAdminAction(ctx, a.id, "premium_seat.remove", { reason: v.reason, source: a.premium_seat_source });
+    await logAdminAction(ctx, a.id, "premium_seat.remove", { reason: v.reason, source: a.premium_seat_source, refunded_cents: paid?.amount_cents ?? 0 });
+    if (!paid) await notifyFreedSeats(ctx.db);
   }
   refresh(a.id);
-  return { ok: true, message: v.on ? "Premium seat on: the car is featured (labelled \"Featured\") until the auction ends." : "Premium seat removed." };
+  return { ok: true, message: v.on ? "Premium seat on: the car is featured (labelled \"Featured\") until the auction ends." : refunded ? "Premium seat removed and the seller's payment refunded." : "Premium seat removed." };
+}
+
+// -----------------------------------------------------------------------------
+// Premium seats (0036): settings and refunds. Everything is logged.
+// -----------------------------------------------------------------------------
+export async function savePremiumSettings(input: unknown): Promise<AdminResult> {
+  const g = await guard(premiumSettingsSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const before = await seatSettings(ctx.db);
+  const now = new Date().toISOString();
+  const { error } = await ctx.db.from("site_settings").upsert([
+    { key: "premium_seat_price_eur", value: v.priceEur, updated_at: now, updated_by: ctx.adminId },
+    { key: "premium_seat_limit", value: v.limit, updated_at: now, updated_by: ctx.adminId },
+  ]);
+  if (error) return { ok: false, error: dbMessage(error) };
+  await logAdminAction(ctx, null, "premium_seat.settings", { before, after: { priceEur: v.priceEur, limit: v.limit } });
+  if (v.limit > before.limit) await notifyFreedSeats(ctx.db);
+  revalidatePath("/admin/premium-seats");
+  return { ok: true, message: "Saved. New purchases use these settings; seats already paid for don't change." };
+}
+
+export async function refundPremiumSeat(input: unknown): Promise<AdminResult> {
+  const g = await guard(premiumRefundSchema, input);
+  if ("result" in g) return g.result;
+  const { ctx, data: v } = g;
+  const { data: p } = await ctx.db.from("premium_seat_purchases").select("auction_id, amount_cents, status").eq("id", v.purchaseId).maybeSingle<{ auction_id: string; amount_cents: number; status: string }>();
+  if (!p) return { ok: false, error: "This purchase no longer exists." };
+  const r = await refundSeat(ctx.db, v.purchaseId, { reason: v.reason, by: ctx.adminId });
+  if ("error" in r) return { ok: false, error: r.error };
+  await logAdminAction(ctx, p.auction_id, "premium_seat.refund", { purchase_id: v.purchaseId, amount_cents: p.amount_cents, reason: v.reason });
+  revalidatePath("/admin/premium-seats");
+  refresh(p.auction_id);
+  return { ok: true, message: "Refunded, and the seat removed. The seller gets a credit note and a refund receipt." };
 }

@@ -186,7 +186,7 @@ export function simulateStripe(method: string, url: URL, body: URLSearchParams):
     );
   }
 
-  if (method === "POST" && path === "/v1/payment_intents" && body.get("metadata[kind]") === "buyer_premium") {
+  if (method === "POST" && path === "/v1/payment_intents" && ["buyer_premium", "premium_seat"].includes(body.get("metadata[kind]") ?? "")) {
     const cents = Number(body.get("amount") ?? 0);
     const id = `pi_e2e_new_${cents}_${Date.now().toString(36)}${counter++}`;
     const pm = body.get("payment_method");

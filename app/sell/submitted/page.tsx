@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatEur } from "@/lib/format";
+import { seatSettings } from "@/lib/premium-seat";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Listing submitted" };
@@ -26,6 +28,7 @@ const STEPS_WITHOUT_INSPECTION = [
 
 export default async function SellSubmittedPage({ searchParams }: { searchParams: { id?: string | string[] } }) {
   const id = typeof searchParams.id === "string" && UUID_RE.test(searchParams.id) ? searchParams.id : null;
+  const seatPrice = (await seatSettings(getAdminSupabase())).priceEur;
 
   let title: string | null = null;
   let dealerReport = false;
@@ -77,6 +80,26 @@ export default async function SellSubmittedPage({ searchParams }: { searchParams
           <Button asChild className="mt-3">
             <Link href={`/account/listings/${id}/verify`}>Verify your car</Link>
           </Button>
+        </section>
+      ) : null}
+
+      {id && title ? (
+        <section aria-labelledby="feature-heading" data-feature-offer className="mt-6 rounded-lg border border-line bg-panel p-4">
+          <h2 id="feature-heading" className="text-lg font-bold">
+            Optional: feature this car
+          </h2>
+          <p className="mt-1 text-sm text-mute">
+            Once your auction is scheduled, you can give it a premium seat for {formatEur(seatPrice)} (VAT included): it&apos;s shown in
+            the featured carousel on Biddr&apos;s home page, labelled &quot;Featured&quot;, until the auction ends. If you withdraw it before
+            it goes live, you get your money back. Your auction runs the same without it.
+          </p>
+          <p className="mt-2 text-sm">
+            Use <span className="font-semibold">Feature this car</span> on{" "}
+            <Link href="/account/listings" className="font-semibold underline underline-offset-4 hover:text-signal">
+              My listings
+            </Link>{" "}
+            when it&apos;s scheduled.
+          </p>
         </section>
       ) : null}
 

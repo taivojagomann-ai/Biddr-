@@ -18,7 +18,9 @@ const FORBIDDEN: [RegExp, string][] = [
   [/biddr['’]s take/i, "8: 'Biddr's take' no longer exists"],
   [/only (for|in) the baltics|baltics only|estonia, latvia and lithuania/i, "2: not only the Baltics"],
   [/book(ing)? an inspection|inspection booking/i, "3: no inspection booking"],
-  [/seller fee|listing fee|success fee/i, "11: no seller fee"],
+  // The one paid seller product is the optional premium seat (always labelled "Featured"); no fee of any other kind.
+  [/seller fee|listing fee|success fee|commission/i, "11: no seller fee"],
+  [/(required|mandatory|compulsory) (premium seat|featur)|must (buy|pay for) a premium seat/i, "11: the premium seat is optional"],
   [/carfax|autodna|vin ?audit|history report included|free history report/i, "11: history reports come only from the seller's own carVertical report"],
   [/carvertical (partner|approved|certified|verified)|partnership with carvertical|in partnership with/i, "11: nothing suggests a carVertical partnership"],
   [/\[to be confirmed\]/i, "11: no unconfirmed placeholders"],
@@ -60,6 +62,19 @@ test.describe("copy consistency", () => {
         });
     }
     expect(hits, hits.join("\n")).toEqual([]);
+  });
+
+  test("the premium seat is the only paid seller product: optional, and disclosed as \"Featured\" wherever it's offered", async ({}, info) => {
+    test.skip(info.project.name !== "desktop-berlin", "Source check runs once");
+    // Every file that offers the seat to sellers says it's optional and labelled "Featured".
+    const offers = ["app/account/listings/feature-car.tsx", "app/sell/submitted/page.tsx"];
+    for (const f of offers) {
+      const text = readFileSync(f, "utf8");
+      expect(text, f).toMatch(/Optional/);
+      expect(text, f).toMatch(/Featured/);
+    }
+    // The carousel always shows the label for a premium seat.
+    expect(readFileSync("components/auction/featured-lot.tsx", "utf8")).toMatch(/premium \? \(\s*<span data-featured-label[^>]*>\s*Featured/);
   });
 
   test("the carVertical logo is used only in the history report section", async ({}, info) => {

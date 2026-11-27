@@ -5,6 +5,7 @@ import { markHoldAuthorized } from "@/lib/holds";
 import { finishWithPaymentIntent } from "@/lib/settlement";
 import { handleIdentityEvent } from "@/lib/identity";
 import { receiptForRefundedCharge } from "@/lib/receipts/issue";
+import { finishSeatPayment } from "@/lib/premium-seat";
 
 export const runtime = "nodejs";
 
@@ -82,7 +83,10 @@ async function handle(admin: ReturnType<typeof getAdminSupabase>, event: Stripe.
       );
       break;
     case "payment_intent.succeeded":
-      if (event.data.object.metadata?.kind === "buyer_premium") {
+      if (event.data.object.metadata?.kind === "premium_seat") {
+        // A seller bought a premium seat.
+        await finishSeatPayment(admin, await stripe.paymentIntents.retrieve(event.data.object.id));
+      } else if (event.data.object.metadata?.kind === "buyer_premium") {
         // The winner paid the premium (on the site or off-session): mark it paid.
         const pi = await stripe.paymentIntents.retrieve(event.data.object.id, { expand: ["latest_charge"] });
         await finishWithPaymentIntent(admin, pi);

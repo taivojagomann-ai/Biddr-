@@ -5,6 +5,7 @@ import { checkReportPaths } from "@/lib/report-files";
 import { REPORT_BUCKET, newReportSchema } from "@/lib/sell";
 import { newHistoryReportSchema } from "@/lib/history-report";
 import { getAdminSupabase, getServerSupabase } from "@/lib/supabase/server";
+import { joinSeatWaitlist, refundSeatOnWithdrawal } from "@/lib/premium-seat";
 import {
   DECISION_ERRORS,
   WITHDRAW_ERRORS,
@@ -27,6 +28,8 @@ export async function withdrawListing(input: unknown): Promise<WithdrawResult> {
   // The user's own client: auth.uid() inside the function is the seller.
   const { error } = await getServerSupabase().rpc("seller_withdraw", { p_auction_id: auctionId, p_reason: reason || null });
   if (error) return fail(error.message);
+  // Withdrawn before it went live (only drafts and scheduled auctions can be): a paid premium seat is refunded.
+  await refundSeatOnWithdrawal(getAdminSupabase(), auctionId, "upcoming");
   revalidatePath("/account/listings");
   revalidatePath(`/auctions/${auctionId}`);
   return { ok: true, message: "Listing withdrawn." };
@@ -287,4 +290,21 @@ export async function updateDamageSummary(input: unknown): Promise<NewReportResu
   revalidatePath("/account/listings");
   revalidatePath(`/admin/auctions/${v.auctionId}`);
   return { ok: true, message: "Description updated. Biddr's team will check your history report again." };
+}
+
+// -----------------------------------------------------------------------------
+// Premium seat (0036): "Notify me when a place frees up".
+// -----------------------------------------------------------------------------
+export async function joinFeaturedWaitlist(input: unknown): Promise<WithdrawResult> {
+  const parsed = z.object({ auctionId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: "This listing no longer exists." };
+  const { data: { user } } = await getServerSupabase().auth.getUser();
+  if (!user) return { ok: false, error: "Your session has expired. Sign in again." };
+  const admin = getAdminSupabase();
+  const { data: a } = await admin.from("auctions").select("seller_id, status").eq("id", parsed.data.auctionId).maybeSingle<{ seller_id: string; status: string }>();
+  if (!a || a.seller_id !== user.id) return { ok: false, error: "This listing isn't yours." };
+  if (a.status !== "upcoming" && a.status !== "live") return { ok: false, error: "Only a scheduled or live auction can be featured." };
+  await joinSeatWaitlist(admin, user.id, parsed.data.auctionId);
+  revalidatePath("/account/listings");
+  return { ok: true, message: "We'll notify you when a place frees up." };
 }
