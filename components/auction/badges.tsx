@@ -18,6 +18,15 @@ export function ReserveBadge({ hasReserve, reserveMet, className }: { hasReserve
   );
 }
 
+/** A premium seat in the home page carousel (DECISIONS.md point 9): same look as "No reserve". */
+export function FeaturedBadge({ className }: { className?: string }) {
+  return (
+    <span data-featured-label className={cn("rounded-sm bg-signal px-1.5 py-0.5 text-xs font-bold text-asphalt", className)}>
+      Featured
+    </span>
+  );
+}
+
 /** "Dealer inspected": only pass `dealer` for cars with an accepted authorised dealer report. */
 export function InspectionBadge({ dealer, className }: { dealer: string | null; className?: string }) {
   if (!dealer) return null;

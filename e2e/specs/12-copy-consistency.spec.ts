@@ -74,7 +74,8 @@ test.describe("copy consistency", () => {
       expect(text, f).toMatch(/Featured/);
     }
     // The carousel always shows the label for a premium seat.
-    expect(readFileSync("components/auction/featured-lot.tsx", "utf8")).toMatch(/premium \? \(\s*<span data-featured-label[^>]*>\s*Featured/);
+    expect(readFileSync("components/auction/featured-lot.tsx", "utf8")).toMatch(/\{premium && <FeaturedBadge \/>\}/);
+    expect(readFileSync("components/auction/badges.tsx", "utf8")).toMatch(/<span data-featured-label[^>]*>\s*Featured\s*<\/span>/);
   });
 
   test("the carVertical logo is used only in the history report section", async ({}, info) => {
