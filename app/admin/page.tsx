@@ -106,6 +106,10 @@ export default async function AdminPage({ searchParams }: { searchParams: { tab?
         <Link href="/admin/messages" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
           Reported conversations
         </Link>
+        {" · "}
+        <Link href="/admin/premium-seats" className="font-semibold text-chalk underline underline-offset-4 hover:text-signal">
+          Premium seats
+        </Link>
       </p>
       <p className="mt-1 text-xs text-mute">
         Fake-listing checks, last 30 days: {checkedListings} {checkedListings === 1 ? "listing" : "listings"}, estimated API cost{" "}

@@ -257,6 +257,7 @@ export type NotificationType =
   | "bidding_unblocked" | "new_message" | "report_opened" | "report_resolved" | "account_blocked" | "selling_unblocked"
   | "viewing_update" | "conversation_reported" | "messaging_unblocked"
   | "identity_required" | "identity_verified" | "listing_on_hold" | "listing_needs_check" | "listing_edited"
+  | "premium_seat_paid" | "premium_seat_refunded" | "premium_seat_available"
   | "receipt_ready";
 
 /** A row of public.notifications (0009) with the car title joined in. */

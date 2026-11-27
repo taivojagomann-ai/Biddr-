@@ -14,6 +14,7 @@ import {
   PlayCircle,
   Send,
   Timer,
+  Star,
   TriangleAlert,
   Trophy,
   CircleX,
@@ -68,6 +69,9 @@ const ICONS: Record<NotificationType, LucideIcon> = {
   listing_on_hold: TriangleAlert,
   listing_needs_check: TriangleAlert,
   listing_edited: TriangleAlert,
+  premium_seat_paid: CircleCheck,
+  premium_seat_refunded: Receipt,
+  premium_seat_available: Star,
   receipt_ready: Receipt,
 };
 

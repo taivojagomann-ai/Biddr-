@@ -111,10 +111,10 @@ export async function renderInvoicePdf(inv: InvoiceRow, { testMode }: { testMode
   }
   text(formatCents(inv.total_cents), right, y + 15, { font: bold, size: 11, align: "right" });
   const sub = [
-    `Winning bid ${formatCents(inv.details.line.winningBid * 100)}`,
+    inv.details.line.winningBid != null ? `Winning bid ${formatCents(inv.details.line.winningBid * 100)}` : null,
     inv.details.line.basis,
     `Car located in ${countryName(inv.details.line.carCountry)}`,
-  ];
+  ].filter((x): x is string => Boolean(x));
   for (const s of sub) for (const l of wrap(s, regular, 9.5, descWidth)) {
     text(l, left, y, { size: 9.5, color: MUTE });
     y -= 13;
@@ -288,16 +288,17 @@ export async function renderReceiptPdf(r: ReceiptRow, { testMode }: { testMode: 
   rule(y);
   y -= 18;
   const descWidth = right - left - 120;
-  const desc = refund ? `Refund of the buyer's premium: ${r.details.reference.auctionTitle}` : r.details.line.description;
+  const seat = r.details.product === "premium_seat";
+  const desc = refund ? `Refund of the ${seat ? "premium seat" : "buyer's premium"}: ${r.details.reference.auctionTitle}` : r.details.line.description;
   for (const l of wrap(desc, bold, 11, descWidth)) {
     text(l, left, y, { font: bold, size: 11 });
     y -= 15;
   }
   text(formatCents(r.amount), right, y + 15, { font: bold, size: 11, align: "right" });
   for (const s of [
-    `Buyer's premium ${formatCents(r.details.line.premium * 100)}: ${r.details.line.basis}`,
-    `Winning bid ${formatCents(r.details.line.winningBid * 100)}`,
-  ]) for (const l of wrap(s, regular, 9.5, descWidth)) {
+    `${seat ? "Premium seat" : "Buyer's premium"} ${formatCents(r.details.line.premium * 100)}: ${r.details.line.basis}`,
+    r.details.line.winningBid != null ? `Winning bid ${formatCents(r.details.line.winningBid * 100)}` : null,
+  ].filter((x): x is string => Boolean(x))) for (const l of wrap(s, regular, 9.5, descWidth)) {
     text(l, left, y, { size: 9.5, color: MUTE });
     y -= 13;
   }
