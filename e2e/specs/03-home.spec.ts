@@ -30,7 +30,9 @@ test.describe("home page", () => {
     expect(await order("ending")).toEqual([href(live2)]);
     // Coming up: starting soonest first.
     expect(await order("upcoming")).toEqual([href(upcomingSoon), href(upcomingLate)]);
-    expect(await order("past")).toEqual([href(sold)]);
+    // Past results aren't shown publicly: an old ?status=past link shows Live, and a sold car appears nowhere.
+    expect(await order("past")).toEqual([href(live2), href(live1)]);
+    for (const status of ["", "newest", "ending", "upcoming"]) expect(await order(status)).not.toContain(href(sold));
     // Drafts never appear.
     await page.goto(`/?q=${model}`);
     await expect(page.locator(`a[href="${href(draft)}"]`)).toHaveCount(0);
@@ -47,7 +49,7 @@ test.describe("home page", () => {
     }
     await page.goto("/");
     const tabs = page.getByRole("navigation", { name: "Auction status" }).getByRole("link");
-    await expect(tabs).toHaveText(["Live", "Newly listed", "Ending in 24h", "Coming up", "Past results"]);
+    await expect(tabs).toHaveText(["Live", "Newly listed", "Ending in 24h", "Coming up"]);
     await expectAccessible(page, "Home");
   });
 
@@ -200,10 +202,12 @@ test.describe("home page", () => {
     }
   });
 
-  test("search suggestions work with the keyboard; no results offers past results", async ({ page }) => {
+  test("search suggestions work with the keyboard and offer only cars people can see now; no past results are offered", async ({ page }) => {
     const seller = await createUser({ role: "seller" });
     const model = tag();
-    await createAuction({ seller, make: "Porsche", model, status: "sold", startsAt: iso(-5 * DAY), endsAt: iso(-1 * DAY) });
+    const soldModel = tag();
+    await createAuction({ seller, make: "Porsche", model, status: "upcoming", startsAt: iso(1 * DAY), endsAt: iso(4 * DAY) });
+    await createAuction({ seller, make: "Porsche", model: soldModel, status: "sold", startsAt: iso(-5 * DAY), endsAt: iso(-1 * DAY) });
     await page.goto("/");
     const box = page.getByRole("combobox", { name: "Search make, model or year" });
     await box.click();
@@ -215,9 +219,15 @@ test.describe("home page", () => {
     await box.press("Enter");
     await expect(page).toHaveURL(/q=/);
     await expect(page.getByText(new RegExp(`No live results for “.*${model}”\\.`, "i"))).toBeVisible();
-    await page.getByRole("link", { name: /See 1 past result for/ }).click();
-    await expect(page).toHaveURL(/status=past/);
-    await expect(page.getByRole("heading", { name: /Results for .*\(1\)/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /past result/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Clear the search" })).toBeVisible();
+
+    // A car that has ended isn't suggested.
+    await page.goto("/");
+    await box.click();
+    await box.pressSequentially(soldModel.toLowerCase());
+    await page.waitForTimeout(800);
+    await expect(page.getByRole("listbox", { name: "Suggestions" }).getByRole("option").filter({ hasText: soldModel })).toHaveCount(0);
   });
 
   test("the country filter lists only countries with listings; history filters work", async ({ page }) => {

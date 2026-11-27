@@ -7,7 +7,6 @@ export const STATUS_TABS = [
   { value: "newest", label: "Newly listed" },
   { value: "ending", label: "Ending in 24h" },
   { value: "upcoming", label: "Coming up" },
-  { value: "past", label: "Past results" },
 ] as const;
 
 export type FeedStatus = (typeof STATUS_TABS)[number]["value"];
@@ -36,8 +35,6 @@ export function compareForTab(status: FeedStatus): (a: Sortable, b: Sortable) =>
       return (a, b) => time(b.starts_at) - time(a.starts_at);
     case "upcoming":
       return (a, b) => time(a.starts_at) - time(b.starts_at);
-    case "past":
-      return (a, b) => time(b.ends_at) - time(a.ends_at);
   }
 }
 

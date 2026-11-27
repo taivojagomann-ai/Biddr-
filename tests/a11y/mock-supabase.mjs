@@ -285,7 +285,7 @@ function searchSuggestions({ p_query, p_limit = 6 }) {
   const words = searchWords(p_query).filter((w) => !isYear(w));
   if (spaced(p_query).length < 2 || !words.length) return [];
   const groups = new Map();
-  for (const a of AUCTIONS.filter((x) => !["draft", "rejected"].includes(x.status))) {
+  for (const a of AUCTIONS.filter((x) => ["upcoming", "live"].includes(x.status))) { // 0037: only cars people can see now
     for (const [kind, label, model, variant] of [[0, a.make, null, null], [1, [a.make, a.model, a.variant].filter(Boolean).join(" "), a.model, a.variant ?? null]]) {
       const g = groups.get(label) ?? { kind, label, make: a.make, model, variant, listing_count: 0 };
       g.listing_count++;
