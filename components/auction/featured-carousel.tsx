@@ -7,6 +7,12 @@ import { FEATURED_AUTOPLAY_MS, compareFeatured, hasPremiumSeat, type FeaturedCar
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { FeaturedLot } from "./featured-lot";
 
+/** Slide timings: long enough to follow, short enough not to feel slow (Material-style 400–700 ms). */
+const SLIDE_MS = 650;
+const FADE_OUT_MS = 220;
+const FADE_IN_MS = 320;
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
 /**
  * The home page's featured carousel (DECISIONS.md point 9). One slide per featured car,
  * side by side with native scroll snap (swipe on touch, like the gallery), arrows on the
@@ -86,16 +92,70 @@ export function FeaturedCarousel({
 
   /** While the carousel scrolls itself to a slide, scroll events mustn't pick the slide. */
   const scrollTarget = useRef<number | null>(null);
+  /** The running slide animation, if any: stops it and puts the track back as it was. */
+  const stopAnimation = useRef<(() => void) | null>(null);
   const scrollToIndex = useCallback(
     (i: number, smooth: boolean) => {
       const track = trackRef.current;
       if (!track) return;
+      stopAnimation.current?.();
+      const from = track.scrollLeft;
+      const to = i * track.clientWidth;
       // Already there: no scroll event will come, so nothing to wait for.
-      scrollTarget.current = Math.abs(track.scrollLeft - i * track.clientWidth) < 2 ? null : i;
-      track.scrollTo({ left: i * track.clientWidth, behavior: smooth && !reducedMotion ? "smooth" : "auto" });
+      if (Math.abs(from - to) < 2) {
+        scrollTarget.current = null;
+        return;
+      }
+      scrollTarget.current = i;
+      // Snapping and CSS smooth scrolling would fight a scroll driven frame by frame.
+      track.style.scrollSnapType = "none";
+      track.style.scrollBehavior = "auto";
+      let frame = 0;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const restore = () => {
+        cancelAnimationFrame(frame);
+        clearTimeout(timer);
+        track.style.scrollSnapType = "";
+        track.style.scrollBehavior = "";
+        track.style.transition = "";
+        track.style.opacity = "";
+        stopAnimation.current = null;
+      };
+      // Stopped early (another move, a touch, leaving the page): stays where it is, and the
+      // next move or scroll snap carries on from there.
+      stopAnimation.current = restore;
+
+      if (!smooth || reducedMotion) {
+        track.scrollLeft = to;
+        restore();
+        return;
+      }
+      if (Math.abs(to - from) > track.clientWidth * 1.5) {
+        // Back to the first car (or any jump of several): a short cross-fade instead of
+        // sweeping past every car in between.
+        track.style.transition = `opacity ${FADE_OUT_MS}ms ease-out`;
+        track.style.opacity = "0";
+        timer = setTimeout(() => {
+          track.scrollLeft = to;
+          track.style.transition = `opacity ${FADE_IN_MS}ms ease-in`;
+          track.style.opacity = "1";
+          timer = setTimeout(restore, FADE_IN_MS);
+        }, FADE_OUT_MS);
+        return;
+      }
+      // Next or previous car: an eased glide (slow start, slow finish), not a jump.
+      const start = performance.now();
+      const step = (t: number) => {
+        const p = Math.min(1, (t - start) / SLIDE_MS);
+        track.scrollLeft = from + (to - from) * easeInOutCubic(p);
+        if (p < 1) frame = requestAnimationFrame(step);
+        else restore();
+      };
+      frame = requestAnimationFrame(step);
     },
     [reducedMotion],
   );
+  useEffect(() => () => stopAnimation.current?.(), []);
 
   // Re-sort by bids only while nobody is interacting; stay on the same car.
   useEffect(() => {
@@ -188,7 +248,12 @@ export function FeaturedCarousel({
       onBlurCapture={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusInside(false);
       }}
-      onTouchStart={() => setTouching(true)}
+      onTouchStart={() => {
+        // A finger takes over at once: the slide animation stops where it is.
+        stopAnimation.current?.();
+        scrollTarget.current = null;
+        setTouching(true);
+      }}
       onTouchEnd={() => setTouching(false)}
       onTouchCancel={() => setTouching(false)}
       onKeyDown={(e) => {
@@ -204,7 +269,7 @@ export function FeaturedCarousel({
       <div
         ref={trackRef}
         onScroll={onScroll}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {visible.map((a, i) => (
           <div
