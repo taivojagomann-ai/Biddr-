@@ -109,9 +109,10 @@ test.describe("home page", () => {
     await createAuction({ seller, endsAt: iso(2 * HOUR) });
     await createAuction({ seller, endsAt: iso(3 * HOUR) });
     const carousel = page.getByRole("region", { name: "Featured cars" });
-    const current = async () => Number(await carousel.getAttribute("data-current"));
-    const total = async () => carousel.locator("[data-slide]").count();
-    const next = (n: number, of: number) => (n % of) + 1;
+    // Other tests add and close cars at the same time, so the slide number can shift while
+    // the same car stays on screen: compare which car is shown, not its position.
+    const shown = () => carousel.locator('[data-slide]:not([aria-hidden="true"])').getAttribute("data-slide");
+    const movesOn = async (from: string | null) => expect.poll(shown, { timeout: 8_000 }).not.toBe(from);
 
     // Reduced motion: no autoplay. No Pause/Play button and no "1 / 2" text.
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -120,52 +121,52 @@ test.describe("home page", () => {
     await expect(carousel).toHaveAttribute("data-current", "1");
     await expect(carousel.getByRole("button", { name: /Pause featured cars|Play featured cars/ })).toHaveCount(0);
     await expect(carousel.getByText(/^\d+ \/ \d+$/)).toHaveCount(0);
+    const still = await shown();
     await page.waitForTimeout(6_500);
-    await expect(carousel).toHaveAttribute("data-current", "1");
+    expect(await shown()).toBe(still);
 
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/");
     await page.mouse.move(0, 0);
     // Plays by itself.
-    await expect(carousel).toHaveAttribute("data-current", "2", { timeout: 8_000 });
-    const of = await total();
+    await movesOn(await shown());
 
     if (!isMobile) {
       // Paused while the mouse is over it.
       await carousel.hover();
-      const at = await current();
+      const at = await shown();
       await page.waitForTimeout(6_500);
-      await expect(carousel).toHaveAttribute("data-current", String(at));
+      expect(await shown()).toBe(at);
       // Clicking an arrow moves it, and once the mouse leaves it carries on by itself
       // (the clicked arrow keeps focus, which used to stop it for good).
       await carousel.getByRole("button", { name: "Next featured car" }).click();
-      const clicked = next(at, of);
-      await expect(carousel).toHaveAttribute("data-current", String(clicked));
+      await movesOn(at);
+      const clicked = await shown();
       await page.mouse.move(0, 0);
-      await expect(carousel).toHaveAttribute("data-current", String(next(clicked, of)), { timeout: 8_000 });
+      await movesOn(clicked);
     } else {
       // A tap on an arrow moves it, and it carries on by itself afterwards.
-      const at = await current();
+      const at = await shown();
       await carousel.getByRole("button", { name: "Next featured car" }).tap();
-      const tapped = next(at, of);
-      await expect(carousel).toHaveAttribute("data-current", String(tapped));
-      await expect(carousel).toHaveAttribute("data-current", String(next(tapped, of)), { timeout: 8_000 });
+      await movesOn(at);
+      await movesOn(await shown());
     }
 
     // Paused while keyboard focus is inside (arrows and keys work).
     await carousel.getByRole("button", { name: "Next featured car" }).focus();
     await page.keyboard.press("Tab");
     await page.keyboard.press("Shift+Tab");
-    const before = await current();
+    const before = await shown();
     await page.keyboard.press("ArrowRight");
-    await expect(carousel).toHaveAttribute("data-current", String(next(before, of)));
+    await movesOn(before);
     await page.keyboard.press("ArrowLeft");
-    await expect(carousel).toHaveAttribute("data-current", String(before));
+    await expect.poll(shown).toBe(before);
     await page.waitForTimeout(6_500);
-    await expect(carousel).toHaveAttribute("data-current", String(before));
+    expect(await shown()).toBe(before);
     // The slides are named "Slide n of N", and a move by the user is announced.
     await expect(carousel.locator('[aria-roledescription="slide"]').first()).toHaveAttribute("aria-label", /^Slide 1 of \d+$/);
-    await expect(carousel.getByText(new RegExp(`^Slide ${before} of \\d+: `))).toBeAttached();
+    const n = await carousel.getAttribute("data-current");
+    await expect(carousel.getByText(new RegExp(`^Slide ${n} of \\d+: `))).toBeAttached();
 
     if (isMobile) {
       // Swipe: native scroll snap moves to the next car.
