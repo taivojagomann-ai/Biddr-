@@ -53,11 +53,11 @@ export function PremiumSeatRowActions({ purchaseId, auctionId, title, live }: { 
         <FieldNote error={fe.reason} hint={live ? "Live: there's no automatic refund; refund here only if you decide to." : undefined} />
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" disabled={pending} onClick={() => void run(refundPremiumSeat, { purchaseId, reason })}>
-          Refund<span className="sr-only"> the premium seat for {title}</span>
+        <Button type="button" variant="outline" disabled={pending} aria-label={`Refund the premium seat for ${title}`} onClick={() => void run(refundPremiumSeat, { purchaseId, reason })}>
+          Refund
         </Button>
-        <Button type="button" variant="outline" disabled={pending} onClick={() => void run(setPremiumSeat, { auctionId, on: false, reason })}>
-          Remove seat<span className="sr-only"> for {title}</span>
+        <Button type="button" variant="outline" disabled={pending} aria-label={`Remove seat for ${title}`} onClick={() => void run(setPremiumSeat, { auctionId, on: false, reason })}>
+          Remove seat
         </Button>
         <ActionMessage result={result} />
       </div>

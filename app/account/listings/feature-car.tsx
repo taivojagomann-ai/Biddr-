@@ -91,8 +91,8 @@ export function FeatureCar({ auctionId, title, offer }: { auctionId: string; tit
             }}
             className="pl-6"
           >
-            <Button type="submit" variant="outline" className="min-h-11">
-              Notify me when a place frees up<span className="sr-only">: {title}</span>
+            <Button type="submit" variant="outline" className="min-h-11" aria-label={`Notify me when a place frees up: ${title}`}>
+              Notify me when a place frees up
             </Button>
           </form>
         )}
@@ -125,9 +125,9 @@ export function FeatureCar({ auctionId, title, offer }: { auctionId: string; tit
 
   return (
     <div data-feature-state="available">
-      <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" className="min-h-11" onClick={() => setOpen(true)} aria-label={`Feature this car: ${title}`}>
         <Star aria-hidden />
-        Feature this car<span className="sr-only">: {title}</span>
+        Feature this car
       </Button>
       {done ? (
         <p role="status" className="mt-2 text-sm">
