@@ -14,9 +14,6 @@ import type { Auction, AuctionCard as AuctionCardData } from "@/lib/types";
 /** An active search (?q=), worked out on the server. */
 export interface FeedSearch {
   query: string;
-  /** Matches in Past results, offered when this tab has none. */
-  pastCount: number;
-  pastHref: string;
   clearHref: string;
 }
 
@@ -116,13 +113,6 @@ export function AuctionFeed({
             <>
               <p className="font-semibold">{noResultsText(status, search.query)}</p>
               <ul className="mt-3 flex flex-col items-center gap-2 text-sm">
-                {status !== "past" && search.pastCount > 0 && (
-                  <li>
-                    <Link href={search.pastHref} scroll={false} className="font-semibold text-signal underline underline-offset-4">
-                      See {search.pastCount} past {search.pastCount === 1 ? "result" : "results"} for “{search.query}”
-                    </Link>
-                  </li>
-                )}
                 <li>
                   <Link href={search.clearHref} scroll={false} className="text-chalk underline underline-offset-4">
                     Clear the search
@@ -133,7 +123,7 @@ export function AuctionFeed({
           ) : (
             <>
               <p className="font-semibold">No cars match these filters.</p>
-              <p className="mt-1 text-sm text-mute">Clear a filter, or check Past results to see what similar cars sold for.</p>
+              <p className="mt-1 text-sm text-mute">Clear a filter to see more cars.</p>
             </>
           )}
         </div>

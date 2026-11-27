@@ -23,8 +23,6 @@ export function noResultsText(status: FeedStatus, query: string): string {
       return `No results ending in 24h for ${q}.`;
     case "upcoming":
       return `No upcoming results for ${q}.`;
-    case "past":
-      return `No past results for ${q}.`;
     default:
       return `No live results for ${q}.`;
   }

@@ -100,10 +100,8 @@ function sellDraft(step: number) {
 
 const PUBLIC_PAGES = [
   ["Home", "/"],
-  ["Home, past results", "/?status=past"],
   ["Home, search with no results", "/?q=Lotus"],
   ["Home, search results", "/?q=bmw"],
-  ["Home, search with only past results", "/?q=c63"],
   ["Live auction", `/auctions/${LIVE}`],
   ["Restored car", `/auctions/${RESTORED}`],
   ["Upcoming auction", `/auctions/${UPCOMING}`],
@@ -421,7 +419,7 @@ test.describe("newly listed", () => {
   test("tabs are in order, Newly listed shows its count and announces it", async ({ page }) => {
     await page.goto("/");
     const tabs = page.getByRole("navigation", { name: "Auction status" }).getByRole("link");
-    await expect(tabs).toHaveText(["Live", "Newly listed", "Ending in 24h", "Coming up", "Past results"]);
+    await expect(tabs).toHaveText(["Live", "Newly listed", "Ending in 24h", "Coming up"]);
     await page.getByRole("link", { name: "Newly listed" }).click();
     await expect(page).toHaveURL(/\?status=newest/);
     await expect(page.getByRole("link", { name: "Newly listed" })).toHaveAttribute("aria-current", "page");
@@ -438,6 +436,13 @@ test.describe("newly listed", () => {
     await expect(page.getByRole("link", { name: "Live", exact: true })).toHaveAttribute("aria-current", "page");
   });
 
+  test("past results aren't shown publicly: no tab, and an old ?status=past link shows Live", async ({ page }) => {
+    await page.goto("/?status=past");
+    await expect(page.getByRole("link", { name: "Live", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("link", { name: "Past results" })).toHaveCount(0);
+    await expect(page.locator("article.auction-card", { hasText: "C 63 S" })).toHaveCount(0);
+  });
+
   test("cars that went live days ago have no New badge", async ({ page }) => {
     await page.goto("/?status=newest");
     const older = page.locator("article.auction-card", { hasText: "Audi RS 4" });
@@ -447,9 +452,9 @@ test.describe("newly listed", () => {
 
   test("on a narrow phone the active tab is scrolled into view", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 700 });
-    await page.goto("/?status=past");
+    await page.goto("/?status=upcoming");
     const nav = page.getByRole("navigation", { name: "Auction status" });
-    const active = nav.getByRole("link", { name: "Past results" });
+    const active = nav.getByRole("link", { name: "Coming up" });
     await expect(async () => {
       const n = await nav.boundingBox();
       const t = await active.boundingBox();
@@ -750,7 +755,7 @@ test.describe("search", () => {
     await box(page).click();
     await box(page).pressSequentially("merc");
     const list = page.getByRole("listbox", { name: "Suggestions" });
-    await expect(list.getByRole("option").first()).toHaveText("Mercedes-AMG (2 listings)");
+    await expect(list.getByRole("option").first()).toHaveText("Mercedes-AMG (1 listing)"); // the sold C 63 S isn't suggested (0037)
     await expect(box(page)).toHaveAttribute("aria-expanded", "true");
     await expectNoSeriousViolations(page, "Search suggestions", "[role=search]");
 
@@ -797,19 +802,16 @@ test.describe("search", () => {
     await page.getByLabel("History").selectOption("clean");
     await expect(page).toHaveURL(/condition=clean/);
     await expect(page).toHaveURL(/q=bmw/);
-    await page.getByRole("link", { name: "Past results" }).click();
-    await expect(page).toHaveURL(/status=past/);
+    await page.getByRole("link", { name: "Coming up" }).click();
+    await expect(page).toHaveURL(/status=upcoming/);
     await expect(page).toHaveURL(/q=bmw/);
     await expect(box(page)).toHaveValue("bmw");
   });
 
-  test("no live results offers past results and clearing the search", async ({ page }) => {
+  test("no live results offers clearing the search, never past results", async ({ page }) => {
     await page.goto("/?q=c63");
     await expect(page.getByText("No live results for “c63”.")).toBeVisible();
-    await page.getByRole("link", { name: "See 1 past result for “c63”" }).click();
-    await expect(page).toHaveURL(/status=past/);
-    await expect(page.getByRole("heading", { name: "Results for “c63” (1)" })).toBeVisible();
-    await expect(page.locator("article.auction-card", { hasText: "C 63 S" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /past result/ })).toHaveCount(0);
 
     await page.goto("/?q=Lotus");
     await expect(page.getByText("No live results for “Lotus”.")).toBeVisible();

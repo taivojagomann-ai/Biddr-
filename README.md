@@ -238,6 +238,7 @@ Migrations are applied by hand in the Supabase SQL Editor. Each file is idempote
 | `0021_payments_scheduling.sql` | Stripe webhook event log (`stripe_events`, service role only) and `call_app_job()`, which lets `pg_cron` call the site's protected job routes through `pg_net`; the card-hold release runs every 5 minutes | Run before deploying this version, then add the two Vault secrets (see "Scheduled jobs") |
 | `0020_history_reports.sql` | Vehicle history reports (carVertical): the seller's files, share link, sharing permission and Biddr's review on `auction_private`; `history_report_verified`, `history_summary` (2–8 lines, 200 characters each) and `history_report_public_link` (only when sharing is allowed) on `auctions`; the `history_report_rejected` notification type | Run before deploying this version (the sell form, admin review and auction page use it) |
 | `0019_admin_two_factor.sql` | `is_admin()` is true only after two-step verification (`aal2`), so admin rights in the database need the authenticator code too | Run when deploying this version (admins then sign in with Google and a code) |
+| `0037_search_suggestions_current_only.sql` | Search suggestions offer only makes and models of upcoming and live listings (past results aren't shown publicly) | Run before deploying this version |
 
 ## Vehicle history reports (carVertical)
 
@@ -429,8 +430,8 @@ The search box above the tabs replaces the old Make filter. It searches make, mo
   on conflict (alias) do update set canonical = excluded.canonical;
   ```
 - **Order.** Results keep the tab's order (Live: ending soonest first), with exact model matches first, so "m3" shows M3s before an M340i.
-- **Suggestions** appear from two characters: up to six makes and models from listings people can see, with counts, e.g. "Audi RS6 Avant (3)". Use the arrow keys and Enter, or Escape to close.
-- **The search is in the address** (`/?q=rs6`), so it can be shared and works with the tabs and the country and history filters. While searching, the featured car is hidden and the grid is titled "Results for “rs6” (3)". With no results the page offers past results for the same search, when there are any.
+- **Suggestions** appear from two characters: up to six makes and models from upcoming and live listings, with counts (0037), e.g. "Audi RS6 Avant (3)". Use the arrow keys and Enter, or Escape to close.
+- **The search is in the address** (`/?q=rs6`), so it can be shared and works with the tabs and the country and history filters. While searching, the featured car is hidden and the grid is titled "Results for “rs6” (3)". With no results the page offers to clear the search. Past results (ended and sold cars) aren't shown publicly: there is no Past results tab, and an old `?status=past` link shows Live.
 - Drafts and rejected listings never appear: the search functions run with the visitor's own permissions, so the usual access rules apply.
 
 ## Demo data (for testing)

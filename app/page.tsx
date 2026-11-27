@@ -42,8 +42,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   let data: AuctionCard[] | null;
   let error: unknown;
   let count: number | null;
-  // With a search, how many past results exist (offered when the tab has none).
-  let pastCount = 0;
 
   if (q) {
     // search_auctions (0012): every word must match, ordered like the tab with exact
@@ -59,10 +57,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
     error = res.error;
     data = (res.data ?? []).map(({ sort_rank: _rank, total_count: _total, ...card }) => card);
     count = res.data?.[0] ? Number(res.data[0].total_count) : 0;
-    if (!error && count === 0 && status !== "past") {
-      const past = await searchTab("past", 1);
-      pastCount = past.data?.[0] ? Number(past.data[0].total_count) : 0;
-    }
   } else {
     // count: total matches for the tab (the grid shows up to 48), for the heading and announcement.
     let query = supabase.from("auctions").select(AUCTION_CARD_COLUMNS, { count: "exact" }).limit(48);
@@ -83,9 +77,6 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
         break;
       case "upcoming":
         query = query.eq("status", "upcoming").order("starts_at", { ascending: true });
-        break;
-      case "past":
-        query = query.in("status", ["ended", "sold", "reserve_not_met"]).order("ends_at", { ascending: false });
         break;
     }
 
@@ -132,18 +123,16 @@ export default async function HomePage({ searchParams }: { searchParams: SearchP
   const search = q
     ? {
         query: q,
-        pastCount,
-        pastHref: homeHref({ status: "past", q, country, condition }),
         clearHref: homeHref({ status: status === "live" ? null : status, country, condition }),
       }
     : null;
 
-  // The country filter offers only countries that have listings people can see
-  // (plus the one in the address, so it never disappears while selected).
+  // The country filter offers only countries with upcoming or live listings (past results
+  // aren't shown publicly), plus the one in the address so it never disappears while selected.
   const { data: countryRows } = await supabase
     .from("auctions")
     .select("location_country")
-    .in("status", ["upcoming", "live", "ended", "sold", "reserve_not_met"])
+    .in("status", ["upcoming", "live"])
     .returns<{ location_country: Country }[]>();
   const present = new Set<Country>((countryRows ?? []).map((r) => r.location_country));
   if (country) present.add(country);
