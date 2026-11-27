@@ -104,70 +104,76 @@ test.describe("home page", () => {
     await expect(slide(laterPremium.id)).toHaveCount(0);
   });
 
-  test("carousel controls: plays every 5 s, pauses on hover, focus and the Pause button, never by itself with reduced motion; arrows, keys and swipe", async ({ page, isMobile }) => {
+  test("carousel controls: plays every 5 s and keeps playing after the arrows are clicked; pauses on mouse hover, keyboard focus and touch, never with reduced motion; no Pause button or position text; arrows, keys and swipe", async ({ page, isMobile }) => {
     const seller = await createUser({ role: "seller" });
     await createAuction({ seller, endsAt: iso(2 * HOUR) });
     await createAuction({ seller, endsAt: iso(3 * HOUR) });
     const carousel = page.getByRole("region", { name: "Featured cars" });
-    const position = carousel.locator("[data-carousel-position]");
+    const current = async () => Number(await carousel.getAttribute("data-current"));
+    const total = async () => carousel.locator("[data-slide]").count();
+    const next = (n: number, of: number) => (n % of) + 1;
 
-    // Reduced motion: no autoplay.
+    // Reduced motion: no autoplay. No Pause/Play button and no "1 / 2" text.
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await expect(carousel).toHaveAttribute("aria-roledescription", "carousel");
-    await expect(position).toHaveText(/^1 \/ \d+$/);
-    await expect(carousel.getByRole("button", { name: "Play featured cars automatically" })).toBeVisible();
+    await expect(carousel).toHaveAttribute("data-current", "1");
+    await expect(carousel.getByRole("button", { name: /Pause featured cars|Play featured cars/ })).toHaveCount(0);
+    await expect(carousel.getByText(/^\d+ \/ \d+$/)).toHaveCount(0);
     await page.waitForTimeout(6_500);
-    await expect(position).toHaveText(/^1 \//);
+    await expect(carousel).toHaveAttribute("data-current", "1");
 
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto("/");
     await page.mouse.move(0, 0);
-    await expect(carousel.getByRole("button", { name: "Pause featured cars" })).toBeVisible();
     // Plays by itself.
-    await expect(position).toHaveText(/^2 \//, { timeout: 8_000 });
+    await expect(carousel).toHaveAttribute("data-current", "2", { timeout: 8_000 });
+    const of = await total();
+
     if (!isMobile) {
-      // Paused while the pointer is over it.
+      // Paused while the mouse is over it.
       await carousel.hover();
-      const at = await position.innerText();
+      const at = await current();
       await page.waitForTimeout(6_500);
-      await expect(position).toHaveText(at);
+      await expect(carousel).toHaveAttribute("data-current", String(at));
+      // Clicking an arrow moves it, and once the mouse leaves it carries on by itself
+      // (the clicked arrow keeps focus, which used to stop it for good).
+      await carousel.getByRole("button", { name: "Next featured car" }).click();
+      const clicked = next(at, of);
+      await expect(carousel).toHaveAttribute("data-current", String(clicked));
       await page.mouse.move(0, 0);
+      await expect(carousel).toHaveAttribute("data-current", String(next(clicked, of)), { timeout: 8_000 });
+    } else {
+      // A tap on an arrow moves it, and it carries on by itself afterwards.
+      const at = await current();
+      await carousel.getByRole("button", { name: "Next featured car" }).tap();
+      const tapped = next(at, of);
+      await expect(carousel).toHaveAttribute("data-current", String(tapped));
+      await expect(carousel).toHaveAttribute("data-current", String(next(tapped, of)), { timeout: 8_000 });
     }
+
     // Paused while keyboard focus is inside (arrows and keys work).
     await carousel.getByRole("button", { name: "Next featured car" }).focus();
-    const before = Number((await position.innerText()).split(" ")[0]);
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+    const before = await current();
     await page.keyboard.press("ArrowRight");
-    const afterKey = Number((await position.innerText()).split(" ")[0]);
-    expect(afterKey === before + 1 || afterKey === 1).toBe(true);
+    await expect(carousel).toHaveAttribute("data-current", String(next(before, of)));
     await page.keyboard.press("ArrowLeft");
-    await expect(position).toHaveText(new RegExp(`^${before} /`));
+    await expect(carousel).toHaveAttribute("data-current", String(before));
     await page.waitForTimeout(6_500);
-    await expect(position).toHaveText(new RegExp(`^${before} /`));
-    await carousel.getByRole("button", { name: "Previous featured car" }).click();
-    await carousel.getByRole("button", { name: "Next featured car" }).click();
-    await expect(position).toHaveText(new RegExp(`^${before} /`));
+    await expect(carousel).toHaveAttribute("data-current", String(before));
     // The slides are named "Slide n of N", and a move by the user is announced.
     await expect(carousel.locator('[aria-roledescription="slide"]').first()).toHaveAttribute("aria-label", /^Slide 1 of \d+$/);
     await expect(carousel.getByText(new RegExp(`^Slide ${before} of \\d+: `))).toBeAttached();
 
-    // The Pause button stops it even with the pointer away and focus gone.
-    await carousel.getByRole("button", { name: "Pause featured cars" }).click();
-    await page.locator("body").click({ position: { x: 1, y: 1 } });
-    await page.mouse.move(0, 0);
-    const paused = await position.innerText();
-    await page.waitForTimeout(6_500);
-    await expect(position).toHaveText(paused);
-    await expect(carousel.getByRole("button", { name: "Play featured cars automatically" })).toBeVisible();
-
     if (isMobile) {
       // Swipe: native scroll snap moves to the next car.
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto("/");
-      await carousel.getByRole("button", { name: "Pause featured cars" }).click();
-      await page.locator("body").click({ position: { x: 1, y: 1 } });
       const track = carousel.locator("[data-slide]").first().locator("..");
       await track.evaluate((el) => el.scrollBy({ left: el.clientWidth, behavior: "instant" as ScrollBehavior }));
-      await expect(position).toHaveText(/^2 \//);
+      await expect(carousel).toHaveAttribute("data-current", "2");
       await expectNoHorizontalScroll(page, "Home carousel on a phone");
     }
   });

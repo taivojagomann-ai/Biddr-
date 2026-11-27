@@ -1240,13 +1240,13 @@ test("the featured carousel: a labelled region of slides, Featured disclosed, co
   await expect(carousel.locator("[data-featured-label]")).toHaveText("Featured");
   await expect(carousel.getByRole("button", { name: "Previous featured car" })).toBeVisible();
   await expect(carousel.getByRole("button", { name: "Next featured car" })).toBeVisible();
-  // Reduced motion: it doesn't play by itself, and the button offers Play.
-  await expect(carousel.getByRole("button", { name: "Play featured cars automatically" })).toBeVisible();
-  await expect(carousel.locator("[data-carousel-position]")).toHaveText("1 / 2");
+  // Reduced motion: it doesn't play by itself. No Pause/Play button or "1 / 2" text.
+  await expect(carousel.getByRole("button", { name: /Pause featured cars|Play featured cars/ })).toHaveCount(0);
+  await expect(carousel).toHaveAttribute("data-current", "1");
   const shown = carousel.locator('[aria-roledescription="slide"]:not([aria-hidden="true"])');
   await expect(shown.getByText("Ends in", { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, "Featured carousel");
   await carousel.getByRole("button", { name: "Next featured car" }).click();
-  await expect(carousel.locator("[data-carousel-position]")).toHaveText("2 / 2");
+  await expect(carousel).toHaveAttribute("data-current", "2");
   await expect(carousel.getByText(/^Slide 2 of 2: /)).toBeAttached();
 });

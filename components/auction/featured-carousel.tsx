@@ -1,19 +1,18 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimePostgresUpdatePayload } from "@supabase/supabase-js";
-import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useServerNow } from "@/hooks/use-server-clock";
 import { FEATURED_AUTOPLAY_MS, compareFeatured, hasPremiumSeat, type FeaturedCard } from "@/lib/featured";
 import { getBrowserSupabase } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
 import { FeaturedLot } from "./featured-lot";
 
 /**
  * The home page's featured carousel (DECISIONS.md point 9). One slide per featured car,
  * side by side with native scroll snap (swipe on touch, like the gallery), arrows on the
- * edges, left/right keys, "2 / 6" below. Plays every 5 seconds, except: paused by the
- * button, while the pointer is over it, while focus is inside, during a touch, and never
- * with prefers-reduced-motion (WCAG 2.2.2). Realtime bids update the slides; a car that
+ * edges, left/right keys. Plays every 5 seconds and keeps playing after the user moves it
+ * (arrows, swipe); it pauses only while a mouse pointer is over it, while keyboard focus is
+ * inside, during a touch, and never plays with prefers-reduced-motion. Realtime bids update the slides; a car that
  * closes leaves at once; re-sorting by bids waits until nobody is interacting, so a slide
  * never jumps away while someone looks at it.
  */
@@ -30,8 +29,6 @@ export function FeaturedCarousel({
 }) {
   const [items, setItems] = useState(initial);
   const [current, setCurrent] = useState(0);
-  /** "auto": plays unless reduced motion or someone interacts; "paused"/"playing": the user chose. */
-  const [mode, setMode] = useState<"auto" | "paused" | "playing">("auto");
   const [hovering, setHovering] = useState(false);
   const [focusInside, setFocusInside] = useState(false);
   const [touching, setTouching] = useState(false);
@@ -132,11 +129,9 @@ export function FeaturedCarousel({
     [visible, scrollToIndex],
   );
 
-  // Autoplay. Pressing Play overrides the hover and focus pauses (focus is on the button);
-  // a touch still pauses it.
-  const playing =
-    visible.length > 1 && !touching && (mode === "playing" || (mode === "auto" && !reducedMotion && !hovering && !focusInside));
-  const showsPlaying = mode === "playing" || (mode === "auto" && !reducedMotion);
+  // Autoplay. Each move (by itself or by the user) starts the 5 seconds again, so after
+  // clicking an arrow it carries on from that car.
+  const playing = visible.length > 1 && !reducedMotion && !touching && !hovering && !focusInside;
   // The clock re-renders the carousel every second (and with it goTo), so the timer must
   // depend only on whether it plays and which slide is shown, or it would restart forever.
   const goToRef = useRef(goTo);
@@ -176,10 +171,20 @@ export function FeaturedCarousel({
       aria-roledescription="carousel"
       aria-label="Featured cars"
       data-featured-carousel
+      data-current={current + 1}
       className="relative"
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
-      onFocusCapture={() => setFocusInside(true)}
+      // Only a real mouse pauses it: a tap fires emulated mouse events that never "leave",
+      // which used to stop the carousel for good on phones.
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") setHovering(true);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType === "mouse") setHovering(false);
+      }}
+      // Only keyboard focus pauses it: a clicked arrow keeps focus, and that used to stop it.
+      onFocusCapture={(e) => {
+        if ((e.target as Element).matches(":focus-visible")) setFocusInside(true);
+      }}
       onBlurCapture={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusInside(false);
       }}
@@ -241,28 +246,10 @@ export function FeaturedCarousel({
         </>
       ) : null}
 
-      <div className="mt-2 flex items-center justify-center gap-3 text-sm">
-        {total > 1 ? (
-          <button
-            type="button"
-            onClick={() => setMode(showsPlaying ? "paused" : "playing")}
-            aria-label={showsPlaying ? "Pause featured cars" : "Play featured cars automatically"}
-            data-carousel-pause
-            className={cn(
-              "grid size-11 place-items-center rounded-full border border-field text-chalk hover:border-chalk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal",
-            )}
-          >
-            {showsPlaying ? <Pause aria-hidden className="size-4" /> : <Play aria-hidden className="size-4" />}
-          </button>
-        ) : null}
-        <p data-carousel-position aria-hidden className="tabular text-mute">
-          {current + 1} / {total}
-        </p>
-        {/* Announces the slide when the user moves the carousel; quiet while it plays by itself. */}
-        <p aria-live={userMoved ? "polite" : "off"} className="sr-only">
-          {`Slide ${current + 1} of ${total}: ${visible[current]?.title ?? ""}`}
-        </p>
-      </div>
+      {/* Announces the slide when the user moves the carousel; quiet while it plays by itself. */}
+      <p aria-live={userMoved ? "polite" : "off"} className="sr-only">
+        {`Slide ${current + 1} of ${total}: ${visible[current]?.title ?? ""}`}
+      </p>
     </section>
   );
 }
