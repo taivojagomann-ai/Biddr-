@@ -87,10 +87,14 @@ export function FeaturedCarousel({
     };
   }, []);
 
+  /** While the carousel scrolls itself to a slide, scroll events mustn't pick the slide. */
+  const scrollTarget = useRef<number | null>(null);
   const scrollToIndex = useCallback(
     (i: number, smooth: boolean) => {
       const track = trackRef.current;
       if (!track) return;
+      // Already there: no scroll event will come, so nothing to wait for.
+      scrollTarget.current = Math.abs(track.scrollLeft - i * track.clientWidth) < 2 ? null : i;
       track.scrollTo({ left: i * track.clientWidth, behavior: smooth && !reducedMotion ? "smooth" : "auto" });
     },
     [reducedMotion],
@@ -151,6 +155,12 @@ export function FeaturedCarousel({
     const track = trackRef.current;
     if (!track || !track.clientWidth) return;
     const i = Math.round(track.scrollLeft / track.clientWidth);
+    if (scrollTarget.current !== null) {
+      // Our own scroll: done once it arrives; a touch takes over at once.
+      if (i === scrollTarget.current && Math.abs(track.scrollLeft - i * track.clientWidth) < 2) scrollTarget.current = null;
+      if (!touching) return;
+      scrollTarget.current = null;
+    }
     if (i !== current && visible[i]) {
       setCurrent(i);
       currentId.current = visible[i]!.id;
