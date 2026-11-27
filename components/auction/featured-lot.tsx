@@ -49,7 +49,7 @@ export function FeaturedLot({
                 Featured
               </span>
             ) : null}
-            <span>{premium ? "Paid placement" : "Ending within 24 hours"}</span>
+            {premium ? null : <span>Ending within 24 hours</span>}
           </p>
           <h2 className="mt-1 text-2xl font-bold leading-tight md:text-3xl">
             <Link href={`/auctions/${auction.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
